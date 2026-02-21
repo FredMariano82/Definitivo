@@ -1,0 +1,1195 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import {
+  Filter,
+  Search,
+  X,
+  CheckCircle,
+  XCircle,
+  Clock,
+  ShieldAlert,
+  Columns,
+  ChevronLeft,
+  ChevronRight,
+  Check,
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import type { Solicitacao, PrestadorAvaliacao } from "../../types"
+import { StatusCadastroBadge, StatusCadastroIcon, getChecagemStatus, getCadastroStatus } from "../ui/status-badges"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { getAllSolicitacoes } from "../../services/solicitacoes-service"
+import { supabase } from "@/lib/supabase"
+import { formatarDataParaBR } from "../../utils/date-helpers"
+import { Badge } from "../ui/badge"
+import * as XLSX from "xlsx"
+import { DataInicialIndicator } from "../../utils/date-indicators"
+
+type StatusCadastro = "pendente" | "ok" | "urgente" | "vencida" | "negada"
+
+// Definir todas as colunas disponíveis
+const COLUNAS_DISPONIVEIS = [
+  { key: "prestador", label: "Prestador" },
+  { key: "documento", label: "Documento" },
+  { key: "dataInicial", label: "Data Inicial" },
+  { key: "dataFinal", label: "Data Final" },
+  { key: "liberacao", label: "Liberação" },
+  { key: "checagem", label: "Checagem" },
+  { key: "validaAte", label: "Válida até" },
+  { key: "acoes", label: "Ações" },
+  { key: "justificativa", label: "Justificativa" },
+]
+
+const PRESTADORES_POR_PAGINA = 10
+
+export default function TodasSolicitacoes() {
+  const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([])
+  const [carregando, setCarregando] = useState(true)
+  const [carregandoDownload, setCarregandoDownload] = useState(false)
+  const [filtroStatus, setFiltroStatus] = useState<string>("todos")
+  const [filtroCadastro, setFiltroCadastro] = useState<string>("todos")
+  const [filtroDepartamento, setFiltroDepartamento] = useState<string>("todos")
+  const [buscaGeral, setBuscaGeral] = useState("")
+  const [detalhesSolicitacao, setDetalhesSolicitacao] = useState<Solicitacao | null>(null)
+  const [popoverAberto, setPopoverAberto] = useState<string | null>(null)
+  const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null)
+  const [modalColunasAberto, setModalColunasAberto] = useState(false)
+  const [paginaAtual, setPaginaAtual] = useState(1)
+
+  // 🆕 Estados para Modal de Observações (Negado)
+  const [modalObservacoesAberto, setModalObservacoesAberto] = useState(false)
+  const [prestadorSelecionado, setPrestadorSelecionado] = useState<{
+    solicitacao: Solicitacao
+    prestador: PrestadorAvaliacao
+  } | null>(null)
+  const [observacoes, setObservacoes] = useState("")
+  const [carregandoNegacao, setCarregandoNegacao] = useState(false)
+
+  // Estado para controlar colunas visíveis
+  const [colunasVisiveis, setColunasVisiveis] = useState<Record<string, boolean>>(() => {
+    // Tentar carregar do localStorage
+    if (typeof window !== "undefined") {
+      const salvas = localStorage.getItem("admin-colunas-visiveis")
+      if (salvas) {
+        return JSON.parse(salvas)
+      }
+    }
+    // Estado inicial: todas as colunas visíveis
+    const estadoInicial = COLUNAS_DISPONIVEIS.reduce(
+      (acc, coluna) => {
+        acc[coluna.key] = true
+        return acc
+      },
+      {} as Record<string, boolean>,
+    )
+    return estadoInicial
+  })
+
+  // Carregar solicitações do banco
+  useEffect(() => {
+    buscarSolicitacoes()
+  }, [])
+
+  // Salvar preferências no localStorage sempre que mudar
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("admin-colunas-visiveis", JSON.stringify(colunasVisiveis))
+    }
+  }, [colunasVisiveis])
+
+  // Resetar página quando filtros mudarem
+  useEffect(() => {
+    setPaginaAtual(1)
+  }, [filtroStatus, filtroCadastro, filtroDepartamento, buscaGeral])
+
+  const buscarSolicitacoes = async () => {
+    try {
+      setCarregando(true)
+      console.log("🔍 PRODUÇÃO REAL: Buscando solicitações...")
+      const dados = await getAllSolicitacoes()
+      console.log("📊 PRODUÇÃO REAL: Dados carregados:", dados.length, "solicitações")
+
+      // DEBUG: Verificar se justificativa está sendo carregada
+      dados.forEach((sol, i) => {
+        sol.prestadores?.forEach((prest, j) => {
+          if (prest.justificativa) {
+            console.log(`✅ PRODUÇÃO REAL: Justificativa encontrada - Sol ${i}, Prest ${j}:`, prest.justificativa)
+          }
+        })
+      })
+
+      setSolicitacoes(dados)
+    } catch (error) {
+      console.error("❌ PRODUÇÃO REAL: Erro:", error)
+    } finally {
+      setCarregando(false)
+    }
+  }
+
+  const departamentos = Array.from(new Set(solicitacoes.map((s) => s.departamento)))
+
+  const normalizarTexto = (texto: string) => {
+    return texto
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+      .replace(/[^\w\s]/g, "") // Remove pontuação
+      .replace(/\s+/g, " ") // Normaliza espaços
+      .trim()
+  }
+
+  // Função para normalizar documento (remove pontos, traços, espaços)
+  const normalizarDocumento = (documento: string) => {
+    return documento.replace(/[.\-\s]/g, "").toLowerCase()
+  }
+
+  // 🆕 NOVA FUNÇÃO DE PRIORIDADE COM AS REGRAS ATUALIZADAS
+  const getPrioridade = (prestador: PrestadorAvaliacao, dataInicial: string) => {
+    const cadastroStatus = prestador.cadastro.toLowerCase()
+    const checagemStatus = prestador.status.toLowerCase()
+
+    // PRIORIDADE 5 (MAIS BAIXA): Qualquer STATUS + CADASTRO = "ok" OU "negada"
+    if (cadastroStatus === "ok" || cadastroStatus === "negada") {
+      return 5
+    }
+
+    // PRIORIDADE 1 (MAIS ALTA): STATUS = "excecao" + CADASTRO = ("urgente" OU "pendente")
+    if (checagemStatus === "excecao" && (cadastroStatus === "urgente" || cadastroStatus === "pendente")) {
+      return 1
+    }
+
+    // PRIORIDADE 2: STATUS = "reprovado" + CADASTRO = ("urgente" OU "pendente")
+    if (checagemStatus === "reprovado" && (cadastroStatus === "urgente" || cadastroStatus === "pendente")) {
+      return 2
+    }
+
+    // PRIORIDADE 3: STATUS = "aprovado" + CADASTRO = ("urgente" OU "pendente")
+    if (checagemStatus === "aprovado" && (cadastroStatus === "urgente" || cadastroStatus === "pendente")) {
+      return 3
+    }
+
+    // PRIORIDADE 4 (MÉDIA): Todos os outros casos
+    return 4
+  }
+
+  // 🆕 FUNÇÃO PARA CALCULAR DIAS ATÉ DATA INICIAL (para critério de desempate)
+  const getDiasAteDataInicial = (dataInicial: string): number => {
+    try {
+      // Converter data DD/MM/YYYY para Date
+      const [dia, mes, ano] = dataInicial.split("/").map(Number)
+      const dataInicialDate = new Date(ano, mes - 1, dia)
+      const hoje = new Date()
+
+      // Zerar horas para comparar apenas datas
+      hoje.setHours(0, 0, 0, 0)
+      dataInicialDate.setHours(0, 0, 0, 0)
+
+      // Calcular diferença em dias
+      const diffTime = dataInicialDate.getTime() - hoje.getTime()
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+      return diffDays
+    } catch (error) {
+      console.error("Erro ao calcular dias até data inicial:", error)
+      return 999 // Valor alto para colocar no final em caso de erro
+    }
+  }
+
+  // 🆕 FUNÇÃO PARA VERIFICAR SE BOTÕES DEVEM ESTAR HABILITADOS
+  const isBotoesHabilitados = (prestador: PrestadorAvaliacao): boolean => {
+    return prestador.status.toLowerCase() !== "pendente"
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "aprovado":
+        return <CheckCircle className="h-4 w-4 text-green-600" />
+      case "reprovado":
+      case "reprovada":
+        return <XCircle className="h-4 w-4 text-red-600" />
+      case "pendente":
+        return <Clock className="h-4 w-4 text-yellow-600" />
+      case "excecao":
+        return <ShieldAlert className="h-4 w-4 text-purple-600" />
+      default:
+        return null
+    }
+  }
+
+  // Função para alternar visibilidade da coluna
+  const toggleColuna = (chaveColuna: string) => {
+    setColunasVisiveis((prev) => ({
+      ...prev,
+      [chaveColuna]: !prev[chaveColuna],
+    }))
+  }
+
+  // Função para mostrar/esconder todas as colunas
+  const toggleTodasColunas = (mostrar: boolean) => {
+    const novoEstado = COLUNAS_DISPONIVEIS.reduce(
+      (acc, coluna) => {
+        acc[coluna.key] = mostrar
+        return acc
+      },
+      {} as Record<string, boolean>,
+    )
+    setColunasVisiveis(novoEstado)
+  }
+
+  // Filtrar solicitações e prestadores baseado nos filtros
+  const dadosIniciais = solicitacoes
+    .map((solicitacao) => {
+      // Filtro de departamento
+      const deptMatch = filtroDepartamento === "todos" || solicitacao.departamento === filtroDepartamento
+
+      if (!deptMatch) return null
+
+      // Filtrar prestadores dentro da solicitação
+      const prestadoresFiltrados = solicitacao.prestadores
+        ? solicitacao.prestadores.filter((prestador) => {
+          // Calcular status real para filtros
+          const checagemStatusReal = getChecagemStatus(prestador)
+          const cadastroStatusReal = getCadastroStatus(prestador, solicitacao.dataFinal)
+
+          // Filtro de status checagem (incluindo status calculados)
+          let statusMatch = filtroStatus === "todos"
+          if (filtroStatus === "vencida") {
+            statusMatch = checagemStatusReal === "vencida"
+          } else if (filtroStatus !== "todos") {
+            // CORREÇÃO: Mapear filtro para status do banco
+            const statusParaFiltro =
+              filtroStatus === "aprovado" ? "aprovado" : filtroStatus === "reprovado" ? "reprovado" : filtroStatus
+            statusMatch = prestador.status === statusParaFiltro
+          }
+
+          // Filtro de cadastro (incluindo status calculados)
+          let cadastroMatch = filtroCadastro === "todos"
+          if (filtroCadastro === "vencida") {
+            cadastroMatch = cadastroStatusReal === "vencida"
+          } else if (filtroCadastro === "negada") {
+            cadastroMatch = cadastroStatusReal === "negada"
+          } else if (filtroCadastro !== "todos") {
+            cadastroMatch = prestador.cadastro === filtroCadastro
+          }
+
+          // Filtro de busca geral
+          let buscaMatch = true
+          if (buscaGeral.trim()) {
+            const termoBusca = buscaGeral.trim()
+            const nomeNormalizado = normalizarTexto(prestador.nome)
+            const documentoNormalizado = normalizarDocumento(prestador.documento)
+            const termoBuscaNormalizado = normalizarTexto(termoBusca)
+            const termoBuscaDocumento = normalizarDocumento(termoBusca)
+
+            buscaMatch =
+              nomeNormalizado.includes(termoBuscaNormalizado) || documentoNormalizado.includes(termoBuscaDocumento)
+          }
+
+          return statusMatch && cadastroMatch && buscaMatch
+        })
+        : []
+
+      // Retornar solicitação apenas se tiver prestadores que passaram no filtro
+      if (prestadoresFiltrados.length > 0) {
+        return {
+          ...solicitacao,
+          prestadores: prestadoresFiltrados,
+        }
+      }
+
+      return null
+    })
+    .filter((solicitacao) => solicitacao !== null) as Solicitacao[]
+
+  // 🆕 ORDENAÇÃO COM NOVAS REGRAS DE PRIORIDADE
+  const todosPrestadoresFiltrados = dadosIniciais
+    .flatMap((solicitacao) =>
+      solicitacao.prestadores
+        ? solicitacao.prestadores.map((prestador) => ({
+          solicitacao,
+          prestador,
+          prioridade: getPrioridade(prestador, solicitacao.dataInicial),
+          diasAteDataInicial: getDiasAteDataInicial(solicitacao.dataInicial),
+        }))
+        : [],
+    )
+    .sort((a, b) => {
+      // 1. Ordenar por prioridade (menor número = maior prioridade)
+      if (a.prioridade !== b.prioridade) {
+        return a.prioridade - b.prioridade
+      }
+
+      // 2. Critério de desempate: Data Inicial mais próxima ou igual à atual
+      // (menor número de dias = mais urgente)
+      if (a.diasAteDataInicial !== b.diasAteDataInicial) {
+        return a.diasAteDataInicial - b.diasAteDataInicial
+      }
+
+      // 3. Se ainda empatar, ordenar por data de solicitação (mais recente primeiro)
+      const dataA = new Date(a.solicitacao.dataSolicitacao.split("/").reverse().join("-"))
+      const dataB = new Date(b.solicitacao.dataSolicitacao.split("/").reverse().join("-"))
+      return dataB.getTime() - dataA.getTime()
+    })
+
+  // Calcular paginação
+  const totalPrestadores = todosPrestadoresFiltrados.length
+  const totalPaginas = Math.ceil(totalPrestadores / PRESTADORES_POR_PAGINA)
+  const indiceInicio = (paginaAtual - 1) * PRESTADORES_POR_PAGINA
+  const indiceFim = indiceInicio + PRESTADORES_POR_PAGINA
+  const dadosFiltrados = todosPrestadoresFiltrados.slice(indiceInicio, indiceFim)
+
+  const handleEditarClick = (prestadorId: string) => {
+    setPopoverAberto(prestadorId)
+    setMensagemSucesso(null)
+  }
+
+  // 🆕 Função para abrir modal de observações (Negado)
+  const handleNegarClick = (solicitacao: Solicitacao, prestador: PrestadorAvaliacao) => {
+    setPrestadorSelecionado({ solicitacao, prestador })
+    setObservacoes("")
+    setModalObservacoesAberto(true)
+  }
+
+  // 🆕 Função para confirmar negação com observações
+  const handleConfirmarNegacao = async () => {
+    if (!prestadorSelecionado || !observacoes.trim()) {
+      alert("Por favor, preencha as observações antes de confirmar.")
+      return
+    }
+
+    try {
+      setCarregandoNegacao(true)
+      console.log("🔴 PRODUÇÃO REAL: Negando prestador com observações...")
+
+      const { error } = await supabase
+        .from("prestadores")
+        .update({
+          cadastro: "negada",
+          observacoes: observacoes.trim(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", prestadorSelecionado.prestador.id)
+
+      if (error) {
+        console.error("❌ PRODUÇÃO REAL: Erro ao negar prestador:", error)
+        alert(`Erro ao negar prestador: ${error.message}`)
+        return
+      }
+
+      console.log("✅ PRODUÇÃO REAL: Prestador negado com sucesso!")
+
+      // Atualizar estado local
+      setSolicitacoes((prevSolicitacoes) =>
+        prevSolicitacoes.map((s) =>
+          s.id === prestadorSelecionado.solicitacao.id
+            ? {
+              ...s,
+              prestadores: s.prestadores
+                ? s.prestadores.map((p) =>
+                  p.id === prestadorSelecionado.prestador.id
+                    ? { ...p, cadastro: "negada" as StatusCadastro, observacoes: observacoes.trim() }
+                    : p,
+                )
+                : [],
+            }
+            : s,
+        ),
+      )
+
+      // Fechar modal e limpar estados
+      setModalObservacoesAberto(false)
+      setPrestadorSelecionado(null)
+      setObservacoes("")
+      setMensagemSucesso(prestadorSelecionado.prestador.id)
+
+      // Remover mensagem de sucesso após 3 segundos
+      setTimeout(() => {
+        setMensagemSucesso(null)
+      }, 3000)
+    } catch (error: any) {
+      console.error("💥 PRODUÇÃO REAL: Erro na negação:", error)
+      alert(`Erro inesperado: ${error.message}`)
+    } finally {
+      setCarregandoNegacao(false)
+    }
+  }
+
+  const handleConfirmarCadastro = async (solicitacao: Solicitacao, prestador: PrestadorAvaliacao) => {
+    try {
+      console.log("🔧 PRODUÇÃO REAL: INICIANDO DEBUG...")
+      console.log("📋 Dados recebidos:", {
+        solicitacao: solicitacao.numero,
+        prestador: {
+          id: prestador.id,
+          nome: prestador.nome,
+          documento: prestador.documento,
+          cadastroAtual: prestador.cadastro,
+        },
+      })
+
+      // Verificar se prestador.id existe
+      if (!prestador.id) {
+        console.error("❌ ERRO: prestador.id está vazio!")
+        alert("Erro: ID do prestador não encontrado")
+        return
+      }
+
+      // Verificar conexão com Supabase
+      if (!supabase) {
+        console.error("❌ ERRO: Supabase não inicializado!")
+        alert("Erro: Problema de conexão com banco de dados")
+        return
+      }
+
+      console.log("🔄 PRODUÇÃO REAL: Executando UPDATE...")
+
+      // Tentar diferentes valores para o campo cadastro
+      const { error } = await supabase
+        .from("prestadores")
+        .update({
+          cadastro: "ok", // TESTE: Usar minúsculo primeiro
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", prestador.id)
+
+      console.log("📊 Resultado do UPDATE:", { error })
+
+      if (error) {
+        console.error("❌ PRODUÇÃO REAL: Erro detalhado:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        })
+
+        alert(`Erro ao atualizar: ${error.message}`)
+        return
+      }
+
+      console.log("✅ PRODUÇÃO REAL: UPDATE executado com sucesso!")
+
+      // Atualizar o estado local
+      setSolicitacoes((prevSolicitacoes) =>
+        prevSolicitacoes.map((s) =>
+          s.id === solicitacao.id
+            ? {
+              ...s,
+              prestadores: s.prestadores
+                ? s.prestadores.map((p) => (p.id === prestador.id ? { ...p, cadastro: "ok" as StatusCadastro } : p))
+                : [],
+            }
+            : s,
+        ),
+      )
+
+      setPopoverAberto(null)
+      setMensagemSucesso(prestador.id)
+
+      console.log("✅ PRODUÇÃO REAL: Estado local atualizado com sucesso")
+
+      // Remover mensagem de sucesso após 3 segundos
+      setTimeout(() => {
+        setMensagemSucesso(null)
+      }, 3000)
+    } catch (error: any) {
+      console.error("💥 PRODUÇÃO REAL: Erro na função:", error)
+      alert(`Erro inesperado: ${error.message}`)
+    }
+  }
+
+  const handleCancelar = () => {
+    setPopoverAberto(null)
+  }
+
+  const handlePaginaAnterior = () => {
+    if (paginaAtual > 1) {
+      setPaginaAtual(paginaAtual - 1)
+    }
+  }
+
+  const handleProximaPagina = () => {
+    if (paginaAtual < totalPaginas) {
+      setPaginaAtual(paginaAtual + 1)
+    }
+  }
+
+  const handleDownloadExcel = async () => {
+    try {
+      setCarregandoDownload(true)
+      console.log("📊 Iniciando download Excel - Administrador")
+
+      // Configurar XLSX explicitamente para browser
+      if (typeof window !== "undefined") {
+        // Forçar uso de APIs do browser
+        XLSX.set_fs({
+          readFileSync: () => {
+            throw new Error("Not implemented")
+          },
+          writeFileSync: () => {
+            throw new Error("Not implemented")
+          },
+        })
+      }
+
+      // Preparar dados para Excel
+      const dadosParaExportar = todosPrestadoresFiltrados.map(({ solicitacao, prestador }, index) => ({
+        "#": index + 1,
+        "Nome do Prestador": prestador.nome,
+        "CPF/CNPJ": prestador.documento,
+        "Data Inicial": prestador.status === "reprovado" ? "-" : solicitacao.dataInicial,
+        "Data Final": prestador.status === "reprovado" ? "-" : solicitacao.dataFinal,
+        "Status Liberação": getCadastroStatus(prestador, solicitacao.dataFinal),
+        "Status Checagem":
+          prestador.status === "aprovado"
+            ? "Aprovada"
+            : prestador.status === "reprovado"
+              ? "Reprovada"
+              : prestador.status === "pendente"
+                ? "Pendente"
+                : prestador.status === "excecao"
+                  ? "Exceção"
+                  : prestador.status,
+        "Válida até": prestador.checagemValidaAte ? formatarDataParaBR(prestador.checagemValidaAte) : "-",
+        Justificativa: prestador.justificativa || "-",
+        Observações: prestador.observacoes || "-", // 🆕 NOVA COLUNA
+        Departamento: solicitacao.departamento,
+        "Nº Solicitação": solicitacao.numero,
+        "Data da Solicitação": solicitacao.dataSolicitacao,
+        Local: solicitacao.local || "-",
+      }))
+
+      // Criar workbook
+      const wb = XLSX.utils.book_new()
+
+      // Criar worksheet com os dados
+      const ws = XLSX.utils.json_to_sheet(dadosParaExportar)
+
+      // Configurar larguras das colunas
+      const colWidths = [
+        { wch: 5 },
+        { wch: 25 },
+        { wch: 18 },
+        { wch: 12 },
+        { wch: 12 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 12 },
+        { wch: 30 },
+        { wch: 30 }, // 🆕 Observações
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 18 },
+        { wch: 20 },
+      ]
+      ws["!cols"] = colWidths
+
+      // Adicionar worksheet ao workbook
+      XLSX.utils.book_append_sheet(wb, ws, "Todas as Solicitações")
+
+      // Criar segunda aba com resumo
+      const resumoData = [
+        { Informação: "Total de Prestadores", Valor: totalPrestadores },
+        { Informação: "Data da Exportação", Valor: new Date().toLocaleDateString("pt-BR") },
+        { Informação: "Hora da Exportação", Valor: new Date().toLocaleTimeString("pt-BR") },
+        { Informação: "Filtros Aplicados", Valor: "" },
+        { Informação: "- Departamento", Valor: filtroDepartamento === "todos" ? "Todos" : filtroDepartamento },
+        { Informação: "- Status Checagem", Valor: filtroStatus === "todos" ? "Todos" : filtroStatus },
+        { Informação: "- Status Liberação", Valor: filtroCadastro === "todos" ? "Todos" : filtroCadastro },
+        { Informação: "- Busca", Valor: buscaGeral || "Nenhuma" },
+      ]
+
+      const wsResumo = XLSX.utils.json_to_sheet(resumoData)
+      wsResumo["!cols"] = [{ wch: 25 }, { wch: 30 }]
+      XLSX.utils.book_append_sheet(wb, wsResumo, "Resumo")
+
+      // Gerar nome do arquivo
+      const agora = new Date()
+      const dataFormatada = agora.toLocaleDateString("pt-BR").replace(/\//g, "-")
+      const horaFormatada = agora.toLocaleTimeString("pt-BR").replace(/:/g, "-")
+      const nomeArquivo = `Solicitacoes_Admin_${dataFormatada}_${horaFormatada}.xlsx`
+
+      // Gerar buffer do Excel
+      const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" })
+
+      // Criar blob e fazer download
+      const blob = new Blob([excelBuffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      })
+
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = nomeArquivo
+      link.style.display = "none"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      console.log("✅ Download Excel concluído:", dadosParaExportar.length, "registros")
+    } catch (error) {
+      console.error("❌ Erro no download Excel:", error)
+      alert("Erro ao gerar arquivo Excel: " + error.message)
+    } finally {
+      setCarregandoDownload(false)
+    }
+  }
+
+  if (carregando) {
+    return (
+      <div className="flex justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-slate-600"></div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+      <div className="max-w-7xl mx-auto">
+        <Card className="shadow-lg border-0">
+          <CardHeader className="pb-6">
+            <CardTitle className="text-2xl font-bold text-slate-800 text-center">Todas as Solicitações</CardTitle>
+            <div className="w-24 h-1 bg-slate-600 mx-auto rounded-full"></div>
+          </CardHeader>
+
+          <CardContent>
+            {/* Filtros */}
+            <div className="mb-6 p-4 bg-slate-50 rounded-lg">
+              <div className="flex items-center gap-2 mb-4">
+                <Filter className="h-5 w-5 text-slate-600" />
+                <Label className="text-lg font-medium text-slate-700">Filtros</Label>
+                <Button
+                  onClick={buscarSolicitacoes}
+                  variant="outline"
+                  size="sm"
+                  className="ml-auto border-slate-300 text-slate-600 hover:bg-slate-50"
+                >
+                  🔄 Atualizar
+                </Button>
+                {/* Botão de Download */}
+                <Button
+                  onClick={handleDownloadExcel}
+                  disabled={carregandoDownload}
+                  variant="outline"
+                  size="sm"
+                  className="ml-2 border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  {carregandoDownload ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-slate-600 mr-2"></div>
+                      Gerando...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                      Download
+                    </>
+                  )}
+                </Button>
+                {/* Botão Modal de Colunas */}
+                <Button
+                  onClick={() => setModalColunasAberto(true)}
+                  variant="outline"
+                  size="sm"
+                  className="ml-2 border-slate-300 text-slate-600 hover:bg-slate-50"
+                >
+                  <Columns className="h-4 w-4 mr-1" />
+                  Colunas
+                </Button>
+              </div>
+
+              {/* Modal de Colunas */}
+              {modalColunasAberto && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                  {/* Overlay */}
+                  <div
+                    className="fixed inset-0 bg-black bg-opacity-50"
+                    onClick={() => setModalColunasAberto(false)}
+                  ></div>
+
+                  {/* Modal Content */}
+                  <div className="relative bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-lg font-semibold text-slate-800">🔧 Configurar Colunas</h2>
+                      <Button
+                        onClick={() => setModalColunasAberto(false)}
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Botões para selecionar/deselecionar todas */}
+                      <div className="flex gap-2 pb-2 border-b border-slate-200">
+                        <Button
+                          onClick={() => toggleTodasColunas(true)}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 border-green-600 text-green-600 hover:bg-green-50"
+                        >
+                          ✅ Mostrar Todas
+                        </Button>
+                        <Button
+                          onClick={() => toggleTodasColunas(false)}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 border-red-600 text-red-600 hover:bg-red-50"
+                        >
+                          ❌ Esconder Todas
+                        </Button>
+                      </div>
+
+                      {/* Lista de checkboxes para cada coluna */}
+                      <div className="space-y-3 max-h-80 overflow-y-auto">
+                        {COLUNAS_DISPONIVEIS.map((coluna) => (
+                          <div key={coluna.key} className="flex items-center space-x-3">
+                            <input
+                              type="checkbox"
+                              id={coluna.key}
+                              checked={colunasVisiveis[coluna.key] || false}
+                              onChange={() => toggleColuna(coluna.key)}
+                              className="h-4 w-4 text-slate-600 border-slate-300 rounded focus:ring-slate-500"
+                            />
+                            <label htmlFor={coluna.key} className="text-sm font-medium text-slate-700 cursor-pointer">
+                              {coluna.label}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Resumo */}
+                      <div className="pt-2 border-t border-slate-200 text-center">
+                        <p className="text-xs text-slate-600">
+                          {Object.values(colunasVisiveis).filter(Boolean).length} de {COLUNAS_DISPONIVEIS.length}{" "}
+                          colunas visíveis
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {/* Departamento */}
+                <div>
+                  <Label className="text-sm font-medium text-slate-700 mb-2 block">Departamento</Label>
+                  <select
+                    value={filtroDepartamento}
+                    onChange={(e) => setFiltroDepartamento(e.target.value)}
+                    className="w-full p-2 border border-slate-300 rounded-md"
+                  >
+                    <option value="todos">Todos</option>
+                    {departamentos.map((dept) => (
+                      <option key={dept} value={dept}>
+                        {dept}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Status Checagem */}
+                <div>
+                  <Label className="text-sm font-medium text-slate-700 mb-2 block">Status Checagem</Label>
+                  <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                    <SelectTrigger className="border-slate-300">
+                      <SelectValue placeholder="Selecione o status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="pendente">Pendente</SelectItem>
+                      <SelectItem value="aprovado">Aprovado</SelectItem>
+                      <SelectItem value="reprovado">Reprovado</SelectItem>
+                      <SelectItem value="excecao">Exceção</SelectItem>
+                      <SelectItem value="vencida">Vencida</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Status Liberação */}
+                <div>
+                  <Label className="text-sm font-medium text-slate-700 mb-2 block">Status Liberação</Label>
+                  <Select value={filtroCadastro} onValueChange={setFiltroCadastro}>
+                    <SelectTrigger className="border-slate-300">
+                      <SelectValue placeholder="Selecione o cadastro" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="pendente">Pendente</SelectItem>
+                      <SelectItem value="ok">Ok</SelectItem>
+                      <SelectItem value="urgente">Urgente</SelectItem>
+                      <SelectItem value="vencida">Vencida</SelectItem>
+                      <SelectItem value="negada">Negada</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Busca Geral */}
+                <div>
+                  <Label className="text-sm font-medium text-slate-700 mb-2 block">Busca Geral</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      type="text"
+                      placeholder="Nome ou documento..."
+                      value={buscaGeral}
+                      onChange={(e) => setBuscaGeral(e.target.value)}
+                      className="pl-10 border-slate-300 focus:border-slate-600 focus:ring-slate-600"
+                    />
+                  </div>
+                  {buscaGeral && <p className="text-xs text-slate-500 mt-1">{totalPrestadores} resultado(s)</p>}
+                </div>
+              </div>
+            </div>
+
+            {/* Informações de Paginação */}
+            <div className="mb-4 flex items-center justify-between text-sm text-slate-600">
+              <div>
+                <strong>
+                  Mostrando {indiceInicio + 1} - {Math.min(indiceFim, totalPrestadores)} de {totalPrestadores}{" "}
+                  prestadores
+                </strong>
+              </div>
+              <div>
+                <strong>
+                  Página {paginaAtual} de {totalPaginas}
+                </strong>
+              </div>
+            </div>
+
+            {/* Tabela */}
+            <div className="overflow-x-auto border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {colunasVisiveis.prestador && (
+                      <TableHead>
+                        Prestador
+                      </TableHead>
+                    )}
+                    {colunasVisiveis.documento && (
+                      <TableHead>
+                        Documento
+                      </TableHead>
+                    )}
+                    {colunasVisiveis.dataInicial && (
+                      <TableHead>
+                        Data Inicial
+                      </TableHead>
+                    )}
+                    {colunasVisiveis.dataFinal && (
+                      <TableHead>
+                        Data Final
+                      </TableHead>
+                    )}
+                    {colunasVisiveis.liberacao && (
+                      <TableHead className="font-semibold text-slate-800 text-center min-w-[90px]">Liberação</TableHead>
+                    )}
+                    {colunasVisiveis.checagem && (
+                      <TableHead className="font-semibold text-slate-800 text-center min-w-[100px]">Checagem</TableHead>
+                    )}
+                    {colunasVisiveis.validaAte && (
+                      <TableHead className="font-semibold text-slate-800 text-center min-w-[130px] whitespace-nowrap">
+                        Válida até
+                      </TableHead>
+                    )}
+                    {colunasVisiveis.acoes && (
+                      <TableHead className="font-semibold text-slate-800 text-center min-w-[120px]">Ações</TableHead>
+                    )}
+                    {colunasVisiveis.justificativa && (
+                      <TableHead className="font-semibold text-slate-800 text-center min-w-[200px]">
+                        Justificativa
+                      </TableHead>
+                    )}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {dadosFiltrados.map(({ solicitacao, prestador, prioridade }, index) => {
+                    const prestadorIndex = solicitacao.prestadores
+                      ? solicitacao.prestadores.findIndex((p) => p.id === prestador.id)
+                      : -1
+                    const isFirstPrestadorOfSolicitacao =
+                      index === 0 || dadosFiltrados[index - 1].solicitacao.id !== solicitacao.id
+
+                    // 🆕 VERIFICAR SE BOTÕES DEVEM ESTAR HABILITADOS
+                    const botoesHabilitados = isBotoesHabilitados(prestador)
+
+                    // 🆕 NOVA LÓGICA PARA MOSTRAR URGÊNCIA NA DATA INICIAL
+                    const statusLiberacao = getCadastroStatus(prestador, solicitacao.dataFinal)
+                    const mostrarUrgencia = statusLiberacao === "pendente" || statusLiberacao === "urgente"
+
+                    const isBloqueadoPeloGestor =
+                      (prestador.status === "reprovado" || prestador.status === "reprovada") &&
+                      (!prestador.aprovado_por || !prestador.aprovado_por.includes("Gestor - Reprovação Confirmada"))
+
+                    return (
+                      <TableRow key={`${solicitacao.id}-${prestador.id}`} className="hover:bg-slate-50">
+                        {colunasVisiveis.prestador && (
+                          <TableCell className="text-sm text-center">
+                            <div className="whitespace-nowrap font-medium">{prestador.nome}</div>
+                          </TableCell>
+                        )}
+                        {colunasVisiveis.documento && (
+                          <TableCell className="text-sm text-center">
+                            <div className="text-xs font-mono whitespace-nowrap">{prestador.documento}</div>
+                          </TableCell>
+                        )}
+                        {colunasVisiveis.dataInicial && (
+                          <TableCell className="text-sm whitespace-nowrap text-center">
+                            <DataInicialIndicator
+                              dataInicial={solicitacao.dataInicial}
+                              isReprovado={prestador.status === "reprovado"}
+                              mostrarUrgencia={mostrarUrgencia}
+                            />
+                          </TableCell>
+                        )}
+                        {colunasVisiveis.dataFinal && (
+                          <TableCell className="text-sm whitespace-nowrap text-center">
+                            {prestador.status === "reprovado" ? (
+                              <span className="text-slate-400">-</span>
+                            ) : (
+                              solicitacao.dataFinal
+                            )}
+                          </TableCell>
+                        )}
+                        {colunasVisiveis.liberacao && (
+                          <TableCell className="whitespace-nowrap text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <StatusCadastroIcon status={getCadastroStatus(prestador, solicitacao.dataFinal)} />
+                              <StatusCadastroBadge status={getCadastroStatus(prestador, solicitacao.dataFinal)} />
+                            </div>
+                          </TableCell>
+                        )}
+                        {colunasVisiveis.checagem && (
+                          <TableCell className="text-center">
+                            {isBloqueadoPeloGestor ? (
+                              <Badge className="bg-orange-100 text-orange-800 border-orange-200">Em Análise</Badge>
+                            ) : (
+                              <div className="flex items-center justify-center gap-2 whitespace-nowrap">
+                                {/* PRODUÇÃO REAL: Mapear TODOS os status do banco para componente */}
+                                {prestador.status === "aprovado" && (
+                                  <>
+                                    <CheckCircle className="h-4 w-4 text-green-600" />
+                                    <Badge className="bg-green-100 text-green-800 border-green-200">Aprovada</Badge>
+                                  </>
+                                )}
+                                {prestador.status === "reprovado" && (
+                                  <>
+                                    <XCircle className="h-4 w-4 text-red-600" />
+                                    <Badge className="bg-red-100 text-red-800 border-red-200">Reprovada</Badge>
+                                  </>
+                                )}
+                                {prestador.status === "pendente" && (
+                                  <>
+                                    <Clock className="h-4 w-4 text-yellow-600" />
+                                    <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Pendente</Badge>
+                                  </>
+                                )}
+                                {prestador.status === "excecao" && (
+                                  <>
+                                    <ShieldAlert className="h-4 w-4 text-purple-600" />
+                                    <Badge className="bg-purple-100 text-purple-800 border-purple-200">Exceção</Badge>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </TableCell>
+                        )}
+                        {colunasVisiveis.validaAte && (
+                          <TableCell className="text-sm whitespace-nowrap text-center">
+                            {prestador.checagemValidaAte ? (
+                              <span>{formatarDataParaBR(prestador.checagemValidaAte)}</span>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
+                          </TableCell>
+                        )}
+                        {colunasVisiveis.acoes && (
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button
+                                onClick={() => handleConfirmarCadastro(solicitacao, prestador)}
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                              >
+                                <Check className="h-3 w-3 mr-1" />
+                                SIM
+                              </Button>
+                              <Button
+                                onClick={handleCancelar}
+                                variant="outline"
+                                size="sm"
+                                className="border-slate-300 text-slate-600"
+                              >
+                                <X className="h-3 w-3 mr-1" />
+                                NÃO
+                              </Button>
+                            </div>
+
+
+                            {/* 🆕 BOTÃO NEGADO (VERMELHO) - COM CONTROLE DE HABILITAÇÃO */}
+                            <div className="relative">
+                              <Button
+                                onClick={() => botoesHabilitados && handleNegarClick(solicitacao, prestador)}
+                                variant="outline"
+                                size="sm"
+                                disabled={!botoesHabilitados}
+                                className={`h-7 w-7 p-0 mr-1 ${botoesHabilitados
+                                  ? "border-red-600 text-red-600 hover:bg-red-50"
+                                  : "border-slate-300 text-slate-400 cursor-not-allowed opacity-50"
+                                  }`}
+                                title={botoesHabilitados ? "Negar liberação" : "Aguardando checagem"}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+
+                            {/* Mensagem de sucesso */}
+                            {
+                              mensagemSucesso === prestador.id && (
+                                <div className="absolute top-8 right-0 z-40 bg-green-100 border border-green-200 rounded-lg p-2 text-xs text-green-700">
+                                  ✅ Liberação atualizada!
+                                </div>
+                              )
+                            }
+
+                          </TableCell>
+                        )}
+                        {colunasVisiveis.justificativa && (
+                          <TableCell className="text-sm text-center">
+                            {prestador.justificativa ? (
+                              <div className="max-w-xs truncate" title={prestador.justificativa}>
+                                {prestador.justificativa}
+                              </div>
+                            ) : null}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Controles de Paginação */}
+            <div className="mt-4 flex items-center justify-between">
+              <div className="text-sm text-slate-600">
+                <strong>Total:</strong> {totalPrestadores} prestadores
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={handlePaginaAnterior}
+                  disabled={paginaAtual === 1}
+                  variant="outline"
+                  size="sm"
+                  className="border-slate-300 text-slate-600 disabled:opacity-50"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Anterior
+                </Button>
+
+                <span className="text-sm text-slate-600 px-3">
+                  {paginaAtual} / {totalPaginas}
+                </span>
+
+                <Button
+                  onClick={handleProximaPagina}
+                  disabled={paginaAtual === totalPaginas}
+                  variant="outline"
+                  size="sm"
+                  className="border-slate-300 text-slate-600 disabled:opacity-50"
+                >
+                  Próxima
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card >
+
+        {/* 🆕 MODAL DE OBSERVAÇÕES (NEGADO) */}
+        < Dialog open={modalObservacoesAberto} onOpenChange={setModalObservacoesAberto} >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                🔴 Negar Liberação
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {prestadorSelecionado && (
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <p className="text-sm text-slate-600 mb-1">
+                    <strong>Prestador:</strong> {prestadorSelecionado.prestador.nome}
+                  </p>
+                  <p className="text-sm text-slate-600">
+                    <strong>Documento:</strong> {prestadorSelecionado.prestador.documento}
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <Label htmlFor="observacoes" className="text-sm font-medium text-slate-700 mb-2 block">
+                  Observações <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  id="observacoes"
+                  placeholder="Digite o motivo da negação da liberação..."
+                  value={observacoes}
+                  onChange={(e) => setObservacoes(e.target.value)}
+                  className="min-h-[100px] border-slate-300 focus:border-red-500 focus:ring-red-500"
+                  maxLength={500}
+                />
+                <p className="text-xs text-slate-500 mt-1">{observacoes.length}/500 caracteres</p>
+              </div>
+            </div>
+
+            <DialogFooter className="flex gap-2">
+              <Button
+                onClick={() => setModalObservacoesAberto(false)}
+                variant="outline"
+                className="border-slate-300 text-slate-600"
+                disabled={carregandoNegacao}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleConfirmarNegacao}
+                disabled={!observacoes.trim() || carregandoNegacao}
+                className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+              >
+                {carregandoNegacao ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-white mr-2"></div>
+                    Processando...
+                  </>
+                ) : (
+                  <>
+                    <X className="h-4 w-4 mr-1" />
+                    Confirmar Negação
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog >
+      </div >
+    </div >
+  )
+}
