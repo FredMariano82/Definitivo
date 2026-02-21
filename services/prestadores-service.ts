@@ -24,35 +24,34 @@ export class PrestadoresService {
     }
 
     // Limpar o documento de busca (remover tudo que não for número)
-    const documentoLimpo = documento.replace(/\D/g, "")
-    console.log(`🔍 BUSCA INTELIGENTE - Documento original: "${documento}" -> limpo: "${documentoLimpo}"`)
+    const doc1Limpo = documento.replace(/\D/g, "")
+    console.log(`🔍 BUSCA INTELIGENTE - Doc original: "${documento}" -> limpo: "${doc1Limpo}"`)
 
-    if (documentoLimpo === "") {
-      console.log("❌ Documento limpo está vazio")
+    if (doc1Limpo === "") {
+      console.log("❌ Doc limpo está vazio")
       return null
     }
 
     try {
       // ESTRATÉGIA: Tentar busca dupla primeiro, se falhar, usar busca simples
-      console.log(`🔍 SOLICITANTE - Tentando busca dupla (documento + documento2)...`)
+      console.log(`🔍 SOLICITANTE - Tentando busca dupla (doc1 + doc2)...`)
 
       let prestadores: any[] = []
       let usandoBuscaDupla = false
 
       try {
-        // Tentar busca com documento2 - BUSCAR TODOS OS PRESTADORES (SEM FILTRO DE STATUS)
+        // Tentar busca com doc2 - BUSCAR TODOS OS PRESTADORES (SEM FILTRO DE CHECAGEM)
         console.log(`🔍 BUSCA COMPLETA - Consultando TODOS os prestadores (aprovados, pendentes, reprovados)`)
         const { data: prestadoresDupla, error: erroDupla } = await supabase.from("prestadores").select(`
-            documento,
-            documento2,
+            doc1,
+            doc2,
             nome,
             empresa,
             checagem_valida_ate,
-            status,
+            checagem,
             data_avaliacao,
-            cadastro
+            liberacao
           `)
-        // REMOVIDO: .eq("status", "aprovado") - BUSCAR TODOS!
 
         if (!erroDupla && prestadoresDupla) {
           prestadores = prestadoresDupla
@@ -60,7 +59,7 @@ export class PrestadoresService {
           console.log(`✅ Busca dupla funcionou! Total: ${prestadores.length}`)
           console.log(
             `📊 Status encontrados:`,
-            prestadores.map((p) => p.status),
+            prestadores.map((p) => p.checagem),
           )
         } else {
           throw new Error("Busca dupla falhou")
@@ -68,17 +67,16 @@ export class PrestadoresService {
       } catch (errorDupla) {
         console.log(`⚠️ Busca dupla falhou, usando busca simples...`)
 
-        // Fallback: busca apenas na coluna documento - TAMBÉM SEM FILTRO DE STATUS
+        // Fallback: busca apenas na coluna doc1 - TAMBÉM SEM FILTRO DE CHECAGEM
         const { data: prestadoresSimples, error: erroSimples } = await supabase.from("prestadores").select(`
-            documento,
+            doc1,
             nome,
             empresa,
             checagem_valida_ate,
-            status,
+            checagem,
             data_avaliacao,
-            cadastro
+            liberacao
           `)
-        // REMOVIDO: .eq("status", "aprovado") - BUSCAR TODOS!
 
         if (erroSimples) {
           console.error("❌ Erro na busca simples:", erroSimples)
@@ -90,7 +88,7 @@ export class PrestadoresService {
         console.log(`✅ Busca simples funcionou! Total: ${prestadores.length}`)
         console.log(
           `📊 Status encontrados:`,
-          prestadores.map((p) => p.status),
+          prestadores.map((p) => p.checagem),
         )
       }
 
@@ -105,30 +103,30 @@ export class PrestadoresService {
       if (usandoBuscaDupla) {
         // Busca em ambas as colunas
         prestadorEncontrado = prestadores.find((p) => {
-          const doc1Limpo = p.documento ? p.documento.replace(/\D/g, "") : ""
-          const doc2Limpo = p.documento2 ? p.documento2.replace(/\D/g, "") : ""
+          const pDoc1Limpo = p.doc1 ? p.doc1.replace(/\D/g, "") : ""
+          const pDoc2Limpo = p.doc2 ? p.doc2.replace(/\D/g, "") : ""
 
           console.log(`🔍 COMPARAÇÃO DUPLA:`)
-          console.log(`   Doc1: "${doc1Limpo}" === "${documentoLimpo}" = ${doc1Limpo === documentoLimpo}`)
-          console.log(`   Doc2: "${doc2Limpo}" === "${documentoLimpo}" = ${doc2Limpo === documentoLimpo}`)
+          console.log(`   Doc1: "${pDoc1Limpo}" === "${doc1Limpo}" = ${pDoc1Limpo === doc1Limpo}`)
+          console.log(`   Doc2: "${pDoc2Limpo}" === "${doc1Limpo}" = ${pDoc2Limpo === doc1Limpo}`)
 
-          return doc1Limpo === documentoLimpo || doc2Limpo === documentoLimpo
+          return pDoc1Limpo === doc1Limpo || pDoc2Limpo === doc1Limpo
         })
       } else {
-        // Busca apenas na coluna documento
+        // Busca apenas na coluna doc1
         prestadorEncontrado = prestadores.find((p) => {
-          const doc1Limpo = p.documento ? p.documento.replace(/\D/g, "") : ""
-          console.log(`🔍 COMPARAÇÃO SIMPLES: "${doc1Limpo}" === "${documentoLimpo}" = ${doc1Limpo === documentoLimpo}`)
-          return doc1Limpo === documentoLimpo
+          const pDoc1Limpo = p.doc1 ? p.doc1.replace(/\D/g, "") : ""
+          console.log(`🔍 COMPARAÇÃO SIMPLES: "${pDoc1Limpo}" === "${doc1Limpo}" = ${pDoc1Limpo === doc1Limpo}`)
+          return pDoc1Limpo === doc1Limpo
         })
       }
 
       if (!prestadorEncontrado) {
-        console.log(`❌ Nenhum prestador encontrado com documento: "${documentoLimpo}"`)
+        console.log(`❌ Nenhum prestador encontrado com documento: "${doc1Limpo}"`)
         return null
       }
 
-      console.log(`✅ PRESTADOR ENCONTRADO! Nome: ${prestadorEncontrado.nome} | Status: ${prestadorEncontrado.status}`)
+      console.log(`✅ PRESTADOR ENCONTRADO! Nome: ${prestadorEncontrado.nome} | Checagem: ${prestadorEncontrado.checagem}`)
 
       // 🎯 CONVERTER DATA DE VALIDADE SEM FUSO HORÁRIO
       let validadeChecagem = ""
@@ -148,7 +146,7 @@ export class PrestadoresService {
 
       // 🎯 BUSCAR ÚLTIMA SOLICITAÇÃO DESSE PRESTADOR - CORRIGINDO A QUERY
       console.log(`\n🔍 === INICIANDO BUSCA DE SOLICITAÇÕES (CORRIGIDA) ===`)
-      console.log(`📄 Documento para buscar: "${documentoLimpo}"`)
+      console.log(`📄 Doc para buscar: "${doc1Limpo}"`)
 
       // PRIMEIRO: Verificar estrutura da tabela
       const { data: estrutura, error: erroEstrutura } = await supabase.from("solicitacoes").select("*").limit(1)
@@ -224,13 +222,13 @@ export class PrestadoresService {
       console.log(`   Validade Checagem: "${validadeChecagem}"`)
 
       return {
-        documento: prestadorEncontrado.documento,
+        doc1: prestadorEncontrado.doc1,
         nome: prestadorEncontrado.nome,
         dataAprovacao,
         validadeChecagem,
         dataFinal: dataFinalEncontrada, // 🎯 DATA FINAL SEM FUSO HORÁRIO
-        status: prestadorEncontrado.status,
-        cadastro: prestadorEncontrado.cadastro, // 🎯 ADICIONAR ESTE CAMPO
+        checagem: prestadorEncontrado.checagem,
+        liberacao: prestadorEncontrado.liberacao,
         empresa: prestadorEncontrado.empresa,
       }
     } catch (error) {
@@ -243,29 +241,29 @@ export class PrestadoresService {
   static verificarStatusChecagem(
     prestador: PrestadorHistorico,
   ): "valido" | "vencido" | "sem_historico" | "pendente" | "reprovado" | "excecao" {
-    console.log(`📊 Verificando status da checagem para: ${prestador.nome} | Status: ${prestador.status}`)
+    console.log(`📊 Verificando status da checagem para: ${prestador.nome} | Checagem: ${prestador.checagem}`)
 
     // PRIMEIRO: Verificar se está pendente
-    if (prestador.status === "pendente") {
+    if (prestador.checagem === "pendente") {
       console.log(`⏳ Status PENDENTE detectado`)
       return "pendente"
     }
 
     // SEGUNDO: Verificar se foi reprovado
-    if (prestador.status === "reprovado") {
+    if (prestador.checagem === "reprovado") {
       console.log(`❌ Status REPROVADO detectado`)
       return "reprovado"
     }
 
     // 🎯 TERCEIRO: Verificar se é EXCEÇÃO
-    if (prestador.status === "excecao") {
+    if (prestador.checagem === "excecao") {
       console.log(`✅ Status EXCEÇÃO detectado`)
       return "excecao"
     }
 
     // QUARTO: Se não é aprovado, não tem histórico válido
-    if (prestador.status !== "aprovado") {
-      console.log(`📋 Status não aprovado: ${prestador.status}`)
+    if (prestador.checagem !== "aprovado") {
+      console.log(`📋 Status não aprovado: ${prestador.checagem}`)
       return "sem_historico"
     }
 

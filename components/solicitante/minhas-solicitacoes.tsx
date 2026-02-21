@@ -8,7 +8,13 @@ import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { StatusCadastroBadge, StatusCadastroIcon, getCadastroStatus } from "../ui/status-badges"
+import {
+  StatusLiberacaoBadge,
+  StatusLiberacaoIcon,
+  getLiberacaoStatus,
+  StatusChecagemBadge,
+  StatusChecagemIcon,
+} from "../ui/status-badges"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DataInicialIndicator } from "../../utils/date-indicators"
 
@@ -17,13 +23,13 @@ const PRESTADORES_POR_PAGINA = 10
 const MinhasSolicitacoes = () => {
   const [paginaAtual, setPaginaAtual] = useState(1)
   const [filtroStatus, setFiltroStatus] = useState("todos")
-  const [filtroCadastro, setFiltroCadastro] = useState("todos")
+  const [filtroLiberacao, setFiltroLiberacao] = useState("todos")
   const [buscaGeral, setBuscaGeral] = useState("")
 
   // Resetar página quando filtros mudarem
   useEffect(() => {
     setPaginaAtual(1)
-  }, [filtroStatus, filtroCadastro, buscaGeral])
+  }, [filtroStatus, filtroLiberacao, buscaGeral])
 
   // Dados mock expandidos para demonstração da paginação
   const solicitacoesMock = [
@@ -38,9 +44,9 @@ const MinhasSolicitacoes = () => {
       prestadores: Array.from({ length: 150 }, (_, i) => ({
         id: `p${i + 1}`,
         nome: `Prestador ${i + 1}`,
-        documento: `${String(i + 1).padStart(3, "0")}.456.789-00`,
-        status: (i % 3 === 0 ? "aprovado" : i % 3 === 1 ? "pendente" : "reprovado") as const,
-        cadastro: (i % 4 === 0 ? "ok" : i % 4 === 1 ? "pendente" : i % 4 === 2 ? "urgente" : "pendente") as const,
+        doc1: `${String(i + 1).padStart(3, "0")}.456.789-00`,
+        checagem: (i % 3 === 0 ? "aprovado" : i % 3 === 1 ? "pendente" : i % 3 === 2 ? "reprovado" : "excecao") as "aprovado" | "reprovado" | "pendente" | "excecao",
+        liberacao: (i % 4 === 0 ? "ok" : i % 4 === 1 ? "pendente" : i % 4 === 2 ? "urgente" : "negada") as "ok" | "pendente" | "urgente" | "negada",
         checagemValidaAte: i % 2 === 0 ? "25/01/2026" : undefined,
         justificativa: i % 5 === 0 ? `Justificativa para prestador ${i + 1}` : undefined,
       })),
@@ -52,19 +58,19 @@ const MinhasSolicitacoes = () => {
     (solicitacao) =>
       solicitacao.prestadores?.filter((prestador) => {
         // Filtro de status
-        const statusMatch = filtroStatus === "todos" || prestador.status === filtroStatus
+        const statusMatch = filtroStatus === "todos" || prestador.checagem === filtroStatus
 
-        // Filtro de cadastro
-        const cadastroMatch = filtroCadastro === "todos" || prestador.cadastro === filtroCadastro
+        // Filtro de liberação
+        const liberacaoMatch = filtroLiberacao === "todos" || prestador.liberacao === filtroLiberacao
 
         // Filtro de busca
         let buscaMatch = true
         if (buscaGeral.trim()) {
           const termo = buscaGeral.toLowerCase()
-          buscaMatch = prestador.nome.toLowerCase().includes(termo) || prestador.documento.toLowerCase().includes(termo)
+          buscaMatch = prestador.nome.toLowerCase().includes(termo) || prestador.doc1.toLowerCase().includes(termo)
         }
 
-        return statusMatch && cadastroMatch && buscaMatch
+        return statusMatch && liberacaoMatch && buscaMatch
       }) || [],
   )
 
@@ -121,12 +127,12 @@ const MinhasSolicitacoes = () => {
                   </Select>
                 </div>
 
-                {/* Status Liberação */}
+                {/* Liberação */}
                 <div>
-                  <Label className="text-sm font-medium text-blue-700 mb-2 block">Status Liberação</Label>
-                  <Select value={filtroCadastro} onValueChange={setFiltroCadastro}>
+                  <Label className="text-sm font-medium text-blue-700 mb-2 block">Liberação</Label>
+                  <Select value={filtroLiberacao} onValueChange={setFiltroLiberacao}>
                     <SelectTrigger className="border-blue-300">
-                      <SelectValue placeholder="Selecione o cadastro" />
+                      <SelectValue placeholder="Selecione a liberação" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="todos">Todos</SelectItem>
@@ -176,7 +182,7 @@ const MinhasSolicitacoes = () => {
                 <TableHeader>
                   <TableRow className="bg-blue-50">
                     <TableHead className="font-semibold text-blue-800 text-center min-w-[160px]">Prestador</TableHead>
-                    <TableHead className="font-semibold text-blue-800 text-center min-w-[130px]">Documento</TableHead>
+                    <TableHead className="font-semibold text-blue-800 text-center min-w-[130px]">Doc1</TableHead>
                     <TableHead className="font-semibold text-blue-800 text-center min-w-[100px] whitespace-nowrap">
                       Data Inicial
                     </TableHead>
@@ -200,16 +206,16 @@ const MinhasSolicitacoes = () => {
                         <div className="whitespace-nowrap font-medium">{prestador.nome}</div>
                       </TableCell>
                       <TableCell className="text-sm text-center">
-                        <div className="text-xs font-mono whitespace-nowrap">{prestador.documento}</div>
+                        <div className="text-xs font-mono whitespace-nowrap">{prestador.doc1}</div>
                       </TableCell>
                       <TableCell className="text-sm whitespace-nowrap text-center">
                         <DataInicialIndicator
                           dataInicial={solicitacoesMock[0].dataInicial}
-                          isReprovado={prestador.status === "reprovado"}
+                          isReprovado={prestador.checagem === "reprovado"}
                         />
                       </TableCell>
                       <TableCell className="text-sm whitespace-nowrap text-center">
-                        {prestador.status === "reprovado" ? (
+                        {prestador.checagem === "reprovado" ? (
                           <span className="text-blue-400">-</span>
                         ) : (
                           solicitacoesMock[0].dataFinal
@@ -217,36 +223,14 @@ const MinhasSolicitacoes = () => {
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-center">
                         <div className="flex items-center justify-center gap-2">
-                          <StatusCadastroIcon status={getCadastroStatus(prestador, solicitacoesMock[0].dataFinal)} />
-                          <StatusCadastroBadge status={getCadastroStatus(prestador, solicitacoesMock[0].dataFinal)} />
+                          <StatusLiberacaoIcon status={getLiberacaoStatus(prestador, solicitacoesMock[0].dataFinal)} />
+                          <StatusLiberacaoBadge status={getLiberacaoStatus(prestador, solicitacoesMock[0].dataFinal)} />
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-2 whitespace-nowrap">
-                          {prestador.status === "aprovado" && (
-                            <>
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                              <Badge className="bg-green-100 text-green-800 border-green-200">Aprovada</Badge>
-                            </>
-                          )}
-                          {prestador.status === "reprovado" && (
-                            <>
-                              <XCircle className="h-4 w-4 text-red-600" />
-                              <Badge className="bg-red-100 text-red-800 border-red-200">Reprovada</Badge>
-                            </>
-                          )}
-                          {prestador.status === "pendente" && (
-                            <>
-                              <Clock className="h-4 w-4 text-yellow-600" />
-                              <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Pendente</Badge>
-                            </>
-                          )}
-                          {prestador.status === "excecao" && (
-                            <>
-                              <ShieldAlert className="h-4 w-4 text-purple-600" />
-                              <Badge className="bg-purple-100 text-purple-800 border-purple-200">Exceção</Badge>
-                            </>
-                          )}
+                          <StatusChecagemIcon status={prestador.checagem} />
+                          <StatusChecagemBadge status={prestador.checagem} />
                         </div>
                       </TableCell>
                       <TableCell className="text-sm whitespace-nowrap text-center">

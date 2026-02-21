@@ -13,7 +13,7 @@ import { CheckCircle, DollarSign, Users, Send } from "lucide-react"
 interface EconomiaCalculada {
   prestadorId: string
   prestadorNome: string
-  prestadorDocumento: string
+  prestadorDoc1: string
   tipoEconomia: "maxima" | "operacional" | "evitado" | "nenhuma"
   valorEconomizado: number
   detalhes: string
@@ -23,7 +23,7 @@ interface ModalPreviaSolicitacaoProps {
   isOpen: boolean
   onClose: () => void
   onConfirmar: (economias: EconomiaCalculada[]) => Promise<void>
-  prestadores: Prestador[]
+  prestadores: Array<{ id: string; nome: string; doc1: string; empresa?: string }>
   tipoSolicitacao: "checagem_liberacao" | "somente_liberacao"
   dataInicial: string
   dataFinal: string
@@ -68,14 +68,14 @@ export default function ModalPreviaSolicitacao({
     try {
       // Processar cada prestador
       for (const prestador of prestadores) {
-        const documentoParaValidar = prestador.documento.trim() || ""
+        const doc1ParaValidar = prestador.doc1.trim() || ""
 
-        if (!documentoParaValidar || !prestador.nome.trim()) {
+        if (!doc1ParaValidar || !prestador.nome.trim()) {
           // Prestador incompleto - sem economia
           economiasCalculadas.push({
             prestadorId: prestador.id,
             prestadorNome: prestador.nome || "Nome não informado",
-            prestadorDocumento: documentoParaValidar,
+            prestadorDoc1: doc1ParaValidar,
             tipoEconomia: "nenhuma",
             valorEconomizado: 0,
             detalhes: "Prestador com dados incompletos",
@@ -83,17 +83,17 @@ export default function ModalPreviaSolicitacao({
           continue
         }
 
-        console.log(`🔍 Analisando: ${prestador.nome} - Doc: ${documentoParaValidar}`)
+        console.log(`🔍 Analisando: ${prestador.nome} - Doc: ${doc1ParaValidar}`)
 
         // Consultar prestador no banco
-        const prestadorEncontrado = await PrestadoresService.consultarPrestadorPorDocumento(documentoParaValidar)
+        const prestadorEncontrado = await PrestadoresService.consultarPrestadorPorDocumento(doc1ParaValidar)
 
         if (!prestadorEncontrado) {
           // Prestador novo - sem economia
           economiasCalculadas.push({
             prestadorId: prestador.id,
             prestadorNome: prestador.nome,
-            prestadorDocumento: documentoParaValidar,
+            prestadorDoc1: doc1ParaValidar,
             tipoEconomia: "nenhuma",
             valorEconomizado: 0,
             detalhes: "Prestador novo - primeira checagem necessária",
@@ -103,7 +103,7 @@ export default function ModalPreviaSolicitacao({
 
         // Verificar status
         const statusChecagem = PrestadoresService.verificarStatusChecagem(prestadorEncontrado as any)
-        const statusLiberacao = (prestadorEncontrado as any).cadastro || "pendente"
+        const statusLiberacao = (prestadorEncontrado as any).liberacao || "pendente"
 
         console.log(`📊 ${prestador.nome}: Checagem=${statusChecagem}, Liberação=${statusLiberacao}`)
 
@@ -111,7 +111,7 @@ export default function ModalPreviaSolicitacao({
         let economia: EconomiaCalculada = {
           prestadorId: prestador.id,
           prestadorNome: prestador.nome,
-          prestadorDocumento: documentoParaValidar,
+          prestadorDoc1: doc1ParaValidar,
           tipoEconomia: "nenhuma",
           valorEconomizado: 0,
           detalhes: "Sem economia detectada",
@@ -288,7 +288,7 @@ export default function ModalPreviaSolicitacao({
                     <div key={economia.prestadorId} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex-1">
                         <div className="font-medium text-slate-800">{economia.prestadorNome}</div>
-                        <div className="text-sm text-slate-600">Doc: {economia.prestadorDocumento}</div>
+                        <div className="text-sm text-slate-600">Doc: {economia.prestadorDoc1}</div>
                         <div className="text-xs text-slate-500 mt-1">{economia.detalhes}</div>
                       </div>
                       <div className="flex items-center gap-2">

@@ -11,7 +11,7 @@ export class SolicitacoesService {
     finalidade: "evento" | "obra"
     local: string
     empresa: string
-    prestadores: Array<{ nome: string; documento: string; documento2?: string; empresa?: string }>
+    prestadores: Array<{ nome: string; doc1: string; doc2?: string; empresa?: string }>
     dataInicial: string
     dataFinal: string
   }): Promise<{ sucesso: boolean; erro: string; solicitacao?: Solicitacao }> {
@@ -116,11 +116,11 @@ export class SolicitacoesService {
         return {
           solicitacao_id: solicitacao.id,
           nome: p.nome,
-          documento: p.documento,
-          documento2: p.documento2,
+          doc1: p.doc1,
+          doc2: p.doc2,
           empresa: empresaFinal, // 🎯 EMPRESA ESPECÍFICA OU GERAL
-          status: "pendente" as const,
-          cadastro: isUrgente ? ("urgente" as const) : ("pendente" as const),
+          checagem: "pendente" as const,
+          liberacao: isUrgente ? ("urgente" as const) : ("pendente" as const),
         }
       })
 
@@ -202,13 +202,13 @@ export class SolicitacoesService {
         prestadores: prestadores.map((p: any) => ({
           id: p.id,
           nome: p.nome,
-          documento: p.documento,
-          documento2: p.documento2 || undefined,
+          doc1: p.doc1,
+          doc2: p.doc2 || undefined,
 
           empresa: p.empresa || undefined, // 🎯 EMPRESA ESPECÍFICA DO PRESTADOR
-          status: p.status as "aprovado" | "reprovado" | "pendente" | "excecao",
+          checagem: p.checagem as "aprovado" | "reprovado" | "pendente" | "excecao",
           checagemValidaAte: p.checagem_valida_ate || undefined,
-          cadastro: p.cadastro as "ok" | "pendente" | "urgente",
+          liberacao: p.liberacao as "ok" | "pendente" | "urgente",
           observacoes: p.observacoes || undefined,
           aprovadoPor: p.aprovado_por || undefined,
           dataAvaliacao: p.data_avaliacao
@@ -310,13 +310,13 @@ export class SolicitacoesService {
         prestadores: (s.prestadores || []).map((p: any) => ({
           id: p.id,
           nome: p.nome,
-          documento: p.documento,
-          documento2: p.documento2 || undefined,
+          doc1: p.doc1,
+          doc2: p.doc2 || undefined,
 
           empresa: p.empresa || undefined, // 🎯 EMPRESA ESPECÍFICA DO PRESTADOR
-          status: p.status,
+          checagem: p.checagem,
           checagemValidaAte: p.checagem_valida_ate || undefined,
-          cadastro: p.cadastro,
+          liberacao: p.liberacao,
           observacoes: p.observacoes || undefined,
           aprovadoPor: p.aprovado_por || undefined,
           dataAvaliacao: p.data_avaliacao
@@ -366,7 +366,7 @@ export class SolicitacoesService {
       const agora = new Date()
 
       const updateData: any = {
-        status: novoStatus, // APENAS status (Checagem)
+        checagem: novoStatus, // APENAS checagem (Antigo status)
         aprovado_por: aprovadoPor,
         data_avaliacao: agora.toISOString(),
       }
@@ -383,7 +383,7 @@ export class SolicitacoesService {
         updateData.justificativa = justificativa
       }
 
-      // IMPORTANTE: NÃO alterar o campo cadastro (Liberação)
+      // IMPORTANTE: NÃO alterar o campo liberacao (Antigo cadastro)
       // A coluna Liberação é independente da coluna Checagem
 
       const { error } = (await Promise.race([
@@ -429,12 +429,12 @@ export class SolicitacoesService {
       // Buscar todos os prestadores da solicitação
       const { data: prestadores } = await supabase
         .from("prestadores")
-        .select("status")
+        .select("checagem")
         .eq("solicitacao_id", prestador.solicitacao_id)
 
       if (!prestadores) return
 
-      const statusList = prestadores.map((p) => p.status)
+      const statusList = prestadores.map((p) => p.checagem)
       let novoStatus: string
 
       if (statusList.every((s) => s === "aprovado")) {

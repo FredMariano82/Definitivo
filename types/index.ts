@@ -8,17 +8,17 @@ export interface Usuario {
 }
 
 export type StatusChecagem = "pendente" | "aprovada" | "reprovada" | "vencida" | "excecao" | "erro_rg" | "aprovado" | "reprovado"
-export type StatusCadastro = "pendente" | "urgente" | "vencida" | "Ok" | "Não Ok" | "ok" | "negada"
+export type StatusLiberacao = "pendente" | "urgente" | "vencida" | "Ok" | "Não Ok" | "ok" | "negada"
 
 // Atualizar a interface PrestadorAvaliacao
 export interface PrestadorAvaliacao {
   id: string
   nome: string
-  documento: string
-  documento2?: string // PRODUÇÃO REAL: Campo documento2 adicionado
-  status: StatusChecagem
+  doc1: string
+  doc2?: string // PRODUÇÃO REAL: Campo doc2 adicionado
+  checagem: StatusChecagem
   checagemValidaAte?: string
-  cadastro: StatusCadastro
+  liberacao: StatusLiberacao
   observacoes?: string
   aprovadoPor?: string
   dataAvaliacao?: string
@@ -28,13 +28,13 @@ export interface PrestadorAvaliacao {
 }
 
 export interface PrestadorHistorico {
-  documento: string
+  doc1: string
   nome: string
   dataAprovacao?: string
   validadeChecagem?: string
   dataFinal?: string
-  status: StatusChecagem | "valido" | "vencido" | "sem_historico"
-  cadastro?: StatusCadastro
+  checagem: StatusChecagem | "valido" | "vencido" | "sem_historico"
+  liberacao?: StatusLiberacao
   empresa?: string
 }
 
@@ -92,8 +92,8 @@ export interface DashboardMetrics {
 export interface Prestador {
   id: string
   nome: string
-  documento: string
-  documento2?: string // PRODUÇÃO REAL: Campo Doc2 adicionado
+  doc1: string
+  doc2?: string // PRODUÇÃO REAL: Campo Doc2 adicionado
   empresa?: string // PRODUÇÃO REAL: Campo Empresa individual adicionado
 }
 
@@ -104,12 +104,12 @@ export interface DadosMigracao {
   departamento: string // Manual
   dataSolicitacao: string // Manual
   nome: string // Manual
-  documento: string // Manual
-  documento2?: string // Manual (opcional)
+  doc1: string // Manual
+  doc2?: string // Manual (opcional)
   empresa: string // Manual
   dataInicial: string // Manual
   dataFinal?: string // Manual (opcional)
-  cadastro?: string // Automático ("Ok" se dataFinal preenchida)
-  status: string // Automático ("aprovado")
+  liberacao?: string // Automático ("Ok" se dataFinal preenchida)
+  checagem: string // Automático ("aprovado")
   checagemValidaAte: string // Automático (dataSolicitacao + 6 meses)
 }

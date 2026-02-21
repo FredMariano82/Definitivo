@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import type { Solicitacao, PrestadorAvaliacao } from "../../types"
-import { StatusCadastroBadge, StatusCadastroIcon, getChecagemStatus, getCadastroStatus } from "../ui/status-badges"
+import { StatusLiberacaoBadge, StatusLiberacaoIcon, getChecagemStatus, getLiberacaoStatus } from "../ui/status-badges"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getAllSolicitacoes } from "../../services/solicitacoes-service"
 import { supabase } from "@/lib/supabase"
@@ -36,12 +36,12 @@ import { Badge } from "../ui/badge"
 import * as XLSX from "xlsx"
 import { DataInicialIndicator } from "../../utils/date-indicators"
 
-type StatusCadastro = "pendente" | "ok" | "urgente" | "vencida" | "negada"
+type StatusLiberacao = "pendente" | "ok" | "urgente" | "vencida" | "negada"
 
 // Definir todas as colunas disponíveis
 const COLUNAS_DISPONIVEIS = [
   { key: "prestador", label: "Prestador" },
-  { key: "documento", label: "Documento" },
+  { key: "doc1", label: "Doc1" },
   { key: "dataInicial", label: "Data Inicial" },
   { key: "dataFinal", label: "Data Final" },
   { key: "liberacao", label: "Liberação" },
@@ -161,7 +161,7 @@ export default function TodasSolicitacoes() {
 
   // 🆕 NOVA FUNÇÃO DE PRIORIDADE SIMPLIFICADA
   const getPrioridade = (prestador: PrestadorAvaliacao, dataFinal: string) => {
-    const statusLiberacao = getCadastroStatus(prestador, dataFinal).toLowerCase()
+    const statusLiberacao = getLiberacaoStatus(prestador, dataFinal).toLowerCase()
     const statusChecagem = getChecagemStatus(prestador).toLowerCase()
 
     // 🔴 FINAL DA FILA: Vencidos (Prioridade baixíssima)
@@ -203,7 +203,7 @@ export default function TodasSolicitacoes() {
 
   // 🆕 FUNÇÃO PARA VERIFICAR SE BOTÕES DEVEM ESTAR HABILITADOS
   const isBotoesHabilitados = (prestador: PrestadorAvaliacao): boolean => {
-    return prestador.status.toLowerCase() !== "pendente"
+    return prestador.checagem.toLowerCase() !== "pendente"
   }
 
   const getStatusIcon = (status: string) => {
@@ -269,7 +269,7 @@ export default function TodasSolicitacoes() {
         ? solicitacao.prestadores.filter((prestador) => {
           // Calcular status real para filtros
           const checagemStatusReal = getChecagemStatus(prestador)
-          const cadastroStatusReal = getCadastroStatus(prestador, solicitacao.dataFinal)
+          const liberacaoStatusReal = getLiberacaoStatus(prestador, solicitacao.dataFinal)
 
           // Filtro de status checagem (incluindo status calculados)
           let statusMatch = filtroStatus === "todos"
@@ -279,17 +279,17 @@ export default function TodasSolicitacoes() {
             // CORREÇÃO: Mapear filtro para status do banco
             const statusParaFiltro =
               filtroStatus === "aprovado" ? "aprovado" : filtroStatus === "reprovado" ? "reprovado" : filtroStatus
-            statusMatch = prestador.status === statusParaFiltro
+            statusMatch = prestador.checagem === statusParaFiltro
           }
 
           // Filtro de cadastro (incluindo status calculados)
           let cadastroMatch = filtroCadastro === "todos"
           if (filtroCadastro === "vencida") {
-            cadastroMatch = cadastroStatusReal === "vencida"
+            cadastroMatch = liberacaoStatusReal === "vencida"
           } else if (filtroCadastro === "negada") {
-            cadastroMatch = cadastroStatusReal === "negada"
+            cadastroMatch = liberacaoStatusReal === "negada"
           } else if (filtroCadastro !== "todos") {
-            cadastroMatch = prestador.cadastro === filtroCadastro
+            cadastroMatch = prestador.liberacao === filtroCadastro
           }
 
           // Filtro de busca geral
@@ -297,7 +297,7 @@ export default function TodasSolicitacoes() {
           if (buscaGeral.trim()) {
             const termoBusca = buscaGeral.trim()
             const nomeNormalizado = normalizarTexto(prestador.nome)
-            const documentoNormalizado = normalizarDocumento(prestador.documento)
+            const documentoNormalizado = normalizarDocumento(prestador.doc1)
             const termoBuscaNormalizado = normalizarTexto(termoBusca)
             const termoBuscaDocumento = normalizarDocumento(termoBusca)
 
@@ -344,9 +344,9 @@ export default function TodasSolicitacoes() {
           valorA = a.prestador.nome
           valorB = b.prestador.nome
           break
-        case "documento":
-          valorA = a.prestador.documento
-          valorB = b.prestador.documento
+        case "doc1":
+          valorA = a.prestador.doc1
+          valorB = b.prestador.doc1
           break
         case "dataInicial":
           valorA = new Date(a.solicitacao.dataInicial.split("/").reverse().join("-")).getTime()
@@ -401,7 +401,7 @@ export default function TodasSolicitacoes() {
     setPrestadorSelecionado({ solicitacao, prestador })
 
     // Se for erro de RG, já preenche a observação para facilitar
-    if (prestador.status === "erro_rg" || (prestador.status === "reprovado" && prestador.observacoes?.includes('[ERRO RG]'))) {
+    if (prestador.checagem === "erro_rg" || (prestador.checagem === "reprovado" && prestador.observacoes?.includes('[ERRO RG]'))) {
       setObservacoes("Devolvido para correção: Documento informado não pertence a esta pessoa. Favor verificar.")
     } else {
       setObservacoes("")
@@ -424,7 +424,7 @@ export default function TodasSolicitacoes() {
       const { error } = await supabase
         .from("prestadores")
         .update({
-          cadastro: "negada",
+          liberacao: "negada",
           observacoes: observacoes.trim(),
         })
         .eq("id", prestadorSelecionado.prestador.id)
@@ -446,7 +446,7 @@ export default function TodasSolicitacoes() {
               prestadores: s.prestadores
                 ? s.prestadores.map((p) =>
                   p.id === prestadorSelecionado.prestador.id
-                    ? { ...p, cadastro: "negada" as StatusCadastro, observacoes: observacoes.trim() }
+                    ? { ...p, liberacao: "negada" as StatusLiberacao, observacoes: observacoes.trim() }
                     : p,
                 )
                 : [],
@@ -481,8 +481,8 @@ export default function TodasSolicitacoes() {
         prestador: {
           id: prestador.id,
           nome: prestador.nome,
-          documento: prestador.documento,
-          cadastroAtual: prestador.cadastro,
+          doc1: prestador.doc1,
+          liberacaoAtual: prestador.liberacao,
         },
       })
 
@@ -506,7 +506,7 @@ export default function TodasSolicitacoes() {
       const { error } = await supabase
         .from("prestadores")
         .update({
-          cadastro: "ok", // TESTE: Usar minúsculo primeiro
+          liberacao: "ok", // TESTE: Usar minúsculo primeiro
         })
         .eq("id", prestador.id)
 
@@ -533,7 +533,7 @@ export default function TodasSolicitacoes() {
             ? {
               ...s,
               prestadores: s.prestadores
-                ? s.prestadores.map((p) => (p.id === prestador.id ? { ...p, cadastro: "ok" as StatusCadastro } : p))
+                ? s.prestadores.map((p) => (p.id === prestador.id ? { ...p, liberacao: "ok" as StatusLiberacao } : p))
                 : [],
             }
             : s,
@@ -593,20 +593,20 @@ export default function TodasSolicitacoes() {
       const dadosParaExportar = todosPrestadoresFiltrados.map(({ solicitacao, prestador }, index) => ({
         "#": index + 1,
         "Nome do Prestador": prestador.nome,
-        "CPF/CNPJ": prestador.documento,
-        "Data Inicial": ((prestador.status as string) === "reprovado" || prestador.status === "reprovada") ? "-" : solicitacao.dataInicial,
-        "Data Final": ((prestador.status as string) === "reprovado" || prestador.status === "reprovada") ? "-" : solicitacao.dataFinal,
-        "Status Liberação": getCadastroStatus(prestador, solicitacao.dataFinal),
+        "Doc1": prestador.doc1,
+        "Data Inicial": ((prestador.checagem as string) === "reprovado" || prestador.checagem === "reprovada") ? "-" : solicitacao.dataInicial,
+        "Data Final": ((prestador.checagem as string) === "reprovado" || prestador.checagem === "reprovada") ? "-" : solicitacao.dataFinal,
+        "Status Liberação": getLiberacaoStatus(prestador, solicitacao.dataFinal),
         "Status Checagem":
-          prestador.status === "aprovada" || (prestador.status as string) === "aprovado"
+          prestador.checagem === "aprovada" || (prestador.checagem as string) === "aprovado"
             ? "Aprovada"
-            : prestador.status === "reprovada" || (prestador.status as string) === "reprovado"
+            : prestador.checagem === "reprovada" || (prestador.checagem as string) === "reprovado"
               ? "Reprovada"
-              : prestador.status === "pendente"
+              : prestador.checagem === "pendente"
                 ? "Pendente"
-                : prestador.status === "excecao"
+                : prestador.checagem === "excecao"
                   ? "Exceção"
-                  : prestador.status,
+                  : prestador.checagem,
         "Válida até": prestador.checagemValidaAte ? formatarDataParaBR(prestador.checagemValidaAte) : "-",
         Justificativa: prestador.justificativa || "-",
         Observações: prestador.observacoes || "-", // 🆕 NOVA COLUNA
@@ -951,14 +951,14 @@ export default function TodasSolicitacoes() {
                         </div>
                       </th>
                     )}
-                    {colunasVisiveis.documento && (
+                    {colunasVisiveis.doc1 && (
                       <th
                         className="h-12 px-4 text-center align-middle font-semibold text-slate-800 cursor-pointer hover:bg-slate-100 transition-colors"
                         style={{ position: 'sticky', top: 0, zIndex: 40, backgroundColor: '#f8fafc' }}
-                        onClick={() => requestSort("documento")}
+                        onClick={() => requestSort("doc1")}
                       >
                         <div className="flex items-center justify-center">
-                          Documento {getSortIcon("documento")}
+                          Doc1 {getSortIcon("doc1")}
                         </div>
                       </th>
                     )}
@@ -1030,10 +1030,10 @@ export default function TodasSolicitacoes() {
                   {dadosFiltrados.map(({ solicitacao, prestador, prioridade }, index) => {
                     // ... (resto do mapeamento permanece igual, exceto as tags TableRow/TableCell)
                     const isBloqueadoPeloGestor =
-                      (prestador.status === "reprovada" || (prestador.status as string) === "reprovado") &&
+                      (prestador.checagem === "reprovada" || (prestador.checagem as string) === "reprovado") &&
                       (!prestador.aprovadoPor || !prestador.aprovadoPor.includes("Gestor - Reprovação Confirmada"))
 
-                    const statusLiberacao = getCadastroStatus(prestador, solicitacao.dataFinal)
+                    const statusLiberacao = getLiberacaoStatus(prestador, solicitacao.dataFinal)
                     const mostrarUrgencia = statusLiberacao === "pendente" || statusLiberacao === "urgente"
 
                     return (
@@ -1043,9 +1043,9 @@ export default function TodasSolicitacoes() {
                             <div className="whitespace-nowrap font-medium text-slate-700">{prestador.nome}</div>
                           </td>
                         )}
-                        {colunasVisiveis.documento && (
+                        {colunasVisiveis.doc1 && (
                           <td className="p-4 align-middle text-sm text-center">
-                            <div className="text-xs font-mono whitespace-nowrap text-slate-600">{prestador.documento}</div>
+                            <div className="text-xs font-mono whitespace-nowrap text-slate-600">{prestador.doc1}</div>
                           </td>
                         )}
                         {colunasVisiveis.dataInicial && (
@@ -1059,7 +1059,7 @@ export default function TodasSolicitacoes() {
                         )}
                         {colunasVisiveis.dataFinal && (
                           <td className="p-4 align-middle text-sm whitespace-nowrap text-center text-slate-600">
-                            {((prestador.status as string) === "reprovado" || prestador.status === "reprovada") ? (
+                            {((prestador.checagem as string) === "reprovado" || prestador.checagem === "reprovada") ? (
                               <span className="text-slate-400">-</span>
                             ) : (
                               solicitacao.dataFinal
@@ -1069,8 +1069,8 @@ export default function TodasSolicitacoes() {
                         {colunasVisiveis.liberacao && (
                           <td className="p-4 align-middle whitespace-nowrap text-center">
                             <div className="flex items-center justify-center gap-2">
-                              <StatusCadastroIcon status={getCadastroStatus(prestador, solicitacao.dataFinal)} />
-                              <StatusCadastroBadge status={getCadastroStatus(prestador, solicitacao.dataFinal)} />
+                              <StatusLiberacaoIcon status={getLiberacaoStatus(prestador, solicitacao.dataFinal)} />
+                              <StatusLiberacaoBadge status={getLiberacaoStatus(prestador, solicitacao.dataFinal)} />
                             </div>
                           </td>
                         )}
@@ -1083,31 +1083,31 @@ export default function TodasSolicitacoes() {
                               </div>
                             ) : (
                               <div className="flex items-center justify-center gap-2 whitespace-nowrap">
-                                {((prestador.status as string) === "aprovado" || prestador.status === "aprovada") && (
+                                {((prestador.checagem as string) === "aprovado" || prestador.checagem === "aprovada") && (
                                   <>
                                     <CheckCircle className="h-4 w-4 text-green-600" />
                                     <Badge className="bg-green-100 text-green-800 border-green-200">Aprovada</Badge>
                                   </>
                                 )}
-                                {((prestador.status as string) === "reprovado" || prestador.status === "reprovada") && (
+                                {((prestador.checagem as string) === "reprovado" || prestador.checagem === "reprovada") && (
                                   <>
                                     <XCircle className="h-4 w-4 text-red-600" />
                                     <Badge className="bg-red-100 text-red-800 border-red-200">Reprovada</Badge>
                                   </>
                                 )}
-                                {prestador.status === "pendente" && (
+                                {prestador.checagem === "pendente" && (
                                   <>
                                     <Clock className="h-4 w-4 text-yellow-600" />
                                     <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Pendente</Badge>
                                   </>
                                 )}
-                                {prestador.status === "excecao" && (
+                                {prestador.checagem === "excecao" && (
                                   <>
                                     <ShieldAlert className="h-4 w-4 text-purple-600" />
                                     <Badge className="bg-purple-100 text-purple-800 border-purple-200">Exceção</Badge>
                                   </>
                                 )}
-                                {prestador.status === "erro_rg" && (
+                                {prestador.checagem === "erro_rg" && (
                                   <>
                                     <ShieldAlert className="h-4 w-4 text-orange-600" />
                                     <Badge className="bg-orange-100 text-orange-800 border-orange-200">Erro RG</Badge>
@@ -1129,7 +1129,7 @@ export default function TodasSolicitacoes() {
                         {colunasVisiveis.acoes && (
                           <td className="p-4 align-middle relative">
                             {/* Lógica para ERRO RG: Prioridade sobre tudo */}
-                            {(prestador.status === "erro_rg" || (prestador.status === "reprovado" && prestador.observacoes?.includes('[ERRO RG]'))) ? (
+                            {(prestador.checagem === "erro_rg" || (prestador.checagem === "reprovado" && prestador.observacoes?.includes('[ERRO RG]'))) ? (
                               <Button
                                 onClick={() => handleNegarClick(solicitacao, prestador)}
                                 variant="outline"
@@ -1146,13 +1146,13 @@ export default function TodasSolicitacoes() {
                                     <Button
                                       onClick={() => handleConfirmarCadastro(solicitacao, prestador)}
                                       size="sm"
-                                      disabled={!((prestador.status as string) === "aprovado" || prestador.status === "aprovada")}
-                                      className={`h-7 w-7 p-0 text-white ${!((prestador.status as string) === "aprovado" || prestador.status === "aprovada")
+                                      disabled={!((prestador.checagem as string) === "aprovado" || prestador.checagem === "aprovada")}
+                                      className={`h-7 w-7 p-0 text-white ${!((prestador.checagem as string) === "aprovado" || prestador.checagem === "aprovada")
                                         ? "bg-green-600 opacity-40 cursor-not-allowed"
                                         : "bg-green-600 hover:bg-green-700"
                                         }`}
                                       title={
-                                        !((prestador.status as string) === "aprovado" || prestador.status === "aprovada")
+                                        !((prestador.checagem as string) === "aprovado" || prestador.checagem === "aprovada")
                                           ? "Checagem precisa estar Aprovada para liberar"
                                           : "Aprovar liberação"
                                       }
@@ -1166,13 +1166,13 @@ export default function TodasSolicitacoes() {
                                     onClick={() => handleNegarClick(solicitacao, prestador)}
                                     variant="outline"
                                     size="sm"
-                                    disabled={!((prestador.status as string) === "aprovado" || prestador.status === "aprovada")}
-                                    className={`h-7 w-7 p-0 border-red-600 text-red-600 ${!((prestador.status as string) === "aprovado" || prestador.status === "aprovada")
+                                    disabled={!((prestador.checagem as string) === "aprovado" || prestador.checagem === "aprovada")}
+                                    className={`h-7 w-7 p-0 border-red-600 text-red-600 ${!((prestador.checagem as string) === "aprovado" || prestador.checagem === "aprovada")
                                       ? "opacity-40 cursor-not-allowed"
                                       : "hover:bg-red-50"
                                       }`}
                                     title={
-                                      !((prestador.status as string) === "aprovado" || prestador.status === "aprovada")
+                                      !((prestador.checagem as string) === "aprovado" || prestador.checagem === "aprovada")
                                         ? "Checagem precisa estar Aprovada para negar"
                                         : "Negar liberação"
                                     }
@@ -1254,7 +1254,7 @@ export default function TodasSolicitacoes() {
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                {prestadorSelecionado?.prestador.status === "erro_rg" || (prestadorSelecionado?.prestador.status === "reprovado" && prestadorSelecionado?.prestador.observacoes?.includes('[ERRO RG]'))
+                {prestadorSelecionado?.prestador.checagem === "erro_rg" || (prestadorSelecionado?.prestador.checagem === "reprovado" && prestadorSelecionado?.prestador.observacoes?.includes('[ERRO RG]'))
                   ? "↩️ Devolver Solicitação"
                   : "🔴 Negar Liberação"}
               </DialogTitle>
@@ -1267,7 +1267,7 @@ export default function TodasSolicitacoes() {
                     <strong>Prestador:</strong> {prestadorSelecionado.prestador.nome}
                   </p>
                   <p className="text-sm text-slate-600">
-                    <strong>Documento:</strong> {prestadorSelecionado.prestador.documento}
+                    <strong>Doc1:</strong> {prestadorSelecionado.prestador.doc1}
                   </p>
                 </div>
               )}

@@ -31,12 +31,12 @@ export default function MigracaoDados() {
       departamento: "",
       dataSolicitacao: "",
       nome: "",
-      documento: "",
-      documento2: "",
+      doc1: "",
+      doc2: "",
       empresa: "",
       dataInicial: "",
       dataFinal: "",
-      status: "aprovado",
+      checagem: "aprovado",
       checagemValidaAte: "",
     },
   ])
@@ -59,12 +59,12 @@ export default function MigracaoDados() {
         departamento: "",
         dataSolicitacao: "",
         nome: "",
-        documento: "",
-        documento2: "",
+        doc1: "",
+        doc2: "",
         empresa: "",
         dataInicial: "",
         dataFinal: "",
-        status: "aprovado",
+        checagem: "aprovado",
         checagemValidaAte: "",
       },
     ])
@@ -90,7 +90,7 @@ export default function MigracaoDados() {
       const item = dados[i]
 
       // Validações mais flexíveis para migração
-      if (!item.nome.trim() && !item.documento.trim()) {
+      if (!item.nome.trim() && !item.doc1.trim()) {
         return `Linha ${i + 1}: Nome ou documento são obrigatórios`
       }
 
@@ -180,12 +180,12 @@ export default function MigracaoDados() {
               departamento: "",
               dataSolicitacao: "",
               nome: "",
-              documento: "",
-              documento2: "",
+              doc1: "",
+              doc2: "",
               empresa: "",
               dataInicial: "",
               dataFinal: "",
-              status: "aprovado",
+              checagem: "aprovado",
               checagemValidaAte: "",
             },
           ])
@@ -296,7 +296,7 @@ export default function MigracaoDados() {
             <Alert className="border-purple-200 bg-purple-50">
               <FileSpreadsheet className="h-4 w-4 text-purple-600" />
               <AlertDescription className="text-purple-700">
-                <strong>Formato esperado:</strong> Departamento | Data Solicitação | Nome | Documento | Documento2 |
+                <strong>Formato esperado:</strong> Departamento | Data Solicitação | Nome | Doc1 | Doc2 |
                 Empresa | Data Inicial | Data Final
               </AlertDescription>
             </Alert>
@@ -426,9 +426,9 @@ export default function MigracaoDados() {
                   {/* Documento */}
                   <div className="col-span-1">
                     <Input
-                      value={item.documento}
-                      onChange={(e) => atualizarCampo(index, "documento", e.target.value)}
-                      placeholder="RG"
+                      value={item.doc1}
+                      onChange={(e) => atualizarCampo(index, "doc1", e.target.value)}
+                      placeholder="Doc1"
                       className="text-sm"
                     />
                   </div>
@@ -436,9 +436,9 @@ export default function MigracaoDados() {
                   {/* Documento2 */}
                   <div className="col-span-1">
                     <Input
-                      value={item.documento2 || ""}
-                      onChange={(e) => atualizarCampo(index, "documento2", e.target.value)}
-                      placeholder="CPF"
+                      value={item.doc2 || ""}
+                      onChange={(e) => atualizarCampo(index, "doc2", e.target.value)}
+                      placeholder="Doc2"
                       className="text-sm"
                     />
                   </div>

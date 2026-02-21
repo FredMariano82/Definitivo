@@ -228,8 +228,8 @@ export default function UploadListaExcel({ onListaProcessada }: UploadListaExcel
                     <strong>Nome:</strong> {prestador.nome}
                   </p>
                   <p>
-                    <strong>Doc1:</strong> {prestador.documento} | <strong>Doc2:</strong>{" "}
-                    {prestador.documento2 || "N/A"}
+                    <strong>Doc1:</strong> {prestador.doc1} | <strong>Doc2:</strong>{" "}
+                    {prestador.doc2 || "N/A"}
                   </p>
                   <p>
                     <strong>Empresa:</strong> {prestador.empresa || "N/A"}

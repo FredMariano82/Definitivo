@@ -17,6 +17,12 @@ import {
   ArrowUp,
   ArrowDown,
   ChevronDown,
+  CheckCircle,
+  XCircle,
+  Clock,
+  ShieldAlert,
+  User,
+  ShieldCheck,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -31,10 +37,10 @@ import { DataInicialIndicator } from "../../utils/date-indicators"
 import {
   StatusChecagemBadge,
   StatusChecagemIcon,
-  StatusCadastroBadge,
-  StatusCadastroIcon,
+  StatusLiberacaoBadge,
+  StatusLiberacaoIcon,
   getChecagemStatus,
-  getCadastroStatus,
+  getLiberacaoStatus,
 } from "../ui/status-badges"
 import { isDateExpired } from "../../utils/date-helpers"
 import { isAccessExpiringSoon } from "../../utils/status-helpers"
@@ -50,8 +56,8 @@ const COLUNAS_DISPONIVEIS = [
   { key: "dataSolicitacao", label: "Data Solicitação" },
   { key: "empresa", label: "Empresa" },
   { key: "prestador", label: "Prestador" },
-  { key: "documento", label: "Documento" },
-  { key: "documento2", label: "Documento2" },
+  { key: "doc1", label: "Doc1" },
+  { key: "doc2", label: "Doc2" },
   { key: "dataInicial", label: "Data Inicial" },
   { key: "dataFinal", label: "Data Final" },
   { key: "liberacao", label: "Liberação" },
@@ -64,7 +70,7 @@ export default function SolicitacoesDepartamento() {
   const { usuario } = useAuth()
   const router = useRouter()
   const [filtroStatus, setFiltroStatus] = useState<string>("todos")
-  const [filtroCadastro, setFiltroCadastro] = useState<string>("todos")
+  const [filtroLiberacao, setFiltroLiberacao] = useState<string>("todos")
   const [filtroEmpresa, setFiltroEmpresa] = useState<string>("todos")
   const [filtroSolicitante, setFiltroSolicitante] = useState<string>("todos")
   const [buscaGeral, setBuscaGeral] = useState<string>("")
@@ -90,15 +96,15 @@ export default function SolicitacoesDepartamento() {
 
   // 🆕 Estado para Modal de Edição (Correção)
   const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false)
-  const [dadosEdicao, setDadosEdicao] = useState({ documento: "", documento2: "" })
+  const [dadosEdicao, setDadosEdicao] = useState({ doc1: "", doc2: "" })
   const [salvandoEdicao, setSalvandoEdicao] = useState(false)
   const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null)
 
   const handleAbrirEdicao = () => {
     if (prestadorSelecionado) {
       setDadosEdicao({
-        documento: prestadorSelecionado.prestador.documento || "",
-        documento2: prestadorSelecionado.prestador.documento2 || "",
+        doc1: prestadorSelecionado.prestador.doc1 || "",
+        doc2: prestadorSelecionado.prestador.doc2 || "",
       })
       setModalEdicaoAberto(true)
     }
@@ -112,10 +118,10 @@ export default function SolicitacoesDepartamento() {
       const { error } = await supabase
         .from("prestadores")
         .update({
-          documento: dadosEdicao.documento,
-          documento2: dadosEdicao.documento2,
-          status: "pendente", // Resetar status checagem
-          cadastro: "pendente", // Resetar status liberação
+          doc1: dadosEdicao.doc1,
+          doc2: dadosEdicao.doc2,
+          checagem: "pendente", // Resetar status checagem
+          liberacao: "pendente", // Resetar status liberação
           observacoes: null, // Limpar observações de erro
         })
         .eq("id", prestadorSelecionado.prestador.id)
@@ -197,8 +203,8 @@ export default function SolicitacoesDepartamento() {
   }
 
   const getPrioridade = (prestador: any) => {
-    if (prestador.status === "pendente" && prestador.cadastro === "urgente") return 1
-    if (prestador.status === "pendente" && prestador.cadastro === "pendente") return 2
+    if (prestador.checagem === "pendente" && prestador.liberacao === "urgente") return 1
+    if (prestador.checagem === "pendente" && prestador.liberacao === "pendente") return 2
     return 3
   }
 
@@ -223,7 +229,7 @@ export default function SolicitacoesDepartamento() {
   // Resetar página quando filtros mudarem
   useEffect(() => {
     setPaginaAtual(1)
-  }, [filtroStatus, filtroCadastro, filtroSolicitante, filtroEmpresa, buscaGeral])
+  }, [filtroStatus, filtroLiberacao, filtroSolicitante, filtroEmpresa, buscaGeral])
 
   if (carregando) {
     return (
@@ -259,17 +265,17 @@ export default function SolicitacoesDepartamento() {
 
       const prestadoresFiltrados = solicitacao.prestadores.filter((prestador: any) => {
         const checagemStatusReal = getChecagemStatus(prestador)
-        const cadastroStatusReal = getCadastroStatus(prestador, solicitacao.dataFinal)
+        const liberacaoStatusReal = getLiberacaoStatus(prestador, solicitacao.dataFinal)
 
         let statusMatch = filtroStatus === "todos"
         if (filtroStatus === "vencida") statusMatch = checagemStatusReal === "vencida"
-        else if (filtroStatus !== "todos") statusMatch = prestador.status === filtroStatus
+        else if (filtroStatus !== "todos") statusMatch = prestador.checagem === filtroStatus
 
-        let cadastroMatch = filtroCadastro === "todos"
-        if (filtroCadastro === "vencida") cadastroMatch = cadastroStatusReal === "vencida"
-        else if (filtroCadastro !== "todos") cadastroMatch = prestador.cadastro === filtroCadastro
+        let liberacaoMatch = filtroLiberacao === "todos"
+        if (filtroLiberacao === "vencida") liberacaoMatch = liberacaoStatusReal === "vencida"
+        else if (filtroLiberacao !== "todos") liberacaoMatch = prestador.liberacao === filtroLiberacao
 
-        return statusMatch && cadastroMatch
+        return statusMatch && liberacaoMatch
       })
 
       if (prestadoresFiltrados.length > 0) {
@@ -310,9 +316,9 @@ export default function SolicitacoesDepartamento() {
           valorA = a.prestador.nome
           valorB = b.prestador.nome
           break
-        case "documento":
-          valorA = a.prestador.documento
-          valorB = b.prestador.documento
+        case "doc1":
+          valorA = a.prestador.doc1
+          valorB = b.prestador.doc1
           break
         case "dataInicial":
           valorA = new Date(a.solicitacao.dataInicial.split("/").reverse().join("-")).getTime()
@@ -375,8 +381,8 @@ export default function SolicitacoesDepartamento() {
 
   const deveExibirBotaoRenovar = (prestador: any, dataFinal: string) => {
     const checagemStatus = getChecagemStatus(prestador)
-    const cadastroStatus = getCadastroStatus(prestador, dataFinal)
-    if (checagemStatus === "vencida" || cadastroStatus === "vencida") return true
+    const liberacaoStatus = getLiberacaoStatus(prestador, dataFinal)
+    if (checagemStatus === "vencida" || liberacaoStatus === "vencida") return true
     if (prestador.checagemValidaAte && isDateExpired(prestador.checagemValidaAte)) return false
     if (prestador.checagemValidaAte && isAccessExpiringSoon(prestador.checagemValidaAte)) return true
     if (dataFinal && isAccessExpiringSoon(dataFinal)) return true
@@ -391,7 +397,7 @@ export default function SolicitacoesDepartamento() {
       prestadores: solicitacao.prestadores.map((p: any) => ({
         id: p.id,
         nome: p.nome,
-        documento: p.documento,
+        doc1: p.doc1,
       })),
       dataInicial: "",
       dataFinal: "",
@@ -423,12 +429,12 @@ export default function SolicitacoesDepartamento() {
       const dadosParaExportar = dadosOrdenados.map((item, index) => ({
         "#": index + 1,
         Prestador: item.prestador.nome,
-        Documento: item.prestador.documento,
-        Documento2: item.prestador.documento2 || "-",
+        Doc1: item.prestador.doc1,
+        Doc2: item.prestador.doc2 || "-",
         "Data Inicial": item.solicitacao.dataInicial,
         "Data Final": item.solicitacao.dataFinal,
-        "Status Liberação": getCadastroStatus(item.prestador, item.solicitacao.dataFinal),
-        "Status Checagem": getChecagemStatus(item.prestador),
+        "Liberação": getLiberacaoStatus(item.prestador, item.solicitacao.dataFinal),
+        "Checagem": getChecagemStatus(item.prestador),
         "Válida até": item.prestador.checagemValidaAte ? formatarDataParaBR(item.prestador.checagemValidaAte) : "-",
         Observações: item.prestador.observacoes || "-",
         Departamento: item.solicitacao.departamento,
@@ -486,18 +492,24 @@ export default function SolicitacoesDepartamento() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4">
-      <div className="max-w-[1600px] mx-auto">
-        <Card className="shadow-md border border-slate-200 rounded-lg overflow-hidden bg-white">
-          <CardHeader className="pb-6 pt-8 bg-slate-800 border-b border-slate-700 relative">
-            <CardTitle className="text-2xl font-bold text-white text-center flex items-center justify-center gap-3 tracking-tight">
-              <Users className="h-6 w-6 text-slate-400" />
-              Solicitações do Departamento - {usuario?.departamento}
-            </CardTitle>
-            <div className="w-16 h-1 bg-slate-500 mx-auto rounded-full mt-3 opacity-50"></div>
-          </CardHeader>
+    <div className="min-h-screen bg-slate-50 p-4 font-sans">
+      <div className="max-w-[1600px] mx-auto space-y-4">
+        {/* Header - Gradient Original */}
+        <div className="bg-gradient-to-b from-slate-900 to-slate-800 rounded-t-xl rounded-b-sm p-8 text-center relative overflow-hidden shadow-lg border-b-4 border-blue-500">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-slate-700/20 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 w-40 h-40 bg-blue-900/20 rounded-full blur-2xl -ml-10 -mb-10 pointer-events-none"></div>
 
-          <CardContent className="pt-8">
+          <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2 relative z-10 tracking-tight flex items-center justify-center gap-3">
+            <Users className="h-8 w-8 text-blue-400" />
+            Solicitações do Departamento
+            {usuario?.departamento && <span className="text-blue-400">— {usuario.departamento}</span>}
+          </h1>
+          <div className="w-24 h-1.5 bg-blue-500 mx-auto rounded-full mt-4 opacity-80"></div>
+        </div>
+
+        {/* Card Principal */}
+        <Card className="shadow-lg border-0 rounded-xl overflow-hidden bg-white/95 backdrop-blur-sm relative z-20 -mt-2">
+          <CardContent className="p-6">
             <div className="mb-6 bg-slate-50 border-l-4 border-slate-400 p-4 rounded-r-md">
               <div className="flex items-center gap-3">
                 <Users className="h-5 w-5 text-slate-600" />
@@ -510,544 +522,479 @@ export default function SolicitacoesDepartamento() {
               </div>
             </div>
 
-            <div className="mb-8 border border-slate-200 rounded-md p-6 bg-white shadow-sm">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="bg-slate-100 p-2 rounded">
-                    <Filter className="h-5 w-5 text-slate-600" />
-                  </div>
-                  <Label className="text-base font-bold text-slate-800 uppercase tracking-wider">Filtros & Pesquisa</Label>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={() => setMostrarFiltros(!mostrarFiltros)}
-                    variant="outline"
-                    size="sm"
-                    className={`border-slate-300 h-9 px-4 rounded font-semibold ${mostrarFiltros ? "bg-slate-800 text-white hover:bg-slate-900" : "text-slate-600 hover:bg-slate-50"}`}
-                  >
-                    Filtros Avançados
-                    <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${mostrarFiltros ? "rotate-180" : ""}`} />
-                  </Button>
-
-                  {/* Botão Colunas */}
-                  <div className="relative inline-block text-left">
-                    <Button
-                      onClick={() => setModalColunasAberto(!modalColunasAberto)}
-                      variant="outline"
-                      size="sm"
-                      className="h-9 border-slate-300 text-slate-700 hover:bg-slate-50 rounded font-semibold"
-                    >
-                      <Columns className="h-4 w-4 mr-2" />
-                      Colunas
-                      <ChevronDown className="h-3 w-3 ml-2" />
-                    </Button>
-
-                    {modalColunasAberto && (
-                      <>
-                        <div className="fixed inset-0 z-40" onClick={() => setModalColunasAberto(false)}></div>
-                        <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-xl z-50 border border-slate-200 p-4 animate-in fade-in zoom-in-95">
-                          <div className="flex items-center justify-between mb-3 border-b pb-2">
-                            <span className="font-bold text-xs uppercase tracking-widest text-slate-500">Exibir Colunas</span>
-                            <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
-                              {Object.values(colunasVisiveis).filter(Boolean).length}/{COLUNAS_DISPONIVEIS.length}
-                            </span>
-                          </div>
-
-                          <div className="flex gap-2 mb-3">
-                            <Button
-                              onClick={() => toggleTodasColunas(true)}
-                              variant="ghost"
-                              size="sm"
-                              className="flex-1 h-7 text-[10px] font-bold uppercase tracking-tight text-blue-600 hover:bg-blue-50 border border-blue-100 rounded"
-                            >
-                              Todas
-                            </Button>
-                            <Button
-                              onClick={() => toggleTodasColunas(false)}
-                              variant="ghost"
-                              size="sm"
-                              className="flex-1 h-7 text-[10px] font-bold uppercase tracking-tight text-slate-600 hover:bg-slate-50 border border-slate-100 rounded"
-                            >
-                              Ocultar
-                            </Button>
-                          </div>
-
-                          <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
-                            {COLUNAS_DISPONIVEIS.map((coluna) => (
-                              <label
-                                key={coluna.key}
-                                className="flex items-center space-x-2 cursor-pointer hover:bg-slate-50 p-1.5 rounded transition-colors"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={colunasVisiveis[coluna.key] || false}
-                                  onChange={() => toggleColuna(coluna.key)}
-                                  className="h-4 w-4 text-slate-800 rounded border-slate-300 focus:ring-slate-500"
-                                />
-                                <span className="text-sm font-medium text-slate-600">{coluna.label}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Botão Download */}
-                  <Button
-                    onClick={handleDownloadExcel}
-                    disabled={carregandoDownload}
-                    variant="outline"
-                    size="sm"
-                    className="h-9 border-slate-800 bg-slate-800 text-white hover:bg-slate-900 rounded font-semibold px-4 transition-all"
-                  >
-                    {carregandoDownload ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-white mr-2"></div>
-                        Processando...
-                      </>
-                    ) : (
-                      <>
-                        <Download className="h-4 w-4 mr-2" />
-                        Download PDF/Excel
-                      </>
-                    )}
-                  </Button>
-                </div>
+            {/* Área de Filtros principal */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 bg-white p-4 rounded-lg border border-slate-100 shadow-sm">
+              <div className="flex items-center gap-3">
+                <Filter className="h-5 w-5 text-slate-500" />
+                <h3 className="text-lg font-semibold text-slate-700">Filtros & Busca</h3>
               </div>
 
-              {/* Área de Filtros - Layout Flexível */}
-              <div className="space-y-4">
-                {/* Linha Principal: Busca Geral (Sempre Visível) */}
-                <div className="flex flex-col md:flex-row gap-6 mt-4">
-                  <div className="flex-1 max-w-xl">
-                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Pesquisa Global</Label>
-                    <div className="relative">
-                      <Input
-                        type="text"
-                        placeholder="Nome, documento, empresa ou número..."
-                        value={buscaGeral}
-                        onChange={(e) => setBuscaGeral(e.target.value)}
-                        className="h-10 border-slate-300 focus:border-slate-800 focus:ring-0 rounded-none bg-slate-50/30 pr-10"
-                      />
-                      <Search className="h-4 w-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Filtros Avançados (Collapsible) */}
-                {mostrarFiltros && (
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-6 mt-6 border-t border-slate-100 animate-in fade-in slide-in-from-top-4 duration-300">
-                    {/* Empresa */}
-                    <div>
-                      <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Filtrar Empresa</Label>
-                      <Select value={filtroEmpresa} onValueChange={setFiltroEmpresa}>
-                        <SelectTrigger className="h-10 border-slate-300 rounded-none focus:ring-0 bg-white">
-                          <SelectValue placeholder="Todas" />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-none border-slate-300">
-                          <SelectItem value="todos">Todas as Empresas</SelectItem>
-                          {empresasDepartamento.map((empresa) => (
-                            <SelectItem key={empresa} value={empresa}>
-                              {empresa}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Status Checagem */}
-                    <div>
-                      <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Célula Checagem</Label>
-                      <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-                        <SelectTrigger className="h-10 border-slate-300 rounded-none focus:ring-0 bg-white">
-                          <SelectValue placeholder="Todos" />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-none border-slate-300">
-                          <SelectItem value="todos">Todos os Status</SelectItem>
-                          <SelectItem value="pendente">Pendente</SelectItem>
-                          <SelectItem value="aprovado">Aprovado</SelectItem>
-                          <SelectItem value="reprovado">Reprovado</SelectItem>
-                          <SelectItem value="vencida">Vencida</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Status Liberação */}
-                    <div>
-                      <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Célula Liberação</Label>
-                      <Select value={filtroCadastro} onValueChange={setFiltroCadastro}>
-                        <SelectTrigger className="h-10 border-slate-300 rounded-none focus:ring-0 bg-white">
-                          <SelectValue placeholder="Todos" />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-none border-slate-300">
-                          <SelectItem value="todos">Todos os Status</SelectItem>
-                          <SelectItem value="pendente">Pendente</SelectItem>
-                          <SelectItem value="ok">Ok</SelectItem>
-                          <SelectItem value="urgente">Urgente</SelectItem>
-                          <SelectItem value="vencida">Vencida</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Solicitante */}
-                    <div>
-                      <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Responsável</Label>
-                      <Select value={filtroSolicitante} onValueChange={setFiltroSolicitante}>
-                        <SelectTrigger className="h-10 border-slate-300 rounded-none focus:ring-0 bg-white">
-                          <SelectValue placeholder="Todos" />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-none border-slate-300">
-                          <SelectItem value="todos">Todos os Solicitantes</SelectItem>
-                          {solicitantesDepartamento.map((solicitante) => (
-                            <SelectItem key={solicitante} value={solicitante}>
-                              {solicitante}
-                              {solicitante === usuario?.nome && " (Você)"}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Informações de Paginação */}
-            <div className="mb-4 flex items-center justify-between">
-              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                Linhagem: <span className="text-slate-800">{indiceInicio + 1}</span> — <span className="text-slate-800">{Math.min(indiceFim, totalPrestadores)}</span> <span className="mx-2 overflow-hidden opacity-30">|</span> Total de Registros: <span className="text-slate-700 font-bold">{totalPrestadores}</span>
-              </div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                Página <span className="text-slate-800">{paginaAtual}</span> <span className="mx-2 opacity-30">/</span> {totalPaginas}
-              </div>
-            </div>
-
-            {/* Container com scroll e sticky header - Removendo wrapper extra do Table do shadcn se possível ou forçando estilo */}
-            <div className="overflow-x-auto border border-slate-200 rounded-lg">
-              <Table className="w-full border-collapse">
-                <TableHeader
-                  className="bg-slate-800 sticky top-0 z-50 shadow-md"
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                <Button
+                  onClick={() => setMostrarFiltros(!mostrarFiltros)}
+                  variant="outline"
+                  size="sm"
+                  className="bg-white hover:bg-slate-50 text-slate-600 border-slate-200"
                 >
-                  <TableRow className="border-b border-slate-700">
-                    {colunasVisiveis.numero && (
-                      <TableHead
-                        className="h-12 px-4 text-center align-middle font-bold text-slate-200 uppercase tracking-tighter text-[11px] min-w-[120px] whitespace-nowrap cursor-pointer hover:bg-slate-700 transition-colors z-20"
-                        style={{ position: 'sticky', top: 0, zIndex: 40, backgroundColor: '#1e293b' }}
-                        onClick={() => requestSort("numero")}
-                      >
-                        <div className="flex items-center justify-center gap-2">
-                          Número {getSortIcon("numero")}
-                        </div>
-                      </TableHead>
-                    )}
-                    {colunasVisiveis.dataSolicitacao && (
-                      <TableHead
-                        className="h-12 px-4 text-center align-middle font-bold text-slate-200 uppercase tracking-tighter text-[11px] min-w-[110px] whitespace-nowrap cursor-pointer hover:bg-slate-700 transition-colors z-20"
-                        style={{ position: 'sticky', top: 0, zIndex: 40, backgroundColor: '#1e293b' }}
-                        onClick={() => requestSort("dataSolicitacao")}
-                      >
-                        <div className="flex items-center justify-center gap-2">
-                          Solicitação {getSortIcon("dataSolicitacao")}
-                        </div>
-                      </TableHead>
-                    )}
-                    {colunasVisiveis.empresa && (
-                      <TableHead
-                        className="h-12 px-4 text-center align-middle font-bold text-slate-200 uppercase tracking-tighter text-[11px] min-w-[180px] cursor-pointer hover:bg-slate-700 transition-colors z-20"
-                        style={{ position: 'sticky', top: 0, zIndex: 40, backgroundColor: '#1e293b' }}
-                        onClick={() => requestSort("empresa")}
-                      >
-                        <div className="flex items-center justify-center gap-2">
-                          Empresa {getSortIcon("empresa")}
-                        </div>
-                      </TableHead>
-                    )}
-                    {colunasVisiveis.prestador && (
-                      <TableHead
-                        className="h-12 px-4 text-center align-middle font-bold text-slate-200 uppercase tracking-tighter text-[11px] min-w-[160px] cursor-pointer hover:bg-slate-700 transition-colors z-20"
-                        style={{ position: 'sticky', top: 0, zIndex: 40, backgroundColor: '#1e293b' }}
-                        onClick={() => requestSort("prestador")}
-                      >
-                        <div className="flex items-center justify-center gap-2">
-                          Prestador {getSortIcon("prestador")}
-                        </div>
-                      </TableHead>
-                    )}
-                    {colunasVisiveis.documento && (
-                      <TableHead
-                        className="h-12 px-4 text-center align-middle font-bold text-slate-200 uppercase tracking-tighter text-[11px] min-w-[130px] cursor-pointer hover:bg-slate-700 transition-colors z-20"
-                        style={{ position: 'sticky', top: 0, zIndex: 40, backgroundColor: '#1e293b' }}
-                        onClick={() => requestSort("documento")}
-                      >
-                        <div className="flex items-center justify-center gap-2">
-                          Documento {getSortIcon("documento")}
-                        </div>
-                      </TableHead>
-                    )}
-                    {colunasVisiveis.documento2 && (
-                      <TableHead
-                        className="h-12 px-4 text-center align-middle font-bold text-slate-200 uppercase tracking-tighter text-[11px] min-w-[130px] z-20"
-                        style={{ position: 'sticky', top: 0, zIndex: 40, backgroundColor: '#1e293b' }}
-                      >
-                        Documento2
-                      </TableHead>
-                    )}
-                    {colunasVisiveis.dataInicial && (
-                      <TableHead
-                        className="h-12 px-4 text-center align-middle font-bold text-slate-200 uppercase tracking-tighter text-[11px] min-w-[110px] cursor-pointer hover:bg-slate-700 transition-colors z-20"
-                        style={{ position: 'sticky', top: 0, zIndex: 40, backgroundColor: '#1e293b' }}
-                        onClick={() => requestSort("dataInicial")}
-                      >
-                        <div className="flex items-center justify-center gap-2">
-                          Data Inicial {getSortIcon("dataInicial")}
-                        </div>
-                      </TableHead>
-                    )}
-                    {colunasVisiveis.dataFinal && (
-                      <TableHead
-                        className="h-12 px-4 text-center align-middle font-bold text-slate-200 uppercase tracking-tighter text-[11px] min-w-[110px] cursor-pointer hover:bg-slate-700 transition-colors z-20"
-                        style={{ position: 'sticky', top: 0, zIndex: 40, backgroundColor: '#1e293b' }}
-                        onClick={() => requestSort("dataFinal")}
-                      >
-                        <div className="flex items-center justify-center gap-2">
-                          Data Final {getSortIcon("dataFinal")}
-                        </div>
-                      </TableHead>
-                    )}
-                    {colunasVisiveis.liberacao && (
-                      <TableHead
-                        className="h-12 px-4 text-center align-middle font-bold text-slate-200 uppercase tracking-tighter text-[11px] min-w-[120px] whitespace-nowrap z-20"
-                        style={{ position: 'sticky', top: 0, zIndex: 40, backgroundColor: '#1e293b' }}
-                      >
-                        Liberação
-                      </TableHead>
-                    )}
-                    {colunasVisiveis.checagem && (
-                      <TableHead
-                        className="h-12 px-4 text-center align-middle font-bold text-slate-200 uppercase tracking-tighter text-[11px] min-w-[120px] whitespace-nowrap z-20"
-                        style={{ position: 'sticky', top: 0, zIndex: 40, backgroundColor: '#1e293b' }}
-                      >
-                        Checagem
-                      </TableHead>
-                    )}
-                    {colunasVisiveis.validaAte && (
-                      <TableHead
-                        className="h-12 px-4 text-center align-middle font-bold text-slate-200 uppercase tracking-tighter text-[11px] min-w-[110px] whitespace-nowrap z-20"
-                        style={{ position: 'sticky', top: 0, zIndex: 40, backgroundColor: '#1e293b' }}
-                      >
-                        Válida até
-                      </TableHead>
-                    )}
-                    {colunasVisiveis.observacoes && (
-                      <TableHead
-                        className="h-12 px-4 text-center align-middle font-bold text-slate-200 uppercase tracking-tighter text-[11px] min-w-[200px] z-20"
-                        style={{ position: 'sticky', top: 0, zIndex: 40, backgroundColor: '#1e293b' }}
-                      >
-                        Observações
-                      </TableHead>
-                    )}
-                    <TableHead
-                      className="h-12 px-4 text-center align-middle font-bold text-slate-200 uppercase tracking-tighter text-[11px] min-w-[80px] z-30"
-                      style={{ position: 'sticky', top: 0, right: 0, zIndex: 50, backgroundColor: '#1e293b' }}
-                    >
-                      Ações
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody className="[&_tr:last-child]:border-0">
-                  {dadosPaginados.map(({ solicitacao, prestador, prioridade }, index) => {
-                    const prestadorIndex = solicitacao.prestadores.findIndex((p: any) => p.id === prestador.id)
-                    // Remover esta linha:
-                    // const isFirstPrestadorOfSolicitacao = index === 0 || dadosOrdenados[index - 1].solicitacao.id !== solicitacao.id
-                    const checagemStatus = getChecagemStatus(prestador)
-                    const cadastroStatus = getCadastroStatus(prestador, solicitacao.dataFinal)
+                  Filtros Avançados
+                  <ChevronDown className={`h-4 w-4 ml-2 transition-transform duration-200 ${mostrarFiltros ? "rotate-180" : ""}`} />
+                </Button>
 
-                    return (
-                      <TableRow
-                        key={`${solicitacao.id}-${prestador.id}`}
-                        className={`hover:bg-slate-50 ${solicitacao.solicitante === usuario?.nome ? "bg-slate-25 border-l-4 border-l-slate-500" : ""
-                          } ${prestadorIndex > 0 ? "border-l-4 border-l-slate-200 bg-slate-25" : ""}`}
-                      >
-                        {colunasVisiveis.numero && (
-                          <TableCell className="font-medium text-sm whitespace-nowrap text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              {/* Indicador de prioridade */}
-                              {prestador.status === "pendente" && prestador.cadastro === "urgente" && (
-                                <div
-                                  className="w-2 h-2 bg-red-500 rounded-full"
-                                  title="Prioridade ALTA - Urgente"
-                                ></div>
-                              )}
-                              {prestador.status === "pendente" && prestador.cadastro === "pendente" && (
-                                <div className="w-2 h-2 bg-slate-500 rounded-full" title="Prioridade NORMAL"></div>
-                              )}
-                              {solicitacao.numero}
-                              {solicitacao.solicitante === usuario?.nome && (
-                                <Badge variant="outline" className="ml-2 text-xs">
-                                  Minha
-                                </Badge>
-                              )}
-                              {solicitacao.statusGeral === "parcial" && (
-                                <AlertTriangle
-                                  className="h-4 w-4 text-orange-500"
-                                />
-                              )}
-                            </div>
-                          </TableCell>
-                        )}
-                        {colunasVisiveis.dataSolicitacao && (
-                          <TableCell className="text-sm whitespace-nowrap text-center">
-                            {solicitacao.dataSolicitacao}
-                          </TableCell>
-                        )}
-                        {colunasVisiveis.empresa && (
-                          <TableCell className="text-sm text-center">{solicitacao.empresa}</TableCell>
-                        )}
-                        {colunasVisiveis.prestador && (
-                          <TableCell className="text-sm text-center">
-                            <div className="whitespace-nowrap font-medium flex items-center justify-center gap-2">
-                              {prestador.nome}
-                            </div>
-                          </TableCell>
-                        )}
-                        {colunasVisiveis.documento && (
-                          <TableCell className="text-sm text-center">
-                            <div className="text-xs font-mono whitespace-nowrap">{prestador.documento}</div>
-                          </TableCell>
-                        )}
-                        {colunasVisiveis.documento2 && (
-                          <TableCell className="text-sm text-center">
-                            <div className="text-xs font-mono whitespace-nowrap">{prestador.documento2 || "-"}</div>
-                          </TableCell>
-                        )}
-                        {colunasVisiveis.dataInicial && (
-                          <TableCell className="text-sm whitespace-nowrap text-center">
-                            <DataInicialIndicator
-                              dataInicial={solicitacao.dataInicial}
-                              isReprovado={prestador.status === "reprovado"}
-                            />
-                          </TableCell>
-                        )}
-                        {colunasVisiveis.dataFinal && (
-                          <TableCell className="text-sm whitespace-nowrap text-center">
-                            {prestador.status === "reprovado" ? (
-                              <span className="text-slate-400">-</span>
-                            ) : (
-                              <div className="flex items-center justify-center gap-2">
-                                <span
-                                  className={isDateExpired(solicitacao.dataFinal) ? "text-red-600 font-medium" : ""}
-                                >
-                                  {solicitacao.dataFinal}
-                                </span>
-                                {isDateExpired(solicitacao.dataFinal) && (
-                                  <AlertTriangle className="h-4 w-4 text-red-600" />
-                                )}
-                              </div>
-                            )}
-                          </TableCell>
-                        )}
-                        {colunasVisiveis.liberacao && (
-                          <TableCell className="whitespace-nowrap text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              <StatusCadastroIcon status={cadastroStatus} />
-                              <StatusCadastroBadge status={cadastroStatus} />
-                            </div>
-                          </TableCell>
-                        )}
-                        {colunasVisiveis.checagem && (
-                          <TableCell className="px-4 py-3 text-center border-r border-slate-50">
-                            <div className="flex items-center justify-center">
-                              <StatusChecagemBadge status={checagemStatus} />
-                            </div>
-                          </TableCell>
-                        )}
-                        {colunasVisiveis.validaAte && (
-                          <TableCell className="px-4 py-3 text-slate-600 text-center border-r border-slate-50">
-                            {prestador.checagemValidaAte ? formatarDataParaBR(prestador.checagemValidaAte) : <span className="text-slate-300">-</span>}
-                          </TableCell>
-                        )}
-                        {colunasVisiveis.observacoes && (
-                          <TableCell className="px-4 py-3 text-left">
-                            {prestador.observacoes ? (
-                              <div className="text-[11px] leading-tight text-slate-500 bg-slate-50 p-2 border border-slate-100 rounded-sm">
-                                {prestador.observacoes}
-                              </div>
-                            ) : (
-                              <span className="text-slate-300">-</span>
-                            )}
-                          </TableCell>
-                        )}
-                        <TableCell
-                          className="px-4 py-3 text-center bg-white/80 backdrop-blur-sm z-30"
-                          style={{ position: 'sticky', right: 0 }}
-                        >
+                {/* Botão Colunas */}
+                <div className="relative inline-block text-left">
+                  <Button
+                    onClick={() => setModalColunasAberto(!modalColunasAberto)}
+                    variant="outline"
+                    size="sm"
+                    className="bg-white hover:bg-slate-50 text-slate-600 border-slate-200"
+                  >
+                    <Columns className="h-4 w-4 mr-2" />
+                    Colunas
+                    <ChevronDown className="h-3 w-3 ml-2" />
+                  </Button>
+
+                  {modalColunasAberto && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setModalColunasAberto(false)}></div>
+                      <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-xl z-50 border border-slate-200 p-4 animate-in fade-in zoom-in-95">
+                        <div className="flex items-center justify-between mb-3 border-b pb-2">
+                          <span className="font-bold text-xs uppercase tracking-widest text-slate-500">Exibir Colunas</span>
+                          <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                            {Object.values(colunasVisiveis).filter(Boolean).length}/{COLUNAS_DISPONIVEIS.length}
+                          </span>
+                        </div>
+
+                        <div className="flex gap-2 mb-3">
                           <Button
+                            onClick={() => toggleTodasColunas(true)}
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleVisualizarSolicitacao(solicitacao, prestador)}
-                            className="h-8 w-8 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                            className="flex-1 h-7 text-[10px] font-bold uppercase tracking-tight text-blue-600 hover:bg-blue-50 border border-blue-100 rounded"
                           >
-                            <Eye className="h-4 w-4" />
+                            Todas
                           </Button>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
+                          <Button
+                            onClick={() => toggleTodasColunas(false)}
+                            variant="ghost"
+                            size="sm"
+                            className="flex-1 h-7 text-[10px] font-bold uppercase tracking-tight text-slate-600 hover:bg-slate-50 border border-slate-100 rounded"
+                          >
+                            Ocultar
+                          </Button>
+                        </div>
+
+                        <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+                          {COLUNAS_DISPONIVEIS.map((coluna) => (
+                            <label
+                              key={coluna.key}
+                              className="flex items-center space-x-2 cursor-pointer hover:bg-slate-50 p-1.5 rounded transition-colors"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={colunasVisiveis[coluna.key] || false}
+                                onChange={() => toggleColuna(coluna.key)}
+                                className="h-4 w-4 text-slate-800 rounded border-slate-300 focus:ring-slate-500"
+                              />
+                              <span className="text-sm font-medium text-slate-600">{coluna.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <Button
+                  onClick={handleDownloadExcel}
+                  disabled={carregandoDownload}
+                  variant="outline"
+                  size="sm"
+                  className="bg-white hover:bg-slate-50 text-slate-600 border-slate-200"
+                >
+                  {carregandoDownload ? (
+                    <div className="h-4 w-4 border-2 border-slate-400 border-t-slate-600 rounded-full animate-spin mr-2" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  Download
+                </Button>
+              </div>
             </div>
 
-            {dadosPaginados.length === 0 && (
-              <div className="text-center py-20 bg-slate-50 border-x border-b border-slate-200">
-                <Search className="h-12 w-12 mx-auto mb-4 text-slate-300 opacity-50" />
-                <p className="text-lg font-bold text-slate-400 uppercase tracking-wider">Nenhum registro localizado</p>
-                <p className="text-sm text-slate-400">Tente ajustar seus critérios de filtragem.</p>
-              </div>
-            )}
-
-            <div className="mt-8 pt-6 border-t border-slate-200 flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="flex flex-col gap-1">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Resumo da Visualização</div>
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-bold text-slate-800">{totalPrestadoresFiltrados} <span className="text-slate-400 font-medium">prestadores localizados</span></span>
-                  <div className="h-4 w-[1px] bg-slate-200"></div>
-                  <span className="text-sm font-bold text-slate-600 italic">{minhasSolicitacoes.length} <span className="text-slate-400/70 font-medium">seus registros</span></span>
+            <div className="space-y-4 mb-6">
+              <div className="grid gap-2">
+                <Label className="text-sm text-slate-500 font-medium">Busca Geral</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Nome ou documento..."
+                    value={buscaGeral}
+                    onChange={(e) => setBuscaGeral(e.target.value)}
+                    className="pl-9 h-10 border-slate-200 bg-white"
+                  />
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              {/* Filtros Avançados (Collapsible) */}
+              {mostrarFiltros && (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-6 mt-6 border-t border-slate-100 animate-in fade-in slide-in-from-top-4 duration-300">
+                  {/* Empresa */}
+                  <div>
+                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Filtrar Empresa</Label>
+                    <Select value={filtroEmpresa} onValueChange={setFiltroEmpresa}>
+                      <SelectTrigger className="h-10 border-slate-300 rounded-none focus:ring-0 bg-white">
+                        <SelectValue placeholder="Todas" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-none border-slate-300">
+                        <SelectItem value="todos">Todas as Empresas</SelectItem>
+                        {empresasDepartamento.map((empresa) => (
+                          <SelectItem key={empresa} value={empresa}>
+                            {empresa}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Status Checagem */}
+                  <div>
+                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Célula Checagem</Label>
+                    <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                      <SelectTrigger className="h-10 border-slate-300 rounded-none focus:ring-0 bg-white">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-none border-slate-300">
+                        <SelectItem value="todos">Todos os Status</SelectItem>
+                        <SelectItem value="pendente">Pendente</SelectItem>
+                        <SelectItem value="aprovado">Aprovado</SelectItem>
+                        <SelectItem value="reprovado">Reprovado</SelectItem>
+                        <SelectItem value="vencida">Vencida</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Liberação */}
+                  <div>
+                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Liberação</Label>
+                    <Select value={filtroLiberacao} onValueChange={setFiltroLiberacao}>
+                      <SelectTrigger className="h-10 border-slate-300 rounded-none focus:ring-0 bg-white">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-none border-slate-300">
+                        <SelectItem value="todos">Todos os Status</SelectItem>
+                        <SelectItem value="pendente">Pendente</SelectItem>
+                        <SelectItem value="ok">Ok</SelectItem>
+                        <SelectItem value="urgente">Urgente</SelectItem>
+                        <SelectItem value="vencida">Vencida</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Solicitante */}
+                  <div>
+                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Responsável</Label>
+                    <Select value={filtroSolicitante} onValueChange={setFiltroSolicitante}>
+                      <SelectTrigger className="h-10 border-slate-300 rounded-none focus:ring-0 bg-white">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-none border-slate-300">
+                        <SelectItem value="todos">Todos os Solicitantes</SelectItem>
+                        {solicitantesDepartamento.map((solicitante) => (
+                          <SelectItem key={solicitante} value={solicitante}>
+                            {solicitante}
+                            {solicitante === usuario?.nome && " (Você)"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Informações de Paginação/Totais */}
+            <div className="flex items-center justify-between mt-8 mb-4">
+              <div className="text-sm text-slate-600 font-medium">
+                Mostrando <span className="font-bold text-slate-800">{Math.min(indiceInicio + 1, totalPrestadores)}</span> - <span className="font-bold text-slate-800">{Math.min(indiceFim, totalPrestadores)}</span> de <span className="font-bold text-slate-800">{totalPrestadores}</span> prestadores
+              </div>
+              <div className="text-sm font-medium text-slate-600">
+                Página <span className="font-bold text-slate-800">{paginaAtual}</span> de <span className="font-bold text-slate-800">{totalPaginas || 1}</span>
+              </div>
+            </div>
+
+            {/* Container da Tabela */}
+            <div className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-sm">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-slate-50/80 sticky top-0 z-50 shadow-sm border-b border-slate-200">
+                    <TableRow className="hover:bg-slate-50/80 border-b border-slate-200">
+                      {colunasVisiveis.numero && (
+                        <TableHead className="font-semibold text-slate-800 text-center h-12 cursor-pointer transition-colors px-4 align-middle" onClick={() => requestSort("numero")}>
+                          <div className="flex items-center justify-center gap-1">
+                            Número {getSortIcon("numero")}
+                          </div>
+                        </TableHead>
+                      )}
+                      {colunasVisiveis.dataSolicitacao && (
+                        <TableHead className="font-semibold text-slate-800 text-center h-12 cursor-pointer transition-colors px-4 align-middle" onClick={() => requestSort("dataSolicitacao")}>
+                          <div className="flex items-center justify-center gap-1">
+                            Data {getSortIcon("dataSolicitacao")}
+                          </div>
+                        </TableHead>
+                      )}
+                      {colunasVisiveis.empresa && (
+                        <TableHead className="font-semibold text-slate-800 text-center h-12 cursor-pointer transition-colors px-4 align-middle" onClick={() => requestSort("empresa")}>
+                          <div className="flex items-center justify-center gap-1">
+                            Empresa {getSortIcon("empresa")}
+                          </div>
+                        </TableHead>
+                      )}
+                      {colunasVisiveis.prestador && (
+                        <TableHead className="font-semibold text-slate-800 text-center h-12 cursor-pointer transition-colors min-w-[150px] px-4 align-middle" onClick={() => requestSort("prestador")}>
+                          <div className="flex items-center justify-center gap-1">
+                            Prestador {getSortIcon("prestador")}
+                          </div>
+                        </TableHead>
+                      )}
+                      {colunasVisiveis.doc1 && (
+                        <TableHead className="font-semibold text-slate-800 text-center h-12 cursor-pointer transition-colors px-4 align-middle" onClick={() => requestSort("doc1")}>
+                          <div className="flex items-center justify-center gap-1">
+                            Doc1 {getSortIcon("doc1")}
+                          </div>
+                        </TableHead>
+                      )}
+                      {colunasVisiveis.doc2 && (
+                        <TableHead className="font-semibold text-slate-800 text-center h-12 px-4 align-middle">
+                          Doc2
+                        </TableHead>
+                      )}
+                      {colunasVisiveis.dataInicial && (
+                        <TableHead className="font-semibold text-slate-800 text-center h-12 cursor-pointer transition-colors px-4 align-middle" onClick={() => requestSort("dataInicial")}>
+                          <div className="flex items-center justify-center gap-1">
+                            Data Inicial {getSortIcon("dataInicial")}
+                          </div>
+                        </TableHead>
+                      )}
+                      {colunasVisiveis.dataFinal && (
+                        <TableHead className="font-semibold text-slate-800 text-center h-12 cursor-pointer transition-colors px-4 align-middle" onClick={() => requestSort("dataFinal")}>
+                          <div className="flex items-center justify-center gap-1">
+                            Data Final {getSortIcon("dataFinal")}
+                          </div>
+                        </TableHead>
+                      )}
+                      {colunasVisiveis.liberacao && (
+                        <TableHead className="font-semibold text-slate-800 text-center h-12 px-4 align-middle">
+                          Liberação
+                        </TableHead>
+                      )}
+                      {colunasVisiveis.checagem && (
+                        <TableHead className="font-semibold text-slate-800 text-center h-12 px-4 align-middle">
+                          Checagem
+                        </TableHead>
+                      )}
+                      {colunasVisiveis.validaAte && (
+                        <TableHead className="font-semibold text-slate-800 text-center h-12 px-4 align-middle">
+                          Válida até
+                        </TableHead>
+                      )}
+                      {colunasVisiveis.observacoes && (
+                        <TableHead className="font-semibold text-slate-800 text-center h-12 min-w-[200px] px-4 align-middle">
+                          Observações
+                        </TableHead>
+                      )}
+                      <TableHead className="font-semibold text-slate-800 text-center h-12 px-4 align-middle">
+                        Ações
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="[&_tr:last-child]:border-0">
+                    {dadosPaginados.map(({ solicitacao, prestador, prioridade }, index) => {
+                      const prestadorIndex = solicitacao.prestadores.findIndex((p: any) => p.id === prestador.id)
+                      // Remover esta linha:
+                      // const isFirstPrestadorOfSolicitacao = index === 0 || dadosOrdenados[index - 1].solicitacao.id !== solicitacao.id
+                      const checagemStatus = getChecagemStatus(prestador)
+                      const liberacaoStatus = getLiberacaoStatus(prestador, solicitacao.dataFinal)
+
+                      return (
+                        <TableRow
+                          key={`${solicitacao.id}-${prestador.id}`}
+                          className={`hover:bg-slate-50 ${solicitacao.solicitante === usuario?.nome ? "bg-slate-25 border-l-4 border-l-slate-500" : ""
+                            } ${prestadorIndex > 0 ? "border-l-4 border-l-slate-200 bg-slate-25" : ""}`}
+                        >
+                          {colunasVisiveis.numero && (
+                            <TableCell className="p-4 align-middle text-sm text-center font-medium">
+                              <div className="flex items-center justify-center gap-2">
+                                {/* Indicador de prioridade */}
+                                {prestador.checagem === "pendente" && prestador.liberacao === "urgente" && (
+                                  <div
+                                    className="w-2 h-2 bg-red-500 rounded-full"
+                                    title="Prioridade ALTA - Urgente"
+                                  ></div>
+                                )}
+                                {prestador.checagem === "pendente" && prestador.liberacao === "pendente" && (
+                                  <div className="w-2 h-2 bg-slate-500 rounded-full" title="Prioridade NORMAL"></div>
+                                )}
+                                <span className="text-slate-700">{solicitacao.numero}</span>
+                                {solicitacao.solicitante === usuario?.nome && (
+                                  <Badge variant="outline" className="ml-2 text-[10px] h-4 px-1 uppercase tracking-tighter bg-slate-50 text-slate-500 border-slate-200">
+                                    Minha
+                                  </Badge>
+                                )}
+                                {solicitacao.statusGeral === "parcial" && (
+                                  <AlertTriangle
+                                    className="h-4 w-4 text-orange-500"
+                                  />
+                                )}
+                              </div>
+                            </TableCell>
+                          )}
+                          {colunasVisiveis.dataSolicitacao && (
+                            <TableCell className="p-4 align-middle text-sm whitespace-nowrap text-center text-slate-600">
+                              {solicitacao.dataSolicitacao}
+                            </TableCell>
+                          )}
+                          {colunasVisiveis.empresa && (
+                            <TableCell className="p-4 align-middle text-sm text-center text-slate-700 font-medium">{solicitacao.empresa}</TableCell>
+                          )}
+                          {colunasVisiveis.prestador && (
+                            <TableCell className="p-4 align-middle text-sm text-center">
+                              <div className="whitespace-nowrap font-medium text-slate-700 flex items-center justify-center gap-2">
+                                {prestador.nome}
+                              </div>
+                            </TableCell>
+                          )}
+                          {colunasVisiveis.doc1 && (
+                            <TableCell className="p-4 align-middle text-sm text-center">
+                              <div className="text-xs font-mono whitespace-nowrap text-slate-600">{prestador.doc1}</div>
+                            </TableCell>
+                          )}
+                          {colunasVisiveis.doc2 && (
+                            <TableCell className="p-4 align-middle text-sm text-center">
+                              <div className="text-xs font-mono whitespace-nowrap text-slate-600">{prestador.doc2 || "-"}</div>
+                            </TableCell>
+                          )}
+                          {colunasVisiveis.dataInicial && (
+                            <TableCell className="p-4 align-middle text-sm whitespace-nowrap text-center">
+                              <DataInicialIndicator
+                                dataInicial={solicitacao.dataInicial}
+                                isReprovado={prestador.checagem === "reprovado"}
+                              />
+                            </TableCell>
+                          )}
+                          {colunasVisiveis.dataFinal && (
+                            <TableCell className="p-4 align-middle text-sm whitespace-nowrap text-center text-slate-600">
+                              {prestador.checagem === "reprovado" ? (
+                                <span className="text-slate-400">-</span>
+                              ) : (
+                                <div className="flex items-center justify-center gap-2">
+                                  <span
+                                    className={isDateExpired(solicitacao.dataFinal) ? "text-red-600 font-medium" : ""}
+                                  >
+                                    {solicitacao.dataFinal}
+                                  </span>
+                                  {isDateExpired(solicitacao.dataFinal) && (
+                                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                                  )}
+                                </div>
+                              )}
+                            </TableCell>
+                          )}
+                          {colunasVisiveis.liberacao && (
+                            <TableCell className="p-4 align-middle whitespace-nowrap text-center">
+                              <div className="flex items-center justify-center gap-2">
+                                <StatusLiberacaoIcon status={liberacaoStatus} />
+                                <StatusLiberacaoBadge status={liberacaoStatus} />
+                              </div>
+                            </TableCell>
+                          )}
+                          {colunasVisiveis.checagem && (
+                            <TableCell className="p-4 align-middle text-center">
+                              <div className="flex items-center justify-center gap-2">
+                                <StatusChecagemIcon status={checagemStatus} />
+                                <StatusChecagemBadge status={checagemStatus} />
+                              </div>
+                            </TableCell>
+                          )}
+                          {colunasVisiveis.validaAte && (
+                            <TableCell className="p-4 align-middle text-slate-600 text-center text-sm">
+                              {prestador.checagemValidaAte ? formatarDataParaBR(prestador.checagemValidaAte) : <span className="text-slate-300">-</span>}
+                            </TableCell>
+                          )}
+                          {colunasVisiveis.observacoes && (
+                            <TableCell className="p-4 align-middle text-left">
+                              {prestador.observacoes ? (
+                                <div className="text-[11px] leading-tight text-slate-500 bg-slate-50 p-2 border border-slate-100 rounded-sm">
+                                  {prestador.observacoes}
+                                </div>
+                              ) : (
+                                <span className="text-slate-300">-</span>
+                              )}
+                            </TableCell>
+                          )}
+                          <TableCell className="p-4 align-middle text-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleVisualizarSolicitacao(solicitacao, prestador)}
+                              className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-full"
+                              title="Visualizar Detalhes"
+                            >
+                              <Eye className="h-5 w-5" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {dadosPaginados.length === 0 && (
+                <div className="text-center py-20 bg-slate-50 border-x border-b border-slate-200">
+                  <Search className="h-12 w-12 mx-auto mb-4 text-slate-300 opacity-50" />
+                  <p className="text-lg font-bold text-slate-400 uppercase tracking-wider">Nenhum registro localizado</p>
+                  <p className="text-sm text-slate-400">Tente ajustar seus critérios de filtragem.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex flex-col md:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-100">
+              <div className="text-sm text-slate-600 font-medium">
+                Total: <span className="font-bold text-slate-800">{totalPrestadores}</span> prestadores
+              </div>
+
+              <div className="flex items-center gap-2">
                 <Button
                   onClick={handlePaginaAnterior}
                   disabled={paginaAtual === 1}
                   variant="outline"
                   size="sm"
-                  className="h-10 px-4 border-slate-300 text-slate-700 hover:bg-slate-50 rounded-none font-bold uppercase text-[11px] tracking-tight disabled:opacity-30"
+                  className="h-9 px-3 border-slate-200 hover:bg-slate-50 text-slate-600"
                 >
-                  <ChevronLeft className="h-4 w-4 mr-2" />
-                  Voltar
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Anterior
                 </Button>
 
-                <div className="bg-slate-800 px-6 py-2 rounded-none text-xs font-black text-white min-w-[100px] text-center tracking-tighter shadow-inner">
-                  PÁGINA {paginaAtual} <span className="text-slate-400 font-normal mx-1">DE</span> {totalPaginas}
+                <div className="text-sm font-medium text-slate-600 min-w-[60px] text-center">
+                  {paginaAtual} / {totalPaginas > 0 ? totalPaginas : 1}
                 </div>
 
                 <Button
                   onClick={handleProximaPagina}
-                  disabled={paginaAtual === totalPaginas}
+                  disabled={paginaAtual === totalPaginas || totalPaginas === 0}
                   variant="outline"
                   size="sm"
-                  className="h-10 px-4 border-slate-300 text-slate-700 hover:bg-slate-50 rounded-none font-bold uppercase text-[11px] tracking-tight disabled:opacity-30"
+                  className="h-9 px-3 border-slate-200 hover:bg-slate-50 text-slate-600"
                 >
-                  Avançar
-                  <ChevronRight className="h-4 w-4 ml-2" />
+                  Próxima
+                  <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
+
       {/* Dialog para visualização - igual ao do GESTOR */}
       <Dialog
         open={dialogAberto}
@@ -1091,7 +1038,7 @@ export default function SolicitacoesDepartamento() {
               <div>
                 <h4 className="font-semibold">Prestador:</h4>
                 <p>
-                  {prestadorSelecionado.prestador.nome} - {prestadorSelecionado.prestador.documento}
+                  {prestadorSelecionado.prestador.nome} - {prestadorSelecionado.prestador.doc1}
                 </p>
               </div>
 
@@ -1113,7 +1060,7 @@ export default function SolicitacoesDepartamento() {
                   </p>
 
                   {/* Botão de Correção para Reprovados */}
-                  {prestadorSelecionado.prestador.status === 'reprovado' && (
+                  {prestadorSelecionado.prestador.checagem === 'reprovado' && (
                     <div className="mt-3 flex justify-end">
                       <Button onClick={handleAbrirEdicao} className="bg-blue-600 hover:bg-blue-700 text-white">
                         Corrigir Documentos
@@ -1138,16 +1085,16 @@ export default function SolicitacoesDepartamento() {
               <Label htmlFor="doc1">Doc 1 (RG, RNE, Passaporte)</Label>
               <Input
                 id="doc1"
-                value={dadosEdicao.documento}
-                onChange={(e) => setDadosEdicao({ ...dadosEdicao, documento: e.target.value })}
+                value={dadosEdicao.doc1}
+                onChange={(e) => setDadosEdicao({ ...dadosEdicao, doc1: e.target.value })}
               />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="doc2">Doc 2 (CPF, CNH)</Label>
               <Input
                 id="doc2"
-                value={dadosEdicao.documento2}
-                onChange={(e) => setDadosEdicao({ ...dadosEdicao, documento2: e.target.value })}
+                value={dadosEdicao.doc2}
+                onChange={(e) => setDadosEdicao({ ...dadosEdicao, doc2: e.target.value })}
               />
             </div>
           </div>

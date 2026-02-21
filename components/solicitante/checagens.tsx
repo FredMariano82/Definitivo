@@ -10,7 +10,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuth } from "../../contexts/auth-context"
 import { getSolicitacoesByDepartamento } from "../../services/solicitacoes-service"
 import { formatarDataParaBR } from "../../utils/date-helpers"
-import { getChecagemStatus, getCadastroStatus } from "../ui/status-badges"
+import {
+  getChecagemStatus,
+  getLiberacaoStatus,
+  StatusChecagemBadge,
+  StatusChecagemIcon,
+} from "../ui/status-badges"
 import { Button } from "@/components/ui/button"
 
 export default function Checagens() {
@@ -56,11 +61,11 @@ export default function Checagens() {
   const dadosPorStatus = solicitacoesReais
     .filter((solicitacao) => solicitacao.departamento === usuario?.departamento)
     .filter((solicitacao) =>
-      solicitacao.prestadores.some((p: any) => getCadastroStatus(p, solicitacao.dataFinal) === "ok"),
+      solicitacao.prestadores.some((p: any) => getLiberacaoStatus(p, solicitacao.dataFinal) === "ok"),
     )
     .flatMap((solicitacao) =>
       solicitacao.prestadores
-        .filter((prestador: any) => getCadastroStatus(prestador, solicitacao.dataFinal) === "ok")
+        .filter((prestador: any) => getLiberacaoStatus(prestador, solicitacao.dataFinal) === "ok")
         .map((prestador: any) => ({
           solicitacao,
           prestador,
@@ -72,7 +77,7 @@ export default function Checagens() {
       const busca = buscaGeral.toLowerCase()
       return (
         item.prestador.nome.toLowerCase().includes(busca) ||
-        item.prestador.documento.toLowerCase().includes(busca) ||
+        item.prestador.doc1.toLowerCase().includes(busca) ||
         item.solicitacao.numero.toLowerCase().includes(busca)
       )
     })
@@ -214,7 +219,7 @@ export default function Checagens() {
                   <TableRow className="bg-slate-50 hover:bg-slate-50 border-b border-slate-200">
                     <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Solicitação</TableHead>
                     <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Prestador</TableHead>
-                    <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Documento</TableHead>
+                    <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Doc1</TableHead>
                     <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Status Checagem</TableHead>
                     <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Válida até</TableHead>
                     <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Observações</TableHead>
@@ -226,14 +231,12 @@ export default function Checagens() {
                       <TableCell className="font-medium text-sm text-center">{solicitacao.numero}</TableCell>
                       <TableCell className="text-sm text-center">{prestador.nome}</TableCell>
                       <TableCell className="text-sm text-center">
-                        <div className="text-xs font-mono">{prestador.documento}</div>
+                        <div className="text-xs font-mono">{prestador.doc1}</div>
                       </TableCell>
                       <TableCell className="text-center">
-                        <div
-                          className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(statusChecagem)}`}
-                        >
-                          {getStatusIcon(statusChecagem)}
-                          {statusChecagem.charAt(0).toUpperCase() + statusChecagem.slice(1)}
+                        <div className="flex items-center justify-center gap-2">
+                          <StatusChecagemIcon status={statusChecagem} />
+                          <StatusChecagemBadge status={statusChecagem} />
                         </div>
                       </TableCell>
                       <TableCell className="text-sm text-center">

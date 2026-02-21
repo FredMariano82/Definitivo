@@ -14,6 +14,7 @@ import { getAllSolicitacoes } from "../../services/solicitacoes-service"
 import { supabase } from "@/lib/supabase"
 import { EconomiasService, type EconomiaMetricas } from "../../services/economias-service"
 import { DataInicialIndicator } from "../../utils/date-indicators"
+import { StatusChecagemBadge, StatusChecagemIcon } from "../ui/status-badges"
 
 export default function ConsultaSolicitacoesGestor() {
   const [paginaAtual, setPaginaAtual] = useState(1)
@@ -74,12 +75,12 @@ export default function ConsultaSolicitacoesGestor() {
           solicitacao.prestadores.forEach((prestador) => {
             // BUSCAR POR TODOS OS STATUS POSSÍVEIS DE REPROVAÇÃO E EXCEÇÃO
             if (
-              prestador.status === "reprovado" ||
-              prestador.status === "reprovada" ||
-              prestador.status === "excecao"
+              prestador.checagem === "reprovado" ||
+              prestador.checagem === "reprovada" ||
+              prestador.checagem === "excecao"
             ) {
               reprovados.push({ solicitacao, prestador })
-              console.log("❌ Prestador reprovado/exceção encontrado:", prestador.nome, "Status:", prestador.status)
+              console.log("❌ Prestador reprovado/exceção encontrado:", prestador.nome, "Status:", prestador.checagem)
             }
           })
         })
@@ -105,10 +106,10 @@ export default function ConsultaSolicitacoesGestor() {
     if (filtroStatus !== "todos") {
       dadosFiltrados = dadosFiltrados.filter((item) => {
         if (filtroStatus === "reprovado") {
-          return item.prestador.status === "reprovado" || item.prestador.status === "reprovada"
+          return item.prestador.checagem === "reprovado" || item.prestador.checagem === "reprovada"
         }
         if (filtroStatus === "excecao") {
-          return item.prestador.status === "excecao"
+          return item.prestador.checagem === "excecao"
         }
         return true
       })
@@ -128,8 +129,8 @@ export default function ConsultaSolicitacoesGestor() {
 
     // PRIORIZAÇÃO: REPROVADOS SEMPRE PRIMEIRO
     dadosFiltrados.sort((a, b) => {
-      const statusA = a.prestador.status
-      const statusB = b.prestador.status
+      const statusA = a.prestador.checagem
+      const statusB = b.prestador.checagem
 
       // Se A é reprovado e B é exceção, A vem primeiro
       if ((statusA === "reprovado" || statusA === "reprovada") && statusB === "excecao") {
@@ -219,26 +220,13 @@ export default function ConsultaSolicitacoesGestor() {
   }
 
   // CORRIGIR BADGES DE STATUS
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "pendente":
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Pendente</Badge>
-      case "aprovado":
-        return <Badge className="bg-green-100 text-green-800 border-green-200">Aprovada</Badge>
-      case "reprovado":
-        return <Badge className="bg-red-100 text-red-800 border-red-200">Reprovada</Badge>
-      case "aprovada": // Compatibilidade
-        return <Badge className="bg-green-100 text-green-800 border-green-200">Aprovada</Badge>
-      case "reprovada": // Compatibilidade
-        return <Badge className="bg-red-100 text-red-800 border-red-200">Reprovada</Badge>
-      case "vencida":
-        return <Badge className="bg-gray-100 text-gray-800 border-gray-200">Vencida</Badge>
-      case "excecao":
-        return <Badge className="bg-purple-100 text-purple-800 border-purple-200">Exceção</Badge>
-      default:
-        console.warn("⚠️ Status desconhecido:", status)
-        return <Badge variant="secondary">{status || "Sem status"}</Badge>
-    }
+  const renderStatus = (status: any) => {
+    return (
+      <div className="flex items-center gap-2">
+        <StatusChecagemIcon status={status} />
+        <StatusChecagemBadge status={status} />
+      </div>
+    )
   }
 
   const handleVisualizarSolicitacao = (item: { solicitacao: Solicitacao; prestador: PrestadorAvaliacao }) => {
@@ -248,15 +236,15 @@ export default function ConsultaSolicitacoesGestor() {
   }
 
   const handleExcecao = (item: { solicitacao: Solicitacao; prestador: PrestadorAvaliacao }) => {
-    console.log("🔥 BOTÃO EXCEÇÃO CLICADO!")
-    console.log("📋 Item selecionado:", item)
-    console.log("👤 Prestador:", item.prestador.nome)
-    console.log("🏷️ Status atual:", item.prestador.status)
-
     setPrestadorSelecionado(item)
     setDialogAberto(true)
     setMostrandoConfirmacao(true)
     setNovaJustificativa("")
+
+    console.log("🔥 BOTÃO EXCEÇÃO CLICADO!")
+    console.log("📋 Item selecionado:", item)
+    console.log("👤 Prestador:", item.prestador.nome)
+    console.log("🏷️ Status atual:", item.prestador.checagem)
 
     console.log("✅ Estados atualizados - Dialog deve abrir")
   }
@@ -274,7 +262,7 @@ export default function ConsultaSolicitacoesGestor() {
       // PRIMEIRO: Verificar se o prestador existe
       const { data: prestadorExistente, error: erroConsulta } = await supabase
         .from("prestadores")
-        .select("id, status")
+        .select("id, checagem")
         .eq("id", prestadorSelecionado.prestador.id)
         .single()
 
@@ -290,7 +278,8 @@ export default function ConsultaSolicitacoesGestor() {
       const { data, error } = await supabase
         .from("prestadores")
         .update({
-          status: "excecao",
+          checagem: "excecao", // Coluna: Checagem
+          liberacao: "ok",    // Coluna: Liberação (Alinhado com a Regra de Economia)
           justificativa: novaJustificativa,
           data_avaliacao: new Date().toISOString(),
           aprovado_por: "Gestor - Exceção",
@@ -325,7 +314,8 @@ export default function ConsultaSolicitacoesGestor() {
               ...item,
               prestador: {
                 ...item.prestador,
-                status: "excecao" as const,
+                checagem: "excecao" as any,
+                liberacao: "ok" as any,
                 justificativa: novaJustificativa,
               },
             }
@@ -532,7 +522,7 @@ export default function ConsultaSolicitacoesGestor() {
                       <TableHead>Departamento</TableHead>
                       <TableHead>Empresa</TableHead>
                       <TableHead>Prestador</TableHead>
-                      <TableHead>Documento</TableHead>
+                      <TableHead>Doc1</TableHead>
                       <TableHead>Checagem</TableHead>
                       <TableHead>Válida até</TableHead>
                       {/* Coluna Horas Restantes removida */}
@@ -545,7 +535,7 @@ export default function ConsultaSolicitacoesGestor() {
                       <TableRow
                         key={`${item.solicitacao.id}-${item.prestador.id}-${index}`}
                         className={
-                          item.prestador.status === "reprovado" || item.prestador.status === "reprovada"
+                          item.prestador.checagem === "reprovado" || item.prestador.checagem === "reprovada"
                             ? "bg-red-50 border-l-4 border-l-red-500"
                             : "bg-purple-50 border-l-4 border-l-purple-500"
                         }
@@ -566,10 +556,10 @@ export default function ConsultaSolicitacoesGestor() {
                         <TableCell>{item.solicitacao.departamento}</TableCell>
                         <TableCell>{item.solicitacao.empresa}</TableCell>
                         <TableCell className="font-medium">{item.prestador.nome}</TableCell>
-                        <TableCell>{item.prestador.documento}</TableCell>
+                        <TableCell>{item.prestador.doc1}</TableCell>
                         <TableCell>
-                          <span title={`Status original: ${item.prestador.status}`}>
-                            {getStatusBadge(item.prestador.status)}
+                          <span title={`Status original: ${item.prestador.checagem}`}>
+                            {renderStatus(item.prestador.checagem)}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -588,7 +578,7 @@ export default function ConsultaSolicitacoesGestor() {
                             <Button size="sm" variant="outline" onClick={() => handleVisualizarSolicitacao(item)}>
                               <Eye className="h-4 w-4" />
                             </Button>
-                            {(item.prestador.status === "reprovado" || item.prestador.status === "reprovada") && (
+                            {(item.prestador.checagem === "reprovado" || item.prestador.checagem === "reprovada") && (
                               <>
                                 <Button
                                   size="sm"
@@ -706,13 +696,13 @@ export default function ConsultaSolicitacoesGestor() {
               <div>
                 <h4 className="font-semibold">Prestador:</h4>
                 <p>
-                  {prestadorSelecionado.prestador.nome} - {prestadorSelecionado.prestador.documento}
+                  {prestadorSelecionado.prestador.nome} - {prestadorSelecionado.prestador.doc1}
                 </p>
               </div>
 
               <div>
                 <h4 className="font-semibold">Status da Checagem:</h4>
-                <p>{getStatusBadge(prestadorSelecionado.prestador.status)}</p>
+                <p>{renderStatus(prestadorSelecionado.prestador.checagem)}</p>
               </div>
 
               {prestadorSelecionado.prestador.justificativa && (
@@ -739,7 +729,7 @@ export default function ConsultaSolicitacoesGestor() {
                     <strong>Prestador:</strong> {prestadorSelecionado.prestador.nome}
                   </p>
                   <p className="text-gray-700 mb-2">
-                    <strong>Documento:</strong> {prestadorSelecionado.prestador.documento}
+                    <strong>Doc1:</strong> {prestadorSelecionado.prestador.doc1}
                   </p>
                   <p className="text-gray-700">
                     <strong>Status Atual:</strong>

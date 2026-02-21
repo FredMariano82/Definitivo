@@ -6,22 +6,22 @@ import { supabase } from "@/lib/supabase"
 export interface PrestadorExcelADM {
   id?: string // Matrícula ou ID
   nome: string
-  documento: string
-  documento2?: string
+  doc1: string
+  doc2?: string
   empresa: string
   cargo?: string // Novo campo
   observacoes?: string // Novo campo
   validaAte: string // Data de validade da checagem
   dataInicial: string // Data inicial do último acesso
   dataFinal: string // Data final do último acesso
-  status: "aprovado" | "reprovado" | "pendente" | "excecao"
-  cadastro: "ok" | "vencida" | "pendente" | "urgente"
+  checagem: "aprovado" | "reprovado" | "pendente" | "excecao"
+  liberacao: "ok" | "vencida" | "pendente" | "urgente"
 }
 
 export interface PrestadorExcelSolicitante {
   nome: string
-  documento: string
-  documento2?: string
+  doc1: string
+  doc2?: string
   empresa: string
 }
 
@@ -67,16 +67,16 @@ export class ExcelService {
           const colunas = {
             id: this.encontrarColuna(cabecalho, ["id", "matricula", "matrícula", "código"]),
             nome: this.encontrarColuna(cabecalho, ["nome", "name", "prestador", "usuario", "usuário"]),
-            documento: this.encontrarColuna(cabecalho, ["doc1", "documento", "rg", "document", "cpf", "cpf/cnpj"]),
-            documento2: this.encontrarColuna(cabecalho, ["doc2", "documento2", "cnh"]),
+            doc1: this.encontrarColuna(cabecalho, ["doc1", "documento", "rg", "document", "cpf", "cpf/cnpj"]),
+            doc2: this.encontrarColuna(cabecalho, ["doc2", "documento2", "cnh"]),
             empresa: this.encontrarColuna(cabecalho, ["empresa", "company"]),
             cargo: this.encontrarColuna(cabecalho, ["cargo", "funcao", "função", "role"]),
             observacoes: this.encontrarColuna(cabecalho, ["observacoes", "observações", "obs", "notes", "observacao", "observação"]),
             validaAte: this.encontrarColuna(cabecalho, ["valida ate", "válida até", "validade", "valid until", "expiracao", "expiração"]),
             dataInicial: this.encontrarColuna(cabecalho, ["data inicial", "inicio", "start date", "liberacao", "liberação"]),
             dataFinal: this.encontrarColuna(cabecalho, ["data final", "fim", "end date"]),
-            status: this.encontrarColuna(cabecalho, ["status", "checagem", "status checagem"]),
-            cadastro: this.encontrarColuna(cabecalho, ["cadastro", "liberacao", "liberação", "status liberação"]),
+            checagem: this.encontrarColuna(cabecalho, ["checagem", "status", "status checagem"]),
+            liberacao: this.encontrarColuna(cabecalho, ["liberacao", "liberação", "cadastro", "status liberação"]),
           }
 
           console.log("🗂️ ADM - Mapeamento de colunas CSV:", colunas)
@@ -109,7 +109,7 @@ export class ExcelService {
             try {
               // Tentar obter valores, usando defaults se a coluna não existir
               const nomeRaw = getVal(colunas.nome) || "Sem Nome"
-              const docRaw = getVal(colunas.documento)
+              const docRaw = getVal(colunas.doc1)
               const empresaRaw = getVal(colunas.empresa) || "Não Informada"
 
               // Se não achou coluna de documento, tentar usar a segunda coluna genericamente se disponível
@@ -119,21 +119,21 @@ export class ExcelService {
               const prestador: PrestadorExcelADM = {
                 id: getVal(colunas.id) || undefined,
                 nome: nomeRaw,
-                documento: documentoFinal,
-                documento2: this.limparDocumento(getVal(colunas.documento2)) || undefined,
+                doc1: documentoFinal,
+                doc2: this.limparDocumento(getVal(colunas.doc2)) || undefined,
                 empresa: empresaRaw,
                 cargo: getVal(colunas.cargo) || undefined,
                 observacoes: getVal(colunas.observacoes) || undefined,
                 validaAte: this.formatarData(getVal(colunas.validaAte)),
                 dataInicial: this.formatarData(getVal(colunas.dataInicial)),
                 dataFinal: this.formatarData(getVal(colunas.dataFinal)),
-                status: this.normalizarStatus(getVal(colunas.status)), // Default: pendente
-                cadastro: this.normalizarCadastro(getVal(colunas.cadastro)), // Default: pendente
+                checagem: this.normalizarStatus(getVal(colunas.checagem)), // Default: pendente
+                liberacao: this.normalizarCadastro(getVal(colunas.liberacao)), // Default: pendente
               }
 
               // Validação mínima relaxada: precisa pelo menos ter algum conteúdo
               // Se nome for "Sem Nome" e documento for vazio, provavelmente é linha vazia ou lixo
-              if (prestador.nome !== "Sem Nome" || prestador.documento) {
+              if (prestador.nome !== "Sem Nome" || prestador.doc1) {
                 prestadores.push(prestador)
               } else {
                 console.warn(`⚠️ ADM - Linha CSV ${index + 1} ignorada - sem dados mínimos: `, prestador)
@@ -203,16 +203,16 @@ export class ExcelService {
       const colunas = {
         id: this.encontrarColuna(cabecalho, ["id", "matricula", "matrícula", "código"]),
         nome: this.encontrarColuna(cabecalho, ["nome", "name", "prestador", "usuario", "usuário"]),
-        documento: this.encontrarColuna(cabecalho, ["doc1", "documento", "rg", "document", "cpf", "cpf/cnpj"]),
-        documento2: this.encontrarColuna(cabecalho, ["doc2", "documento2", "cnh"]),
+        doc1: this.encontrarColuna(cabecalho, ["doc1", "documento", "rg", "document", "cpf", "cpf/cnpj"]),
+        doc2: this.encontrarColuna(cabecalho, ["doc2", "documento2", "cnh"]),
         empresa: this.encontrarColuna(cabecalho, ["empresa", "company"]),
         cargo: this.encontrarColuna(cabecalho, ["cargo", "funcao", "função", "role"]),
         observacoes: this.encontrarColuna(cabecalho, ["observacoes", "observações", "obs", "notes", "observacao", "observação"]),
         validaAte: this.encontrarColuna(cabecalho, ["valida ate", "válida até", "validade", "valid until", "expiracao", "expiração"]),
         dataInicial: this.encontrarColuna(cabecalho, ["data inicial", "inicio", "start date", "liberacao", "liberação"]),
         dataFinal: this.encontrarColuna(cabecalho, ["data final", "fim", "end date"]),
-        status: this.encontrarColuna(cabecalho, ["status", "checagem"]),
-        cadastro: this.encontrarColuna(cabecalho, ["cadastro", "liberacao", "liberação"]),
+        checagem: this.encontrarColuna(cabecalho, ["checagem", "status"]),
+        liberacao: this.encontrarColuna(cabecalho, ["liberacao", "liberação", "cadastro"]),
       }
 
       console.log("🗂️ ADM - Mapeamento de colunas:", colunas)
@@ -242,20 +242,20 @@ export class ExcelService {
           const prestador: PrestadorExcelADM = {
             id: this.extrairValor(linha, colunas.id) || undefined,
             nome: this.extrairValor(linha, colunas.nome) || "Sem Nome",
-            documento: this.limparDocumento(this.extrairValor(linha, colunas.documento)),
-            documento2: this.limparDocumento(this.extrairValor(linha, colunas.documento2)) || undefined,
+            doc1: this.limparDocumento(this.extrairValor(linha, colunas.doc1)),
+            doc2: this.limparDocumento(this.extrairValor(linha, colunas.doc2)) || undefined,
             empresa: this.extrairValor(linha, colunas.empresa) || "Não Informada",
             cargo: this.extrairValor(linha, colunas.cargo) || undefined,
             observacoes: this.extrairValor(linha, colunas.observacoes) || undefined,
             validaAte: this.formatarData(this.extrairValor(linha, colunas.validaAte)),
             dataInicial: this.formatarData(this.extrairValor(linha, colunas.dataInicial)),
             dataFinal: this.formatarData(this.extrairValor(linha, colunas.dataFinal)),
-            status: this.normalizarStatus(this.extrairValor(linha, colunas.status)),
-            cadastro: this.normalizarCadastro(this.extrairValor(linha, colunas.cadastro)),
+            checagem: this.normalizarStatus(this.extrairValor(linha, colunas.checagem)),
+            liberacao: this.normalizarCadastro(this.extrairValor(linha, colunas.liberacao)),
           }
 
           // Validar dados obrigatórios (Relaxado)
-          if (prestador.nome !== "Sem Nome" || prestador.documento) {
+          if (prestador.nome !== "Sem Nome" || prestador.doc1) {
             prestadores.push(prestador)
           } else {
             console.warn(`⚠️ ADM - Linha ${i + 1} ignorada - dados incompletos: `, prestador)
@@ -317,8 +317,8 @@ export class ExcelService {
 
       const colunas = {
         nome: this.encontrarColuna(cabecalho, ["nome", "name"]),
-        documento: this.encontrarColuna(cabecalho, ["doc1", "documento", "rg", "document"]),
-        documento2: this.encontrarColuna(cabecalho, ["doc2", "documento2", "cpf", "cnh"]),
+        doc1: this.encontrarColuna(cabecalho, ["doc1", "documento", "rg", "document"]),
+        doc2: this.encontrarColuna(cabecalho, ["doc2", "documento2", "cpf", "cnh"]),
         empresa: this.encontrarColuna(cabecalho, ["empresa", "company"]),
       }
 
@@ -338,7 +338,7 @@ export class ExcelService {
       }
 
       // Verificar se tem pelo menos uma coluna de documento
-      if (colunas.documento === -1 && colunas.documento2 === -1) {
+      if (colunas.doc1 === -1 && colunas.doc2 === -1) {
         return {
           sucesso: false,
           erro: "Deve haver pelo menos uma coluna de documento (Doc1 ou Doc2)",
@@ -357,15 +357,15 @@ export class ExcelService {
         try {
           const prestador: PrestadorExcelSolicitante = {
             nome: this.extrairValor(linha, colunas.nome),
-            documento: this.limparDocumento(this.extrairValor(linha, colunas.documento)),
-            documento2: this.limparDocumento(this.extrairValor(linha, colunas.documento2)) || undefined,
+            doc1: this.limparDocumento(this.extrairValor(linha, colunas.doc1)),
+            doc2: this.limparDocumento(this.extrairValor(linha, colunas.doc2)) || undefined,
             empresa: this.extrairValor(linha, colunas.empresa) || "",
           }
 
           // 🎯 CORREÇÃO CRÍTICA: Aceitar prestador com Nome E (Doc1 OU Doc2)
           const temNome = prestador.nome.trim()
-          const temDoc1 = prestador.documento.trim()
-          const temDoc2 = prestador.documento2?.trim()
+          const temDoc1 = prestador.doc1.trim()
+          const temDoc2 = prestador.doc2?.trim()
           const temAlgumDoc = temDoc1 || temDoc2
 
           console.log(
@@ -422,16 +422,16 @@ export class ExcelService {
 
         const dadosParaInserir = lote.map((p) => ({
           nome: p.nome,
-          documento: p.documento,
-          documento2: p.documento2 || null,
+          doc1: p.doc1,
+          doc2: p.doc2 || null,
           empresa: p.empresa,
           funcao: p.cargo || null, // Tentativa de salvar cargo em 'funcao'
           observacao: p.observacoes || null, // Tentativa de salvar obs em 'observacao'
           checagem_valida_ate: p.validaAte || null,
           data_inicial: p.dataInicial || null,
           data_final: p.dataFinal || null,
-          status: p.status,
-          cadastro: p.cadastro,
+          checagem: p.checagem,
+          liberacao: p.liberacao,
           data_avaliacao: new Date().toISOString(),
           aprovado_por: "Upload Excel ADM",
           solicitacao_id: null, // Histórico não tem solicitação específica

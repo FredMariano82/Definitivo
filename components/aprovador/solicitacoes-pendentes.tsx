@@ -48,8 +48,8 @@ export default function SolicitacoesPendentes() {
     dataInicial: true,
     empresa: true,
     prestador: true,
-    documento: true,
-    documento2: true,
+    doc1: true,
+    doc2: true,
     checagem: true,
     validaAte: true,
     justificativa: true,
@@ -61,8 +61,8 @@ export default function SolicitacoesPendentes() {
     dataInicial: true,
     empresa: true,
     prestador: true,
-    documento: true,
-    documento2: true,
+    doc1: true,
+    doc2: true,
     checagem: true,
     validaAte: true,
     justificativa: true,
@@ -131,7 +131,7 @@ export default function SolicitacoesPendentes() {
 
   const getPrioridade = (prestador: PrestadorAvaliacao, solicitacao: Solicitacao) => {
     // 🚨 PRIORIDADE 0 (TOPO): Status Pendente
-    if (prestador.status === "pendente") {
+    if (prestador.checagem === "pendente") {
       return 0 // Qualquer prestador pendente tem prioridade máxima
     }
 
@@ -158,7 +158,7 @@ export default function SolicitacoesPendentes() {
               nome: prestador.nome,
               aprovado_por: (prestador as any).aprovado_por,
               aprovadoPor: prestador.aprovadoPor,
-              status: prestador.status,
+              checagem: prestador.checagem,
               observacoes: prestador.observacoes,
             })
             const isMigrado =
@@ -224,7 +224,7 @@ export default function SolicitacoesPendentes() {
         } else if (filtroStatus !== "todos") {
           const statusParaFiltro =
             filtroStatus === "aprovado" ? "aprovado" : filtroStatus === "reprovado" ? "reprovado" : filtroStatus
-          statusMatch = prestador.status === statusParaFiltro
+          statusMatch = prestador.checagem === statusParaFiltro
         }
 
         // Filtro de busca geral
@@ -232,7 +232,7 @@ export default function SolicitacoesPendentes() {
         if (buscaGeral.trim()) {
           const termoBusca = buscaGeral.trim()
           const nomeNormalizado = normalizarTexto(prestador.nome)
-          const documentoNormalizado = normalizarDocumento(prestador.documento)
+          const documentoNormalizado = normalizarDocumento(prestador.doc1)
           const termoBuscaNormalizado = normalizarTexto(termoBusca)
           const termoBuscaDocumento = normalizarDocumento(termoBusca)
 
@@ -318,14 +318,14 @@ export default function SolicitacoesPendentes() {
             ...s,
             prestadores: s.prestadores.map((p) => {
               if (p.id !== prestadorAvaliando.prestador.id) return p
-              return { ...p, status: novoStatus as any, justificativa: justificativa || undefined }
+              return { ...p, checagem: novoStatus as any, justificativa: justificativa || undefined }
             }),
           }
         }),
       )
 
       const updateData: any = {
-        status: novoStatus,
+        checagem: novoStatus,
         aprovado_por: "Sistema", // Idealmente usar o nome real do usuário logado
         data_avaliacao: agora.toISOString(),
         justificativa: justificativa || null,
@@ -380,12 +380,12 @@ export default function SolicitacoesPendentes() {
       // Buscar todos os prestadores da solicitação
       const { data: prestadores } = await supabase
         .from("prestadores")
-        .select("status")
+        .select("checagem")
         .eq("solicitacao_id", prestador.solicitacao_id)
 
       if (!prestadores) return
 
-      const statusList = prestadores.map((p) => p.status)
+      const statusList = prestadores.map((p) => (p as any).checagem)
       let novoStatus: string
 
       if (statusList.every((s) => s === "aprovado")) {
@@ -566,14 +566,14 @@ export default function SolicitacoesPendentes() {
                         Prestador
                       </TableHead>
                     )}
-                    {colunasVisiveis.documento && (
+                    {colunasVisiveis.doc1 && (
                       <TableHead className="font-semibold text-slate-800 text-center min-w-[130px]">
-                        Documento
+                        Doc1
                       </TableHead>
                     )}
-                    {colunasVisiveis.documento2 && (
+                    {colunasVisiveis.doc2 && (
                       <TableHead className="font-semibold text-slate-800 text-center min-w-[130px]">
-                        Documento2
+                        Doc2
                       </TableHead>
                     )}
                     {colunasVisiveis.checagem && (
@@ -603,11 +603,11 @@ export default function SolicitacoesPendentes() {
                       {colunasVisiveis.dataInicial && (
                         <TableCell className="text-sm whitespace-nowrap text-center">
                           <div className="flex items-center justify-center gap-2">
-                            {prestador.status === "reprovado" ? (
+                            {prestador.checagem === "reprovado" ? (
                               <span className="text-slate-400">-</span>
                             ) : (
                               <>
-                                {prestador.status === "pendente" ? (
+                                {prestador.checagem === "pendente" ? (
                                   (() => {
                                     const hoje = new Date()
                                     hoje.setHours(0, 0, 0, 0)
@@ -656,32 +656,32 @@ export default function SolicitacoesPendentes() {
                           <div className="whitespace-nowrap font-medium">{prestador.nome}</div>
                         </TableCell>
                       )}
-                      {colunasVisiveis.documento && (
+                      {colunasVisiveis.doc1 && (
                         <TableCell className="text-sm text-center">
-                          <div className="text-xs font-mono whitespace-nowrap">{prestador.documento}</div>
+                          <div className="text-xs font-mono whitespace-nowrap">{prestador.doc1}</div>
                         </TableCell>
                       )}
-                      {colunasVisiveis.documento2 && (
+                      {colunasVisiveis.doc2 && (
                         <TableCell className="text-sm text-center">
-                          <div className="text-xs font-mono whitespace-nowrap">{prestador.documento2 || "-"}</div>
+                          <div className="text-xs font-mono whitespace-nowrap">{prestador.doc2 || "-"}</div>
                         </TableCell>
                       )}
                       {colunasVisiveis.checagem && (
                         <TableCell className="text-center">
                           <div className="flex items-center justify-center gap-2 whitespace-nowrap">
-                            {prestador.status === "aprovado" && (
+                            {prestador.checagem === "aprovado" && (
                               <>
                                 <CheckCircle className="h-4 w-4 text-green-600" />
                                 <Badge className="bg-green-100 text-green-800 border-green-200">Aprovada</Badge>
                               </>
                             )}
-                            {prestador.status === "reprovado" && (
+                            {prestador.checagem === "reprovado" && (
                               <>
                                 <XCircle className="h-4 w-4 text-red-600" />
                                 <Badge className="bg-red-100 text-red-800 border-red-200">Reprovada</Badge>
                               </>
                             )}
-                            {prestador.status === "pendente" && (
+                            {prestador.checagem === "pendente" && (
                               <>
                                 <Clock className="h-4 w-4 text-yellow-600" />
                                 <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Pendente</Badge>
@@ -701,7 +701,7 @@ export default function SolicitacoesPendentes() {
                       )}
                       <TableCell>
                         <div className="flex items-center justify-center gap-1">
-                          {prestador.status === "pendente" && (
+                          {prestador.checagem === "pendente" && (
                             <Button
                               onClick={() => handleAvaliar(solicitacao, prestador)}
                               variant="outline"
@@ -796,7 +796,7 @@ export default function SolicitacoesPendentes() {
                         <strong>Prestador:</strong> {prestadorAvaliando?.prestador.nome}
                       </p>
                       <p>
-                        <strong>Documento:</strong> {prestadorAvaliando?.prestador.documento}
+                        <strong>Doc1:</strong> {prestadorAvaliando?.prestador.doc1}
                       </p>
                       <p>
                         <strong>Empresa:</strong> {prestadorAvaliando?.solicitacao.empresa}
@@ -870,8 +870,8 @@ export default function SolicitacoesPendentes() {
                         dataInicial: "Data Inicial",
                         empresa: "Empresa",
                         prestador: "Prestador",
-                        documento: "Documento",
-                        documento2: "Documento2",
+                        doc1: "Doc1",
+                        doc2: "Doc2",
                         checagem: "Checagem",
                         validaAte: "Válida até",
                         justificativa: "Justificativa",
@@ -954,8 +954,8 @@ export default function SolicitacoesPendentes() {
                       dataInicial: "Data Inicial",
                       empresa: "Empresa",
                       prestador: "Prestador",
-                      documento: "Documento",
-                      documento2: "Documento2",
+                      doc1: "Doc1",
+                      doc2: "Doc2",
                       checagem: "Checagem",
                       validaAte: "Válida até",
                       justificativa: "Justificativa",

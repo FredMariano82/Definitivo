@@ -1,5 +1,5 @@
 import { isDateExpired } from "./date-helpers"
-import type { StatusChecagem, StatusCadastro, PrestadorAvaliacao } from "../types"
+import type { StatusChecagem, StatusLiberacao, PrestadorAvaliacao } from "../types"
 
 /**
  * Determina o status real da checagem considerando vencimento
@@ -7,7 +7,7 @@ import type { StatusChecagem, StatusCadastro, PrestadorAvaliacao } from "../type
 export function getChecagemStatus(prestador: PrestadorAvaliacao): StatusChecagem {
   // Se não tem checagem válida até, usar status original
   if (!prestador.checagemValidaAte) {
-    return prestador.status as StatusChecagem
+    return prestador.checagem as StatusChecagem
   }
 
   // Se a checagem está vencida, sobrescrever status
@@ -16,16 +16,16 @@ export function getChecagemStatus(prestador: PrestadorAvaliacao): StatusChecagem
   }
 
   // Caso contrário, usar status original
-  return prestador.status as StatusChecagem
+  return prestador.checagem as StatusChecagem
 }
 
 /**
- * Determina o status real do cadastro considerando data final
+ * Determina o status real da liberação considerando data final
  */
-export function getCadastroStatus(prestador: PrestadorAvaliacao, dataFinal: string): StatusCadastro {
+export function getLiberacaoStatus(prestador: PrestadorAvaliacao, dataFinal: string): StatusLiberacao {
   // Se não tem data final, usar status original do prestador
   if (!dataFinal) {
-    return prestador.cadastro as StatusCadastro
+    return prestador.liberacao as StatusLiberacao
   }
 
   // Se a data final está vencida, retornar "vencida" (não "vencido")
@@ -34,7 +34,7 @@ export function getCadastroStatus(prestador: PrestadorAvaliacao, dataFinal: stri
   }
 
   // Caso contrário, usar status original do prestador
-  return prestador.cadastro as StatusCadastro
+  return prestador.liberacao as StatusLiberacao
 }
 
 /**

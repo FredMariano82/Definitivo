@@ -22,7 +22,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import type { Solicitacao, PrestadorAvaliacao } from "../../types"
-import { StatusCadastroBadge, StatusCadastroIcon, getChecagemStatus, getCadastroStatus } from "../ui/status-badges"
+import {
+  StatusLiberacaoBadge,
+  StatusLiberacaoIcon,
+  getChecagemStatus,
+  getLiberacaoStatus,
+  StatusChecagemBadge,
+  StatusChecagemIcon,
+} from "../ui/status-badges"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getAllSolicitacoes } from "../../services/solicitacoes-service"
 import { supabase } from "@/lib/supabase"
@@ -36,7 +43,7 @@ type StatusCadastro = "pendente" | "ok" | "urgente" | "vencida"
 const COLUNAS_DISPONIVEIS = [
   { key: "dataSolicitacao", label: "Data Solicitação" },
   { key: "prestador", label: "Prestador" },
-  { key: "documento", label: "Documento" },
+  { key: "doc1", label: "Doc1" },
   { key: "dataInicial", label: "Data Inicial" },
   { key: "dataFinal", label: "Data Final" },
   { key: "liberacao", label: "Liberação" },
@@ -149,11 +156,11 @@ export default function ConsultarSolicitacoes() {
   }
 
   const getPrioridade = (prestador: PrestadorAvaliacao) => {
-    if (prestador.status === "pendente" && prestador.cadastro === "urgente") {
-      return 1 // 🔴 Prioridade 1: STATUS = "pendente" + CADASTRO = "urgente"
+    if (prestador.checagem === "pendente" && prestador.liberacao === "urgente") {
+      return 1 // 🔴 Prioridade 1: checagem = "pendente" + liberacao = "urgente"
     }
-    if (prestador.status === "pendente" && prestador.cadastro === "pendente") {
-      return 2 // 🟡 Prioridade 2: STATUS = "pendente" + CADASTRO = "pendente"
+    if (prestador.checagem === "pendente" && prestador.liberacao === "pendente") {
+      return 2 // 🟡 Prioridade 2: checagem = "pendente" + liberacao = "pendente"
     }
     return 3 // ⚪ Demais casos: Outros status
   }
@@ -171,7 +178,7 @@ export default function ConsultarSolicitacoes() {
         ? solicitacao.prestadores.filter((prestador) => {
           // Calcular status real para filtros
           const checagemStatusReal = getChecagemStatus(prestador)
-          const cadastroStatusReal = getCadastroStatus(prestador, solicitacao.dataFinal)
+          const cadastroStatusReal = getLiberacaoStatus(prestador, solicitacao.dataFinal)
 
           // Filtro de status checagem (incluindo status calculados)
           let statusMatch = filtroStatus === "todos"
@@ -181,7 +188,7 @@ export default function ConsultarSolicitacoes() {
             // CORREÇÃO: Mapear filtro para status do banco
             const statusParaFiltro =
               filtroStatus === "aprovado" ? "aprovado" : filtroStatus === "reprovado" ? "reprovado" : filtroStatus
-            statusMatch = prestador.status === statusParaFiltro
+            statusMatch = prestador.checagem === statusParaFiltro
           }
 
           // Filtro de cadastro (incluindo status calculados)
@@ -189,7 +196,7 @@ export default function ConsultarSolicitacoes() {
           if (filtroCadastro === "vencida") {
             cadastroMatch = cadastroStatusReal === "vencida"
           } else if (filtroCadastro !== "todos") {
-            cadastroMatch = prestador.cadastro === filtroCadastro
+            cadastroMatch = prestador.liberacao === filtroCadastro
           }
 
           // Filtro de busca geral
@@ -197,7 +204,7 @@ export default function ConsultarSolicitacoes() {
           if (buscaGeral.trim()) {
             const termoBusca = buscaGeral.trim()
             const nomeNormalizado = normalizarTexto(prestador.nome)
-            const documentoNormalizado = normalizarDocumento(prestador.documento)
+            const documentoNormalizado = normalizarDocumento(prestador.doc1)
             const termoBuscaNormalizado = normalizarTexto(termoBusca)
             const termoBuscaDocumento = normalizarDocumento(termoBusca)
 
@@ -273,11 +280,11 @@ export default function ConsultarSolicitacoes() {
     setDadosEdicao({
       // Dados do prestador
       nome: prestador.nome,
-      documento: prestador.documento,
-      documento2: prestador.documento2 || "",
-      empresa: prestador.empresa || "",
-      status: prestador.status,
-      cadastro: prestador.cadastro,
+      doc1: prestador.doc1,
+      doc2: (prestador as any).doc2 || "",
+      empresa: (prestador as any).empresa || "",
+      checagem: prestador.checagem,
+      liberacao: prestador.liberacao,
       checagemValidaAte: validaAteFormatada,
       justificativa: prestador.justificativa || "",
 
@@ -317,11 +324,11 @@ export default function ConsultarSolicitacoes() {
         .from("prestadores")
         .update({
           nome: dadosEdicao.nome,
-          documento: dadosEdicao.documento,
-          documento2: dadosEdicao.documento2 || null,
+          doc1: dadosEdicao.doc1,
+          doc2: dadosEdicao.doc2 || null,
           empresa: dadosEdicao.empresa || null,
-          status: dadosEdicao.status,
-          cadastro: dadosEdicao.cadastro,
+          checagem: dadosEdicao.checagem,
+          liberacao: dadosEdicao.liberacao,
           checagem_valida_ate: validaAteISO,
           justificativa: dadosEdicao.justificativa || null,
         })
@@ -374,11 +381,11 @@ export default function ConsultarSolicitacoes() {
                     ? {
                       ...p,
                       nome: dadosEdicao.nome,
-                      documento: dadosEdicao.documento,
-                      documento2: dadosEdicao.documento2 || undefined,
+                      doc1: dadosEdicao.doc1,
+                      doc2: dadosEdicao.doc2 || undefined,
                       empresa: dadosEdicao.empresa || undefined,
-                      status: dadosEdicao.status as any,
-                      cadastro: dadosEdicao.cadastro as StatusCadastro,
+                      checagem: dadosEdicao.checagem as any,
+                      liberacao: dadosEdicao.liberacao as any,
                       checagemValidaAte: dadosEdicao.checagemValidaAte
                         ? dadosEdicao.checagemValidaAte.split("-").reverse().join("/")
                         : undefined,
@@ -484,13 +491,13 @@ export default function ConsultarSolicitacoes() {
               Local: sol.local || "-",
               "Empresa Geral": sol.empresa || "-",
               Prestador: prest.nome || "-",
-              Documento: prest.documento || "-",
-              "Documento 2": prest.documento2 || "-",
-              "Empresa Prestador": prest.empresa || "-",
+              Doc1: prest.doc1 || "-",
+              Doc2: (prest as any).doc2 || "-",
+              "Empresa Prestador": (prest as any).empresa || "-",
               "Data Inicial": sol.dataInicial || "-",
               "Data Final": sol.dataFinal || "-",
-              "Status Checagem": prest.status || "-",
-              "Status Liberação": prest.cadastro || "-",
+              "Status Checagem": prest.checagem || "-",
+              "Status Liberação": prest.liberacao || "-",
               "Válida Até": prest.checagemValidaAte || "-",
               Justificativa: prest.justificativa || "-",
             })
@@ -1090,9 +1097,9 @@ export default function ConsultarSolicitacoes() {
                         Prestador
                       </TableHead>
                     )}
-                    {colunasVisiveis.documento && (
+                    {colunasVisiveis.doc1 && (
                       <TableHead className="font-semibold text-purple-800 text-center min-w-[130px]">
-                        Documento
+                        Doc1
                       </TableHead>
                     )}
                     {colunasVisiveis.dataInicial && (
@@ -1150,14 +1157,14 @@ export default function ConsultarSolicitacoes() {
                             <div className="whitespace-nowrap font-medium">{prestador.nome}</div>
                           </TableCell>
                         )}
-                        {colunasVisiveis.documento && (
+                        {colunasVisiveis.doc1 && (
                           <TableCell className="text-sm text-center">
-                            <div className="text-xs font-mono whitespace-nowrap">{prestador.documento}</div>
+                            <div className="text-xs font-mono whitespace-nowrap">{prestador.doc1}</div>
                           </TableCell>
                         )}
                         {colunasVisiveis.dataInicial && (
                           <TableCell className="text-sm whitespace-nowrap text-center">
-                            {prestador.status === "reprovado" ? (
+                            {prestador.checagem === "reprovado" ? (
                               <span className="text-purple-400">-</span>
                             ) : (
                               solicitacao.dataInicial
@@ -1166,7 +1173,7 @@ export default function ConsultarSolicitacoes() {
                         )}
                         {colunasVisiveis.dataFinal && (
                           <TableCell className="text-sm whitespace-nowrap text-center">
-                            {prestador.status === "reprovado" ? (
+                            {prestador.checagem === "reprovado" ? (
                               <span className="text-purple-400">-</span>
                             ) : (
                               solicitacao.dataFinal
@@ -1176,39 +1183,16 @@ export default function ConsultarSolicitacoes() {
                         {colunasVisiveis.liberacao && (
                           <TableCell className="whitespace-nowrap text-center">
                             <div className="flex items-center justify-center gap-2">
-                              <StatusCadastroIcon status={getCadastroStatus(prestador, solicitacao.dataFinal)} />
-                              <StatusCadastroBadge status={getCadastroStatus(prestador, solicitacao.dataFinal)} />
+                              <StatusLiberacaoIcon status={getLiberacaoStatus(prestador, solicitacao.dataFinal)} />
+                              <StatusLiberacaoBadge status={getLiberacaoStatus(prestador, solicitacao.dataFinal)} />
                             </div>
                           </TableCell>
                         )}
                         {colunasVisiveis.checagem && (
                           <TableCell className="text-center">
                             <div className="flex items-center justify-center gap-2 whitespace-nowrap">
-                              {/* SUPORTE: Mapear TODOS os status do banco para componente */}
-                              {prestador.status === "aprovado" && (
-                                <>
-                                  <CheckCircle className="h-4 w-4 text-green-600" />
-                                  <Badge className="bg-green-100 text-green-800 border-green-200">Aprovada</Badge>
-                                </>
-                              )}
-                              {prestador.status === "reprovado" && (
-                                <>
-                                  <XCircle className="h-4 w-4 text-red-600" />
-                                  <Badge className="bg-red-100 text-red-800 border-red-200">Reprovada</Badge>
-                                </>
-                              )}
-                              {prestador.status === "pendente" && (
-                                <>
-                                  <Clock className="h-4 w-4 text-yellow-600" />
-                                  <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Pendente</Badge>
-                                </>
-                              )}
-                              {prestador.status === "excecao" && (
-                                <>
-                                  <ShieldAlert className="h-4 w-4 text-purple-600" />
-                                  <Badge className="bg-purple-100 text-purple-800 border-purple-200">Exceção</Badge>
-                                </>
-                              )}
+                              <StatusChecagemIcon status={prestador.checagem} />
+                              <StatusChecagemBadge status={prestador.checagem} />
                             </div>
                           </TableCell>
                         )}
@@ -1271,29 +1255,29 @@ export default function ConsultarSolicitacoes() {
                                             <Input
                                               value={dadosEdicao.nome || ""}
                                               onChange={(e) =>
-                                                setDadosEdicao((prev) => ({ ...prev, nome: e.target.value }))
+                                                setDadosEdicao((prev: any) => ({ ...prev, nome: e.target.value }))
                                               }
                                               className="text-sm"
                                             />
                                           </div>
 
                                           <div>
-                                            <Label className="text-xs text-purple-600">Documento</Label>
+                                            <Label className="text-xs text-purple-600">Doc1</Label>
                                             <Input
-                                              value={dadosEdicao.documento || ""}
+                                              value={dadosEdicao.doc1 || ""}
                                               onChange={(e) =>
-                                                setDadosEdicao((prev) => ({ ...prev, documento: e.target.value }))
+                                                setDadosEdicao((prev: any) => ({ ...prev, doc1: e.target.value }))
                                               }
                                               className="text-sm"
                                             />
                                           </div>
 
                                           <div>
-                                            <Label className="text-xs text-purple-600">Documento 2</Label>
+                                            <Label className="text-xs text-purple-600">Doc2</Label>
                                             <Input
-                                              value={dadosEdicao.documento2 || ""}
+                                              value={dadosEdicao.doc2 || ""}
                                               onChange={(e) =>
-                                                setDadosEdicao((prev) => ({ ...prev, documento2: e.target.value }))
+                                                setDadosEdicao((prev: any) => ({ ...prev, doc2: e.target.value }))
                                               }
                                               className="text-sm"
                                             />
@@ -1304,18 +1288,18 @@ export default function ConsultarSolicitacoes() {
                                             <Input
                                               value={dadosEdicao.empresa || ""}
                                               onChange={(e) =>
-                                                setDadosEdicao((prev) => ({ ...prev, empresa: e.target.value }))
+                                                setDadosEdicao((prev: any) => ({ ...prev, empresa: e.target.value }))
                                               }
                                               className="text-sm"
                                             />
                                           </div>
 
                                           <div>
-                                            <Label className="text-xs text-purple-600">Status Checagem</Label>
+                                            <Label className="text-xs text-purple-600">Checagem</Label>
                                             <select
-                                              value={dadosEdicao.status || ""}
+                                              value={dadosEdicao.checagem || ""}
                                               onChange={(e) =>
-                                                setDadosEdicao((prev) => ({ ...prev, status: e.target.value }))
+                                                setDadosEdicao((prev: any) => ({ ...prev, checagem: e.target.value }))
                                               }
                                               className="w-full p-2 border border-purple-300 rounded-md text-sm"
                                             >
@@ -1327,11 +1311,11 @@ export default function ConsultarSolicitacoes() {
                                           </div>
 
                                           <div>
-                                            <Label className="text-xs text-purple-600">Status Liberação</Label>
+                                            <Label className="text-xs text-purple-600">Liberação</Label>
                                             <select
-                                              value={dadosEdicao.cadastro || ""}
+                                              value={dadosEdicao.liberacao || ""}
                                               onChange={(e) =>
-                                                setDadosEdicao((prev) => ({ ...prev, cadastro: e.target.value }))
+                                                setDadosEdicao((prev: any) => ({ ...prev, liberacao: e.target.value }))
                                               }
                                               className="w-full p-2 border border-purple-300 rounded-md text-sm"
                                             >
@@ -1347,7 +1331,7 @@ export default function ConsultarSolicitacoes() {
                                               type="date"
                                               value={dadosEdicao.checagemValidaAte || ""}
                                               onChange={(e) =>
-                                                setDadosEdicao((prev) => ({
+                                                setDadosEdicao((prev: any) => ({
                                                   ...prev,
                                                   checagemValidaAte: e.target.value,
                                                 }))
@@ -1369,7 +1353,7 @@ export default function ConsultarSolicitacoes() {
                                               type="date"
                                               value={dadosEdicao.dataSolicitacao || ""}
                                               onChange={(e) =>
-                                                setDadosEdicao((prev) => ({ ...prev, dataSolicitacao: e.target.value }))
+                                                setDadosEdicao((prev: any) => ({ ...prev, dataSolicitacao: e.target.value }))
                                               }
                                               className="text-sm"
                                             />
@@ -1380,7 +1364,7 @@ export default function ConsultarSolicitacoes() {
                                             <Input
                                               value={dadosEdicao.solicitante || ""}
                                               onChange={(e) =>
-                                                setDadosEdicao((prev) => ({ ...prev, solicitante: e.target.value }))
+                                                setDadosEdicao((prev: any) => ({ ...prev, solicitante: e.target.value }))
                                               }
                                               className="text-sm"
                                             />
@@ -1391,7 +1375,7 @@ export default function ConsultarSolicitacoes() {
                                             <Input
                                               value={dadosEdicao.departamento || ""}
                                               onChange={(e) =>
-                                                setDadosEdicao((prev) => ({ ...prev, departamento: e.target.value }))
+                                                setDadosEdicao((prev: any) => ({ ...prev, departamento: e.target.value }))
                                               }
                                               className="text-sm"
                                             />
@@ -1402,7 +1386,7 @@ export default function ConsultarSolicitacoes() {
                                             <Input
                                               value={dadosEdicao.local || ""}
                                               onChange={(e) =>
-                                                setDadosEdicao((prev) => ({ ...prev, local: e.target.value }))
+                                                setDadosEdicao((prev: any) => ({ ...prev, local: e.target.value }))
                                               }
                                               className="text-sm"
                                             />
@@ -1413,7 +1397,7 @@ export default function ConsultarSolicitacoes() {
                                             <Input
                                               value={dadosEdicao.empresaGeral || ""}
                                               onChange={(e) =>
-                                                setDadosEdicao((prev) => ({ ...prev, empresaGeral: e.target.value }))
+                                                setDadosEdicao((prev: any) => ({ ...prev, empresaGeral: e.target.value }))
                                               }
                                               className="text-sm"
                                             />
@@ -1425,7 +1409,7 @@ export default function ConsultarSolicitacoes() {
                                               type="date"
                                               value={dadosEdicao.dataInicial || ""}
                                               onChange={(e) =>
-                                                setDadosEdicao((prev) => ({ ...prev, dataInicial: e.target.value }))
+                                                setDadosEdicao((prev: any) => ({ ...prev, dataInicial: e.target.value }))
                                               }
                                               className="text-sm"
                                             />
@@ -1437,7 +1421,7 @@ export default function ConsultarSolicitacoes() {
                                               type="date"
                                               value={dadosEdicao.dataFinal || ""}
                                               onChange={(e) =>
-                                                setDadosEdicao((prev) => ({ ...prev, dataFinal: e.target.value }))
+                                                setDadosEdicao((prev: any) => ({ ...prev, dataFinal: e.target.value }))
                                               }
                                               className="text-sm"
                                             />
@@ -1450,7 +1434,7 @@ export default function ConsultarSolicitacoes() {
                                           <Textarea
                                             value={dadosEdicao.justificativa || ""}
                                             onChange={(e) =>
-                                              setDadosEdicao((prev) => ({ ...prev, justificativa: e.target.value }))
+                                              setDadosEdicao((prev: any) => ({ ...prev, justificativa: e.target.value }))
                                             }
                                             className="text-sm"
                                             rows={3}

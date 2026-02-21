@@ -18,8 +18,8 @@ export class SuporteService {
           "Departamento",
           "Data Solicitação",
           "Nome",
-          "Documento",
-          "Documento2",
+          "Doc1",
+          "Doc2",
           "Empresa",
           "Data Inicial",
           "Data Final",
@@ -47,8 +47,8 @@ export class SuporteService {
         { wch: 15 }, // Departamento
         { wch: 15 }, // Data Solicitação
         { wch: 25 }, // Nome
-        { wch: 15 }, // Documento
-        { wch: 18 }, // Documento2
+        { wch: 15 }, // Doc1
+        { wch: 18 }, // Doc2
         { wch: 25 }, // Empresa
         { wch: 15 }, // Data Inicial
         { wch: 15 }, // Data Final
@@ -168,14 +168,14 @@ export class SuporteService {
   }> {
     try {
       // 1️⃣ VALIDAR APENAS SE TEM DADOS MÍNIMOS
-      if (!item.nome && !item.documento) {
+      if (!item.nome && !item.doc1) {
         return {
           sucesso: false,
           erro: "Nome ou documento são obrigatórios",
         }
       }
 
-      const duplicata = await this.verificarDuplicata(item.documento, item.documento2)
+      const duplicata = await this.verificarDuplicata(item.doc1, item.doc2)
       if (duplicata) {
         return {
           sucesso: false,
@@ -188,7 +188,7 @@ export class SuporteService {
 
       // 3️⃣ CALCULAR CAMPOS AUTOMÁTICOS - FORMATO BRASILEIRO
       const checagemValidaAte = this.calcularValidadeChecagemBR(item.dataSolicitacao)
-      const cadastro = item.dataFinal ? "ok" : null
+      const liberacao = item.dataFinal ? "ok" : null
 
       // 4️⃣ CONVERTER DATAS PARA ISO APENAS PARA O BANCO
       const dataSolicitacaoISO = this.converterBRParaISO(item.dataSolicitacao)
@@ -234,11 +234,11 @@ export class SuporteService {
         {
           solicitacao_id: solicitacao.id,
           nome: item.nome,
-          documento: item.documento,
-          documento2: item.documento2 || null,
+          doc1: item.doc1,
+          doc2: item.doc2 || null,
           empresa: item.empresa,
-          status: "aprovado",
-          cadastro: cadastro,
+          checagem: "aprovado",
+          liberacao: liberacao,
           checagem_valida_ate: checagemValidaAteISO,
           aprovado_por: "Migração Suporte",
           data_avaliacao: new Date().toISOString(),
@@ -275,8 +275,8 @@ export class SuporteService {
       // Verificar documento principal
       const { data: prestador1 } = await supabase
         .from("prestadores")
-        .select("documento")
-        .or(`documento.eq.${documento},documento2.eq.${documento}`)
+        .select("doc1")
+        .or(`doc1.eq.${documento},doc2.eq.${documento}`)
         .limit(1)
 
       if (prestador1 && prestador1.length > 0) {
@@ -287,8 +287,8 @@ export class SuporteService {
       if (documento2) {
         const { data: prestador2 } = await supabase
           .from("prestadores")
-          .select("documento2")
-          .or(`documento.eq.${documento2},documento2.eq.${documento2}`)
+          .select("doc2")
+          .or(`doc1.eq.${documento2},doc2.eq.${documento2}`)
           .limit(1)
 
         if (prestador2 && prestador2.length > 0) {
@@ -416,8 +416,8 @@ export class SuporteService {
           "solicitação",
         ]),
         nome: this.encontrarColuna(cabecalho, ["nome", "name", "prestador"]),
-        documento: this.encontrarColuna(cabecalho, ["documento", "doc1", "rg", "doc"]),
-        documento2: this.encontrarColuna(cabecalho, ["documento2", "doc2", "cpf", "cnh"]),
+        doc1: this.encontrarColuna(cabecalho, ["documento", "doc1", "rg", "doc"]),
+        doc2: this.encontrarColuna(cabecalho, ["documento2", "doc2", "cpf", "cnh"]),
         empresa: this.encontrarColuna(cabecalho, ["empresa", "company", "emp"]),
         dataInicial: this.encontrarColuna(cabecalho, ["data inicial", "data_inicial", "inicio", "data inicio"]),
         dataFinal: this.encontrarColuna(cabecalho, ["data final", "data_final", "fim", "data fim"]),
@@ -443,17 +443,17 @@ export class SuporteService {
             departamento: this.extrairValor(linha, colunas.departamento) || "",
             dataSolicitacao: dataFormatadaBR || "",
             nome: this.extrairValor(linha, colunas.nome) || "",
-            documento: this.extrairValor(linha, colunas.documento) || "",
-            documento2: this.extrairValor(linha, colunas.documento2) || undefined,
+            doc1: this.extrairValor(linha, colunas.doc1) || "",
+            doc2: this.extrairValor(linha, colunas.doc2) || undefined,
             empresa: this.extrairValor(linha, colunas.empresa) || "",
             dataInicial: this.manterFormatoBrasileiro(this.extrairValor(linha, colunas.dataInicial)) || "",
             dataFinal: this.manterFormatoBrasileiro(this.extrairValor(linha, colunas.dataFinal)) || undefined,
-            status: "aprovado",
+            checagem: "aprovado",
             checagemValidaAte: "",
           }
 
           // VALIDAÇÃO MÍNIMA
-          const temAlgumDado = item.nome || item.documento || item.empresa || item.departamento
+          const temAlgumDado = item.nome || item.doc1 || item.empresa || item.departamento
 
           if (temAlgumDado) {
             dados.push(item)
@@ -545,7 +545,7 @@ export class SuporteService {
   }
 
   // 🔄 CONVERTER BR PARA ISO (APENAS PARA O BANCO)
-  private static converterBRParaISO(dataBR: string): string {
+  private static converterBRParaISO(dataBR?: string): string {
     if (!dataBR) return ""
 
     try {

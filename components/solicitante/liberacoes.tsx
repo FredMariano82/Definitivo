@@ -22,7 +22,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuth } from "../../contexts/auth-context"
 import { getSolicitacoesByDepartamento } from "../../services/solicitacoes-service"
-import { getCadastroStatus } from "../ui/status-badges"
+import {
+  StatusLiberacaoBadge,
+  StatusLiberacaoIcon,
+  getLiberacaoStatus,
+} from "../ui/status-badges"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { converterDataBrParaDate, getCurrentDate } from "../../utils/date-helpers"
@@ -74,15 +78,15 @@ export default function Liberacoes() {
   const dadosPorStatus = solicitacoesReais
     .filter((solicitacao) => solicitacao.departamento === usuario?.departamento)
     .filter((solicitacao) =>
-      solicitacao.prestadores.some((p: any) => getCadastroStatus(p, solicitacao.dataFinal) === "ok"),
+      solicitacao.prestadores.some((p: any) => getLiberacaoStatus(p, solicitacao.dataFinal) === "ok"),
     )
     .flatMap((solicitacao) =>
       solicitacao.prestadores
-        .filter((prestador: any) => getCadastroStatus(prestador, solicitacao.dataFinal) === "ok")
+        .filter((prestador: any) => getLiberacaoStatus(prestador, solicitacao.dataFinal) === "ok")
         .map((prestador: any) => ({
           solicitacao,
           prestador,
-          statusLiberacao: getCadastroStatus(prestador, solicitacao.dataFinal),
+          statusLiberacao: getLiberacaoStatus(prestador, solicitacao.dataFinal),
         })),
     )
     .filter((item) => {
@@ -90,7 +94,7 @@ export default function Liberacoes() {
       const busca = buscaGeral.toLowerCase()
       return (
         item.prestador.nome.toLowerCase().includes(busca) ||
-        item.prestador.documento.toLowerCase().includes(busca) ||
+        item.prestador.doc1.toLowerCase().includes(busca) ||
         item.solicitacao.numero.toLowerCase().includes(busca)
       )
     })
@@ -299,7 +303,7 @@ export default function Liberacoes() {
                   <TableRow className="bg-slate-50 hover:bg-slate-50 border-b border-slate-200">
                     <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Solicitação</TableHead>
                     <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Prestador</TableHead>
-                    <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Documento</TableHead>
+                    <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Doc1</TableHead>
                     <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Status Liberação</TableHead>
                     <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Data Final</TableHead>
                     <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Observações</TableHead>
@@ -312,14 +316,12 @@ export default function Liberacoes() {
                       <TableCell className="font-medium text-sm text-center">{solicitacao.numero}</TableCell>
                       <TableCell className="text-sm text-center">{prestador.nome}</TableCell>
                       <TableCell className="text-sm text-center">
-                        <div className="text-xs font-mono">{prestador.documento}</div>
+                        <div className="text-xs font-mono">{prestador.doc1}</div>
                       </TableCell>
                       <TableCell className="text-center">
-                        <div
-                          className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(statusLiberacao)}`}
-                        >
-                          {getStatusIcon(statusLiberacao)}
-                          {statusLiberacao.charAt(0).toUpperCase() + statusLiberacao.slice(1)}
+                        <div className="flex items-center justify-center gap-2">
+                          <StatusLiberacaoIcon status={statusLiberacao} />
+                          <StatusLiberacaoBadge status={statusLiberacao} />
                         </div>
                       </TableCell>
                       <TableCell className="text-sm text-center">

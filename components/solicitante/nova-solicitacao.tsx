@@ -18,13 +18,13 @@ import UploadListaExcel from "./upload-lista-excel"
 import ModalPreviaSolicitacao from "./modal-previa-solicitacao"
 import FinalidadeSolicitacao from "./finalidade-solicitacao"
 
-interface NovaSolicitacaoProps {
+export interface NovaSolicitacaoProps {
   dadosPrePreenchidos?: {
     tipoSolicitacao?: string
     finalidade?: string
     local?: string
     empresa?: string
-    prestadores?: Array<{ id: string; nome: string; documento: string; empresa?: string }>
+    prestadores?: Array<{ id: string; nome: string; doc1: string; empresa?: string }>
     dataInicial?: string
     dataFinal?: string
   }
@@ -41,13 +41,31 @@ export default function NovaSolicitacao({
   const [tipoSolicitacao] = useState<"checagem_liberacao">("checagem_liberacao")
   const [local, setLocal] = useState("")
   const [empresa, setEmpresa] = useState("")
-  const [prestadores, setPrestadores] = useState<Prestador[]>([
+  const [prestadores, setPrestadores] = useState<
+    Array<{
+      id: string
+      nome: string
+      doc1: string
+      doc2?: string
+      empresa?: string
+      validando?: boolean
+      validado?: boolean
+      encontrado?: boolean
+      pendente?: boolean
+      checagemIncluida?: boolean
+    }>
+  >([
     {
-      id: `prestador_inicial_${Date.now()}`,
+      id: "1",
       nome: "",
-      documento: "",
-      documento2: "",
+      doc1: "",
+      doc2: "",
       empresa: "",
+      validando: false,
+      validado: false,
+      encontrado: false,
+      pendente: false,
+      checagemIncluida: false,
     },
   ])
   const [dataInicial, setDataInicial] = useState("")
@@ -93,9 +111,14 @@ export default function NovaSolicitacao({
       {
         id: novoId,
         nome: "",
-        documento: "",
-        documento2: "",
+        doc1: "",
+        doc2: "",
         empresa: "",
+        validando: false,
+        validado: false,
+        encontrado: false,
+        pendente: false,
+        checagemIncluida: false,
       },
     ])
   }
@@ -129,12 +152,16 @@ export default function NovaSolicitacao({
     }
   }
 
-  const atualizarPrestador = (id: string, campo: "nome" | "documento" | "empresa", valor: string) => {
-    console.log(`🔄 Atualizando prestador ID ${id}, campo ${campo}: "${valor}"`)
-
-    const novosPrestadores = prestadores.map((p) => (p.id === id ? { ...p, [campo]: valor } : p))
-    setPrestadores(novosPrestadores)
-
+  const atualizarPrestador = (id: string, campo: "nome" | "doc1" | "doc2" | "empresa", valor: string) => {
+    setPrestadores(
+      prestadores.map((p) => {
+        if (p.id === id) {
+          const novoValor = campo === "doc1" || campo === "doc2" ? valor.replace(/\s/g, "").toUpperCase() : valor
+          return { ...p, [campo]: novoValor, validado: campo === "doc1" || campo === "doc2" ? false : p.validado }
+        }
+        return p
+      }),
+    )
     // 🎯 LÓGICA INTELIGENTE DE EMPRESA - EXCLUSÃO MÚTUA
     if (campo === "empresa") {
       if (valor.trim() !== "" && modoEmpresa !== "especifica") {
@@ -143,7 +170,7 @@ export default function NovaSolicitacao({
         setModoEmpresa("especifica")
       } else if (valor.trim() === "") {
         // Verificar se ainda há empresas específicas preenchidas
-        const temOutrasEmpresasEspecificas = novosPrestadores.some((p) => p.id !== id && p.empresa?.trim())
+        const temOutrasEmpresasEspecificas = prestadores.some((p) => p.id !== id && p.empresa?.trim())
         if (!temOutrasEmpresasEspecificas) {
           console.log("🏢 Nenhuma empresa específica - voltando para modo nenhum")
           setModoEmpresa("nenhum")
@@ -152,7 +179,7 @@ export default function NovaSolicitacao({
     }
 
     // APENAS limpar alertas se o campo foi esvaziado - SEM VALIDAÇÃO DURANTE DIGITAÇÃO
-    if (campo === "documento" && !valor.trim()) {
+    if ((campo === "doc1" || campo === "doc2") && !valor.trim()) {
       console.log(`🧹 Documento vazio, limpando alertas para prestador ID ${id}`)
       const novosAlertas = { ...alertasPrestadores }
       delete novosAlertas[id]
@@ -192,23 +219,11 @@ export default function NovaSolicitacao({
     }
   }
 
-  // Função para validar quando sair do campo documento (onBlur)
+  // Função para validar quando sair do campo doc1 (onBlur)
   const validarAoSairDoCampo = (prestadorId: string) => {
     const prestador = prestadores.find((p) => p.id === prestadorId)
-
-    console.log(`🔍 VALIDAÇÃO Doc1 - Prestador ID: ${prestadorId}`)
-    console.log(`📝 Dados do prestador:`, prestador)
-    console.log(`📋 Tipo de solicitação: ${tipoSolicitacao}`)
-
-    // MUDANÇA: Validar se tem documento (não precisa de nome preenchido)
-    if (prestador && prestador.documento.trim() && finalidade) {
-      const documentoParaValidar = prestador.documento.trim()
-      console.log(`🔍 VALIDAÇÃO ACIONADA - Documento para validar: "${documentoParaValidar}"`)
-      validarPrestador(prestadorId, prestador.nome, documentoParaValidar)
-    } else {
-      console.log(`⚠️ Validação não executada - documento vazio ou tipo não selecionado`)
-      console.log(`   Doc1: "${prestador?.documento || ""}"`)
-      console.log(`   Tipo: "${tipoSolicitacao}"`)
+    if (prestador && prestador.doc1.trim().length >= 5) {
+      validarPrestador(prestador.id, prestador.nome, prestador.doc1)
     }
   }
 
@@ -236,7 +251,7 @@ export default function NovaSolicitacao({
     console.log(`🧹 Não avançar - limpando campos do prestador ID ${prestadorId}`)
 
     // Limpar nome e documento do prestador
-    const novosPrestadores = prestadores.map((p) => (p.id === prestadorId ? { ...p, nome: "", documento: "" } : p))
+    const novosPrestadores = prestadores.map((p) => (p.id === prestadorId ? { ...p, nome: "", doc1: "", doc2: "" } : p))
     setPrestadores(novosPrestadores)
 
     // Limpar alertas
@@ -251,40 +266,35 @@ export default function NovaSolicitacao({
   }
 
   // Função para validar um único prestador pelo ID (CONSULTA SUPABASE EM TEMPO REAL)
-  const validarPrestador = async (id: string, nome: string, documento: string) => {
-    console.log(`\n🔍 === VALIDANDO PRESTADOR ID ${id} (PRODUÇÃO SUPABASE) ===`)
-    console.log(`📝 Nome: "${nome}"`)
-    console.log(`📄 Documento: "${documento}"`)
+  const validarPrestador = async (id: string, nome: string, doc1: string) => {
+    if (!doc1 || doc1.trim() === "") return
 
-    // MUDANÇA: Só exigir documento preenchido (nome pode estar vazio)
-    if (!documento.trim()) {
-      console.log(`⚠️ Documento vazio - não validar`)
-      // Limpar qualquer alerta existente
-      const novosAlertas = { ...alertasPrestadores }
-      delete novosAlertas[id]
-      setAlertasPrestadores(novosAlertas)
-      return
-    }
+    // Limpar o documento de busca
+    const doc1Limpo = doc1.replace(/\D/g, "")
+    if (!doc1Limpo) return
+
+    setPrestadores((prev) => prev.map((p) => (p.id === id ? { ...p, validando: true } : p)))
 
     try {
-      // 🚀 CONSULTAR SUPABASE EM PRODUÇÃO
-      console.log(`🚀 PRODUÇÃO - Consultando Supabase para documento: "${documento}"`)
-      const prestadorEncontrado = await PrestadoresService.consultarPrestadorPorDocumento(documento)
+      // 🎯 BUSCA REAL NO SUPABASE via SERVICE
+      console.log(`🔍 VALIDANDO PRESTADOR: ${nome} | Doc: ${doc1Limpo}`)
+      const prestadorEncontrado = await PrestadoresService.consultarPrestadorPorDocumento(doc1Limpo)
       console.log(`🚀 PRODUÇÃO - Resultado da consulta:`, prestadorEncontrado)
 
-      // Se encontrou prestador com este documento
-      if (prestadorEncontrado) {
-        console.log(`✅ Prestador encontrado no Supabase: ${prestadorEncontrado.nome}`)
-
-        // AUTO-PREENCHER O NOME APENAS
-        if (prestadorEncontrado && prestadorEncontrado.nome) {
-          console.log(`🎯 Auto-preenchendo nome: ${prestadorEncontrado.nome}`)
-          const novosPrestadores = prestadores.map((p) => (p.id === id ? { ...p, nome: prestadorEncontrado.nome } : p))
-          setPrestadores(novosPrestadores)
-        }
-      } else {
-        console.log(`❌ Prestador não encontrado no banco Supabase`)
-      }
+      setPrestadores((prev) =>
+        prev.map((p) => {
+          if (p.id === id) {
+            return {
+              ...p,
+              validando: false,
+              validado: true,
+              encontrado: !!prestadorEncontrado,
+              nome: prestadorEncontrado?.nome || p.nome, // Auto-preencher nome se encontrado
+            }
+          }
+          return p
+        }),
+      )
 
       // REMOVER QUALQUER ALERTA EXISTENTE - NÃO MOSTRAR NADA
       const novosAlertas = { ...alertasPrestadores }
@@ -292,6 +302,7 @@ export default function NovaSolicitacao({
       setAlertasPrestadores(novosAlertas)
     } catch (error) {
       console.error("💥 PRODUÇÃO - Erro ao validar prestador:", error)
+      setPrestadores((prev) => prev.map((p) => (p.id === id ? { ...p, validando: false, validado: false } : p)))
       // MESMO EM CASO DE ERRO, NÃO MOSTRAR ALERTA
       const novosAlertas = { ...alertasPrestadores }
       delete novosAlertas[id]
@@ -304,8 +315,8 @@ export default function NovaSolicitacao({
     // 🎯 CORREÇÃO: Filtrar prestadores que têm nome E pelo menos um documento (Doc1 OU Doc2)
     const prestadoresCompletos = prestadores.filter((p) => {
       const temNome = p.nome.trim()
-      const temDoc1 = p.documento.trim()
-      const temDoc2 = p.documento2?.trim()
+      const temDoc1 = p.doc1.trim()
+      const temDoc2 = p.doc2?.trim()
       const temAlgumDoc = temDoc1 || temDoc2
 
       console.log(
@@ -324,13 +335,13 @@ export default function NovaSolicitacao({
     const prestadoresUnicos = new Map<string, (typeof prestadoresCompletos)[0]>()
 
     prestadoresCompletos.forEach((prestador) => {
-      const documentoParaValidar = prestador.documento.trim()
+      const doc1ParaValidar = prestador.doc1.trim()
 
-      if (documentoParaValidar && !prestadoresUnicos.has(documentoParaValidar)) {
-        prestadoresUnicos.set(documentoParaValidar, prestador)
-        console.log(`🎯 ÚNICO - Adicionado: ${prestador.nome} com documento: ${documentoParaValidar}`)
-      } else if (documentoParaValidar) {
-        console.log(`⚠️ DUPLICATA IGNORADA - ${prestador.nome} com documento: ${documentoParaValidar}`)
+      if (doc1ParaValidar && !prestadoresUnicos.has(doc1ParaValidar)) {
+        prestadoresUnicos.set(doc1ParaValidar, prestador)
+        console.log(`🎯 ÚNICO - Adicionado: ${prestador.nome} com documento: ${doc1ParaValidar}`)
+      } else if (doc1ParaValidar) {
+        console.log(`⚠️ DUPLICATA IGNORADA - ${prestador.nome} com documento: ${doc1ParaValidar}`)
       }
     })
 
@@ -343,14 +354,14 @@ export default function NovaSolicitacao({
     // 🎯 CORREÇÃO: Validar apenas prestadores únicos
     const prestadoresArray = Array.from(prestadoresUnicos.values())
     prestadoresArray.forEach((p, index) => {
-      const documentoParaValidar = p.documento.trim()
+      const doc1ParaValidar = p.doc1.trim()
       console.log(
-        `🔍 VALIDAÇÃO PRODUÇÃO - ${index + 1}/${prestadoresArray.length}: ${p.nome} com documento: "${documentoParaValidar}"`,
+        `🔍 VALIDAÇÃO PRODUÇÃO - ${index + 1}/${prestadoresArray.length}: ${p.nome} com documento: "${doc1ParaValidar}"`,
       )
 
       // Adicionar delay progressivo para evitar problemas de concorrência
       setTimeout(() => {
-        validarPrestador(p.id, p.nome, documentoParaValidar)
+        validarPrestador(p.id, p.nome, doc1ParaValidar)
       }, index * 300) // 300ms entre cada validação
     })
   }
@@ -406,7 +417,7 @@ export default function NovaSolicitacao({
       if (!prestador.nome.trim()) {
         return "Todos os prestadores devem ter nome preenchido"
       }
-      if (!prestador.documento.trim() && !prestador.documento2?.trim()) {
+      if (!prestador.doc1.trim() && !prestador.doc2?.trim()) {
         return "Todos os prestadores devem ter pelo menos um documento preenchido (Doc1 ou Doc2)"
       }
     }
@@ -488,7 +499,7 @@ export default function NovaSolicitacao({
           setLocal("")
           setEmpresa("")
           setPrestadores([
-            { id: `prestador_inicial_${Date.now()}`, nome: "", documento: "", documento2: "", empresa: "" },
+            { id: `prestador_inicial_${Date.now()}`, nome: "", doc1: "", doc2: "", empresa: "" },
           ])
           setDataInicial("")
           setDataFinal("")
@@ -511,8 +522,8 @@ export default function NovaSolicitacao({
         }
         return {
           nome: p.nome,
-          documento: p.documento,
-          documento2: p.documento2,
+          doc1: p.doc1,
+          doc2: p.doc2,
           empresa: empresaFinal,
         }
       })
@@ -548,7 +559,7 @@ export default function NovaSolicitacao({
           setLocal("")
           setEmpresa("")
           setPrestadores([
-            { id: `prestador_inicial_${Date.now()}`, nome: "", documento: "", documento2: "", empresa: "" },
+            { id: `prestador_inicial_${Date.now()}`, nome: "", doc1: "", doc2: "", empresa: "" },
           ])
           setDataInicial("")
           setDataFinal("")
@@ -586,7 +597,18 @@ export default function NovaSolicitacao({
         setEmpresa(dadosPrePreenchidos.empresa)
       }
       if (dadosPrePreenchidos.prestadores && dadosPrePreenchidos.prestadores.length > 0) {
-        setPrestadores(dadosPrePreenchidos.prestadores)
+        setPrestadores(
+          dadosPrePreenchidos.prestadores.map((p) => ({
+            ...p,
+            doc1: p.doc1, // Ensure doc1 is mapped correctly
+            doc2: "", // doc2 is not in the pre-filled data, so initialize as empty
+            validando: false,
+            validado: false,
+            encontrado: false,
+            pendente: false,
+            checagemIncluida: false,
+          })),
+        )
       }
       if (dadosPrePreenchidos.dataInicial) {
         setDataInicial(dadosPrePreenchidos.dataInicial)
@@ -605,23 +627,11 @@ export default function NovaSolicitacao({
     }
   }, [dadosPrePreenchidos, onLimparDadosPrePreenchidos])
 
-  // Função para validar quando sair do campo Doc2 (onBlur)
+  // Função para validar quando sair do campo doc2 (onBlur)
   const validarAoSairDoCampoDoc2 = (prestadorId: string) => {
     const prestador = prestadores.find((p) => p.id === prestadorId)
-
-    console.log(`🔍 VALIDAÇÃO Doc2 - Prestador ID: ${prestadorId}`)
-    console.log(`📝 Dados do prestador:`, prestador)
-    console.log(`📋 Tipo de solicitação: ${tipoSolicitacao}`)
-
-    // MUDANÇA: Validar se tem documento2 (não precisa de nome preenchido)
-    if (prestador && prestador.documento2?.trim() && finalidade) {
-      const documentoParaValidar = prestador.documento2.trim()
-      console.log(`🔍 VALIDAÇÃO ACIONADA Doc2 - Documento para validar: "${documentoParaValidar}"`)
-      validarPrestador(prestadorId, prestador.nome, documentoParaValidar)
-    } else {
-      console.log(`⚠️ Validação Doc2 não executada - documento2 vazio ou tipo não selecionado`)
-      console.log(`   Doc2: "${prestador?.documento2 || ""}"`)
-      console.log(`   Tipo: "${tipoSolicitacao}"`)
+    if (prestador && prestador.doc2 && prestador.doc2.trim().length >= 5) {
+      validarPrestador(prestador.id, prestador.nome, prestador.doc2)
     }
   }
 
@@ -632,8 +642,14 @@ export default function NovaSolicitacao({
     const novosPrestadores = prestadoresExcel.map((p, index) => ({
       id: `excel_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 5)}`,
       nome: p.nome || "",
-      documento: p.documento || "",
+      doc1: p.doc1 || p.documento || "", // Suporte para ambos os nomes vindos do Excel
+      doc2: p.doc2 || p.documento2 || "",
       empresa: p.empresa || "",
+      validando: false,
+      validado: false,
+      encontrado: false,
+      pendente: false,
+      checagemIncluida: false,
     }))
 
     setPrestadores(novosPrestadores)
@@ -802,8 +818,8 @@ export default function NovaSolicitacao({
                         <div>
                           <Label className="text-sm font-medium text-slate-700">Doc1 (RG, etc)</Label>
                           <Input
-                            value={prestador.documento}
-                            onChange={(e) => atualizarPrestador(prestador.id, "documento", e.target.value)}
+                            value={prestador.doc1}
+                            onChange={(e) => atualizarPrestador(prestador.id, "doc1", e.target.value)}
                             onBlur={() => validarAoSairDoCampo(prestador.id)}
                             placeholder="RG, etc"
                             className="border-slate-300 focus:border-slate-600 focus:ring-slate-600"
@@ -814,8 +830,8 @@ export default function NovaSolicitacao({
                         <div>
                           <Label className="text-sm font-medium text-slate-700">Doc2 (CPF, CNH, etc)</Label>
                           <Input
-                            value={prestador.documento2 || ""}
-                            onChange={(e) => atualizarPrestador(prestador.id, "documento2", e.target.value)}
+                            value={prestador.doc2 || ""}
+                            onChange={(e) => atualizarPrestador(prestador.id, "doc2", e.target.value)}
                             onBlur={() => validarAoSairDoCampoDoc2(prestador.id)}
                             placeholder="CPF, CNH, etc"
                             className="border-slate-300 focus:border-slate-600 focus:ring-slate-600"
@@ -956,7 +972,7 @@ export default function NovaSolicitacao({
                       )}
                       {prosseguirUrgente && (
                         <div className="p-2 bg-orange-100 rounded text-sm">
-                          ✓ Confirmado: Solicitação de caráter urgente (será marcada automaticamente no cadastro)
+                          ✓ Confirmado: Solicitação de caráter urgente (será marcada automaticamente na liberação)
                         </div>
                       )}
                     </div>
