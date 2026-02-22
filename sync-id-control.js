@@ -7,7 +7,7 @@ const { createClient } = require('@supabase/supabase-js');
 
 // Configurações
 const ID_CONTROL_URL = "https://192.168.100.20:30443";
-const CHECK_INTERVAL_MS = 60 * 1000; // 1 minuto
+const CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
 const ID_CONTROL_USER = "mariano";
 const ID_CONTROL_PASS = "hebraica";
 
@@ -15,6 +15,58 @@ const ID_CONTROL_PASS = "hebraica";
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
 let sessionToken = null;
+
+// ==========================================
+// 🛠️ FUNÇÕES DE SEGURANÇA E NORMALIZAÇÃO
+// ==========================================
+
+function normalizar(str) {
+    return (str || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+        .replace(/[^a-z0-9\s]/g, "") // Remove caracteres especiais
+        .trim();
+}
+
+function validarSimilaridadeNome(nomeSupabase, nomeIdControl) {
+    if (!nomeSupabase || !nomeIdControl) return false;
+
+    const n1 = normalizar(nomeSupabase).split(/\s+/).filter(p => p.length > 0);
+    const n2 = normalizar(nomeIdControl).split(/\s+/).filter(p => p.length > 0);
+
+    // 1. Comparação de Primeiro e Último Nome (ignorando sufixos)
+    const sufixos = ["junior", "jr", "filho", "neto", "sobrinho", "segundo", "terceiro"];
+
+    const primeiro1 = n1[0];
+    const primeiro2 = n2[0];
+
+    let ultimo1 = n1.length > 1 ? n1[n1.length - 1] : "";
+    let ultimo2 = n2.length > 1 ? n2[n2.length - 1] : "";
+
+    // Se o último nome for um sufixo, tenta pegar o penúltimo
+    if (sufixos.includes(ultimo1) && n1.length > 2) ultimo1 = n1[n1.length - 2];
+    if (sufixos.includes(ultimo2) && n2.length > 2) ultimo2 = n2[n2.length - 2];
+
+    const nomesPrincipaisBatem = (primeiro1 === primeiro2 && ultimo1 === ultimo2);
+    if (nomesPrincipaisBatem && primeiro1 && ultimo1) {
+        console.log(`      ✅ Match por Primeiro/Último Nome: [${primeiro1}...${ultimo1}]`);
+        return true;
+    }
+
+    // 2. Similaridade de intersecção de palavras (ignorando sufixos)
+    const palavras1 = new Set(n1.filter(p => !sufixos.includes(p)));
+    const palavras2 = new Set(n2.filter(p => !sufixos.includes(p)));
+
+    let intersecção = 0;
+    palavras1.forEach(p => { if (palavras2.has(p)) intersecção++; });
+
+    const totalPalavras = Math.max(palavras1.size, palavras2.size);
+    const similaridade = intersecção / totalPalavras;
+
+    console.log(`      📊 Similaridade calculada: ${(similaridade * 100).toFixed(0)}%`);
+    return similaridade >= 0.7; // Regra dos 70%
+}
 
 // ==========================================
 // 🛠️ FUNÇÕES DE API
@@ -41,18 +93,89 @@ async function loginIdControl() {
 async function buscarUsuarioIdControl(documento) {
     if (!sessionToken && !await loginIdControl()) return null;
     try {
-        const docLimpo = documento.replace(/[^0-9]/g, "");
-        const response = await fetch(`${ID_CONTROL_URL}/api/users?rg=${docLimpo}`, {
-            headers: { "Authorization": `Bearer ${sessionToken}` }
+        const docLimpo = documento.replace(/[^a-zA-Z0-9]/g, ""); // Permitir letras se houver
+        console.log(`   🔎 Iniciando busca técnica para: [${docLimpo}]`);
+
+        // 1. Tentar busca imitando o Web UI (POST com Query Params)
+        const queryParams = new URLSearchParams({
+            idType: "0",
+            deleted: "false",
+            start: "0",
+            length: "10",
+            "search[value]": docLimpo,
+            "search[regex]": "false",
+            filterCol: "rg",
+            inactive: "0", // Adicionado conforme F12
+            blacklist: "0"  // Adicionado conforme F12
+        });
+
+        const url = `${ID_CONTROL_URL}/api/user/list?${queryParams.toString()}`;
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${sessionToken}`,
+                "Content-Type": "application/json;charset=utf-8"
+            },
+            body: null
         });
 
         if (response.ok) {
             const data = await response.json();
-            if (Array.isArray(data) && data.length > 0) return data[0];
-            if (data.id) return data;
+            const list = Array.isArray(data) ? data : (data.content || []);
+            console.log(`   📊 API list retornou ${list.length} resultados.`);
+
+            const user = list.find(u => {
+                const uRg = String(u.rg || "").replace(/[^a-zA-Z0-9]/g, "");
+                const uReg = String(u.registration || "").replace(/[^a-zA-Z0-9]/g, "");
+                return uRg === docLimpo || uReg === docLimpo;
+            });
+
+            if (user) {
+                console.log(`   ✅ Encontrado via list: "${user.name}" (ID: ${user.id})`);
+                return user;
+            }
         }
+
+        // 2. FALLBACK 1: Busca direta pelo RG (Tradicional)
+        console.log(`   🔄 Tentando fallback clássico...`);
+        const resLegacy = await fetch(`${ID_CONTROL_URL}/api/users?rg=${docLimpo}`, {
+            headers: { "Authorization": `Bearer ${sessionToken}` }
+        });
+
+        if (resLegacy.ok) {
+            const data = await resLegacy.json();
+            const found = Array.isArray(data) ? data[0] : (data.id ? data : null);
+            if (found) {
+                console.log(`   🎯 Localizado via fallback: "${found.name}" (ID: ${found.id})`);
+                return found;
+            }
+        }
+
+        // 3. FALLBACK "ULTRA": Baixar uma página maior e filtrar localmente
+        // Esta técnica funcionou no script da Hebraica
+        console.log(`   📦 Tentando fallback exaustivo (GET /api/users?size=2000)...`);
+        const resFull = await fetch(`${ID_CONTROL_URL}/api/users?page=0&size=2000`, {
+            headers: { "Authorization": `Bearer ${sessionToken}` }
+        });
+
+        if (resFull.ok) {
+            const d = await resFull.json();
+            const fullList = Array.isArray(d) ? d : (d.content || []);
+            console.log(`   📦 Lista exaustiva carregada: ${fullList.length} usuários.`);
+            const exhaustiveMatch = fullList.find(u => {
+                const uRg = String(u.rg || "").replace(/[^a-zA-Z0-9]/g, "");
+                return uRg === docLimpo;
+            });
+            if (exhaustiveMatch) {
+                console.log(`   🏆 Encontrado na lista exaustiva! "${exhaustiveMatch.name}"`);
+                return exhaustiveMatch;
+            }
+        }
+
+        console.log(`   ❌ Ninguém localizado com o RG ${docLimpo} após 3 tentativas.`);
     } catch (e) {
-        // Ignora erro se não achar
+        console.error("   ⚠️ Erro na busca:", e.message);
     }
     return null;
 }
@@ -89,8 +212,8 @@ async function upsertUsuarioIdControl(prestador, usuarioExistente) {
         // id: id, // <--- REMOVIDO PARA CRIAÇÃO (Adicionado só se > 0 no final)
         idDevice: idDevice,
         name: prestador.nome,
-        rg: prestador.documento.replace(/[^0-9]/g, ""),
-        document: `RG: ${prestador.documento.replace(/[^0-9]/g, "")}`,
+        rg: prestador.doc1.replace(/[^0-9]/g, ""),
+        document: `RG: ${prestador.doc1.replace(/[^0-9]/g, "")}`,
 
         // Datas
         shelfStartLife: shelfStart,
@@ -125,6 +248,7 @@ async function upsertUsuarioIdControl(prestador, usuarioExistente) {
     const url = `${ID_CONTROL_URL}/api/user/`;
 
     console.log(`   📤 Enviando (${method})...`);
+    console.log("   Payload:", JSON.stringify(payload, null, 2));
 
     const response = await fetch(url, {
         method: method,
@@ -133,6 +257,7 @@ async function upsertUsuarioIdControl(prestador, usuarioExistente) {
     });
 
     if (response.ok) {
+        console.log("   ✅ Sucesso API ID Control");
         try {
             return await response.json(); // Retorna { newID: ... } na criação
         } catch (e) {
@@ -155,11 +280,11 @@ async function processarPendentes() {
     const { data: pendentes, error } = await supabase
         .from('prestadores')
         .select(`
-            id, nome, documento, status, observacoes,
+            id, nome, doc1, liberacao, observacoes,
             solicitacao_id, 
             solicitacoes:solicitacao_id ( data_inicial, data_final )
         `)
-        .eq('status', 'aprovado')
+        .eq('liberacao', 'ok')
         .is('integrado_id_control', false)
         .order('id', { ascending: false })
         .limit(50);
@@ -174,36 +299,57 @@ async function processarPendentes() {
         return;
     }
 
+    // console.log("DEBUG Pendentes:", JSON.stringify(pendentes, null, 2));
+    console.log("DEBUG Pendentes:", JSON.stringify(pendentes, null, 2));
     console.log(`📦 Processando ${pendentes.length} novos...`);
 
     for (const p of pendentes) {
         try {
-            console.log(`🔄 Prestador: ${p.nome} (${p.documento})`);
+            console.log(`🔄 Prestador: ${p.nome} (${p.doc1})`);
 
             // 1. Verificar ID Control
-            const usuarioExistente = await buscarUsuarioIdControl(p.documento);
+            const usuarioExistente = await buscarUsuarioIdControl(p.doc1);
             let idControlRemoto = null;
 
             if (usuarioExistente) {
-                console.log(`   ✅ Já existe: ID ${usuarioExistente.id}`);
-                idControlRemoto = usuarioExistente.id;
+                console.log(`   ✅ Encontrado no ID Control: ${usuarioExistente.name} (ID: ${usuarioExistente.id})`);
+
+                // 🛡️ SECURITY CHECK: Nome Bate?
+                if (validarSimilaridadeNome(p.nome, usuarioExistente.name)) {
+                    console.log(`   🔸 Nomes compatíveis. Prosseguindo com UPDATE.`);
+                    idControlRemoto = usuarioExistente.id;
+                } else {
+                    console.log(`   🚨 NOMES DIVERGENTES! (Supabase: "${p.nome}" vs ID Control: "${usuarioExistente.name}")`);
+                    console.log(`   🚩 Marcando como DEVOLVER no Supabase.`);
+
+                    await supabase.from('prestadores')
+                        .update({
+                            liberacao: 'negada',
+                            checagem: 'reprovada',
+                            observacoes: `[ERRO RG] Conflito de RG. No ID Control este RG pertence a "${usuarioExistente.name}". Favor corrigir ou informar CPF.`,
+                            integrado_id_control: false
+                        })
+                        .eq('id', p.id);
+
+                    continue; // Pula para o próximo
+                }
             } else {
-                console.log(`   🆕 Não existe. Criando...`);
+                console.log(`   🆕 Não encontrado. Criando novo...`);
             }
 
             // 2. UPSERT
-            const resultado = await upsertUsuarioIdControl(p, usuarioExistente);
+            const resultadoId = await upsertUsuarioIdControl(p, usuarioExistente);
 
             // CAPTURA DO O ID (Pode ser .newID na criação ou .id no update)
-            const novoId = resultado.newID || resultado.id;
+            const novoId = resultadoId.newID || resultadoId.id;
 
             if (!idControlRemoto && novoId) {
                 idControlRemoto = novoId;
-                console.log(`   ✨ Novo ID Gerado: ${idControlRemoto}`);
+                console.log(`   ✨ Sucesso! ID: ${idControlRemoto}`);
             }
 
             // 3. Atualizar Supabase e gravar o ID correto
-            console.log(`   🏁 Atualizando Supabase...`);
+            console.log(`   🏁 Finalizando no Supabase...`);
             const { error: updateError } = await supabase
                 .from('prestadores')
                 .update({
@@ -218,6 +364,18 @@ async function processarPendentes() {
 
         } catch (err) {
             console.error(`   ❌ Falha:`, err.message);
+
+            // 🛡️ Segurança: Tratar RG Duplicado inesperado
+            if (err.message.includes("RG já cadastrado") || err.message.includes("400")) {
+                console.log(`   🚨 Conflito crítico de RG no envio.`);
+                await supabase.from('prestadores')
+                    .update({
+                        liberacao: 'negada',
+                        checagem: 'reprovada',
+                        observacoes: '[ERRO RG] RG já cadastrado em outro usuário e não visível na busca principal.'
+                    })
+                    .eq('id', p.id);
+            }
         }
     }
 }

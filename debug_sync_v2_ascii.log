@@ -1,0 +1,102 @@
+[dotenv@17.3.1] injecting env (2) from .env.local -- tip: ?????? secrets for agents: https://dotenvx.com/as2
+???? Monitor Final Iniciado
+???? Buscando pendentes (Ordenado por Cria????o)...
+DEBUG Pendentes: [
+  {
+    "id": "82aca57b-3189-464d-8b97-9c26919d8df9",
+    "nome": "Marcus Marcus Marcus",
+    "doc1": "123456",
+    "liberacao": "ok",
+    "observacoes": null,
+    "solicitacao_id": "c464e6cb-c1c8-4e7c-8d7a-c9705dc0b4f4",
+    "solicitacoes": {
+      "data_final": "2026-03-10",
+      "data_inicial": "2026-02-25"
+    }
+  }
+]
+???? Processando 1 novos...
+???? Prestador: Marcus Marcus Marcus (123456)
+node : (node:26784) 
+Warning: Setting the N
+ODE_TLS_REJECT_UNAUTHO
+RIZED environment 
+variable to '0' makes 
+TLS connections and 
+HTTPS requests 
+insecure by disabling 
+certificate 
+verification.
+No linha:1 caractere:1
++ node 
+sync-id-control.js > 
+debug_sync_v2.log 2>&1
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: ((node:2678   
+ 4) Wa...e verific    
+ation.:String) []    
+, RemoteException
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+(Use `node 
+--trace-warnings ...` 
+to show where the 
+warning was created)
+   ???? Buscando '123456' na lista...
+   ???? N??o existe. Criando...
+   ???? Datas: [25/02/2026 00:00] -> [10/03/2026 00:00] | Obs: []
+   ???? Enviando (POST)...
+   Payload: {
+  "idDevice": 0,
+  "name": "Marcus Marcus Marcus",
+  "rg": "123456",
+  "document": "RG: 123456",
+  "shelfStartLife": "25/02/2026 00:00",
+  "shelfLife": "10/03/2026 00:00",
+  "shelfStartLifeDate": "25/02/2026",
+  "shelfLifeDate": "10/03/2026",
+  "comments": "",
+  "customFields": {},
+  "templates": [],
+  "cards": [],
+  "groups": [],
+  "userGroupsList": [],
+  "deleted": false,
+  "inativo": false,
+  "Ativacao": "",
+  "Validade": "",
+  "password": "",
+  "password_confirmation": "",
+  "pis": 0,
+  "foto": null,
+  "fotoDoc": null
+}
+   ??? Falha: 400 - {"
+code":400,"error":"RG 
+j?? cadastrado em 
+outro 
+usu??rio","stack":"   
+em ControliD.iDSecure.
+db.Users.Validate(DbCo
+nnection db)\r\n   em 
+ControliD.iDSecure.db.
+DAL.Save[T](DbConnecti
+on cnT, T obj, Int64 
+idOperator, Boolean 
+lTry, Boolean 
+isPathUpdate)\r\n   
+em ControliD.iDSecure.
+db.DAL.Save[T](T obj, 
+Int64 idOperator, 
+Boolean lTry, Boolean 
+isPathUpdate)\r\n   
+em ControliD.iDSecure.
+db.DALWebAPI`1.Insert(
+T obj)"}
+   ???? Conflito: RG j?? existe no ID Control.

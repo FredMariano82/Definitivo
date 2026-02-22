@@ -1107,7 +1107,7 @@ export default function TodasSolicitacoes() {
                                     <Badge className="bg-purple-100 text-purple-800 border-purple-200">Exceção</Badge>
                                   </>
                                 )}
-                                {prestador.checagem === "erro_rg" && (
+                                {(prestador.checagem === "erro_rg" || (prestador.checagem === "reprovada" || (prestador.checagem as string) === "reprovado") && prestador.observacoes?.includes('[ERRO RG]')) && (
                                   <>
                                     <ShieldAlert className="h-4 w-4 text-orange-600" />
                                     <Badge className="bg-orange-100 text-orange-800 border-orange-200">Erro RG</Badge>
@@ -1129,15 +1129,15 @@ export default function TodasSolicitacoes() {
                         {colunasVisiveis.acoes && (
                           <td className="p-4 align-middle relative">
                             {/* Lógica para ERRO RG: Prioridade sobre tudo */}
-                            {(prestador.checagem === "erro_rg" || (prestador.checagem === "reprovado" && prestador.observacoes?.includes('[ERRO RG]'))) ? (
+                            {(prestador.checagem === "erro_rg" || ((prestador.checagem as string) === "reprovado" || prestador.checagem === "reprovada") && prestador.observacoes?.includes('[ERRO RG]')) ? (
                               <Button
                                 onClick={() => handleNegarClick(solicitacao, prestador)}
                                 variant="outline"
                                 size="sm"
-                                className="h-7 px-2 border-orange-600 text-orange-600 hover:bg-orange-50 w-full"
+                                className="h-7 px-2 border-orange-600 text-orange-600 hover:bg-orange-50 w-full animate-pulse shadow-sm"
                                 title="Devolver para solicitante"
                               >
-                                <span className="text-xs font-semibold">Devolver</span>
+                                <span className="text-xs font-bold uppercase tracking-wider">Devolver</span>
                               </Button>
                             ) :
                               (statusLiberacao === "pendente" || statusLiberacao === "urgente" || statusLiberacao === "negada") ? (
