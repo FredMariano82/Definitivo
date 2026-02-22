@@ -1,0 +1,128 @@
+[dotenv@17.3.1] injecting env (2) from .env.local -- tip: ?????? secrets for agents: https://dotenvx.com/as2
+???? Monitor em modo MANUAL. Aguardando execu????o...
+???? Buscando pendentes (Ordenado por Cria????o)...
+node : (node:12456) 
+Warning: Setting the N
+ODE_TLS_REJECT_UNAUTHO
+RIZED environment 
+variable to '0' makes 
+TLS connections and 
+HTTPS requests 
+insecure by disabling 
+certificate 
+verification.
+No linha:1 caractere:1
++ node 
+sync-id-control.js > d
+ebug_sync_manual_final
+_v2.log 2>&1
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: ((node:1245   
+ 6) Wa...e verific    
+ation.:String) []    
+, RemoteException
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+(Use `node 
+--trace-warnings ...` 
+to show where the 
+warning was created)
+   ???? Carregando lista de grupos da ID Control...
+   ???? 436 grupos carregados.
+DEBUG Pendentes: [
+  {
+    "id": "d568ae29-6b8c-48c9-bcbb-49a5a9e2695e",
+    "nome": "Marcus Marcus Marcus",
+    "doc1": "123456",
+    "liberacao": "ok",
+    "observacoes": null,
+    "empresa": "Hagan??",
+    "solicitacao_id": "f72ff9af-6afb-42c8-8313-4a6e6a983796",
+    "solicitacoes": {
+      "data_final": "2026-02-28",
+      "data_inicial": "2026-02-24",
+      "departamento": "Seguran??a"
+    }
+  }
+]
+???? Processando 1 novos...
+???? Prestador: Marcus Marcus Marcus (123456)
+   ???? Iniciando busca t??cnica para: [123456]
+   ???? API list retornou 0 resultados.
+   ???? Tentando fallback cl??ssico...
+   ???? Tentando fallback exaustivo (GET /api/users?size=2000)...
+   ??? Ningu??m localizado com o RG 123456 ap??s 3 tentativas.
+   ???? N??o encontrado. Criando novo...
+   ??????? Processando grupos para: [Hagan??] e [Seguran??a]
+      ???? Mapeado: "Hagan??" -> ID 2039
+      ???? Mapeado: "Seguran??a" -> ID 1104
+   ???? Datas: [24/02/2026 00:00] -> [28/02/2026 00:00] | Obs: []
+   ???? Enviando (POST)...
+   Payload: {
+  "idDevice": 0,
+  "name": "Marcus Marcus Marcus",
+  "rg": "123456",
+  "document": "RG: 123456",
+  "shelfStartLife": "24/02/2026 00:00",
+  "shelfLife": "28/02/2026 00:00",
+  "shelfStartLifeDate": "24/02/2026",
+  "shelfLifeDate": "28/02/2026",
+  "comments": "",
+  "customFields": {},
+  "templates": [],
+  "cards": [],
+  "groups": [
+    2039,
+    1104
+  ],
+  "userGroupsList": [
+    {
+      "idGroup": 2039,
+      "idUser": 0,
+      "isVisitor": 0
+    },
+    {
+      "idGroup": 1104,
+      "idUser": 0,
+      "isVisitor": 0
+    }
+  ],
+  "deleted": false,
+  "inativo": false,
+  "Ativacao": "",
+  "Validade": "",
+  "password": "",
+  "password_confirmation": "",
+  "pis": 0,
+  "foto": null,
+  "fotoDoc": null
+}
+   ??? Falha: 400 - {"
+code":400,"error":"RG 
+j?? cadastrado em 
+outro 
+usu??rio","stack":"   
+em ControliD.iDSecure.
+db.Users.Validate(DbCo
+nnection db)\r\n   em 
+ControliD.iDSecure.db.
+DAL.Save[T](DbConnecti
+on cnT, T obj, Int64 
+idOperator, Boolean 
+lTry, Boolean 
+isPathUpdate)\r\n   
+em ControliD.iDSecure.
+db.DAL.Save[T](T obj, 
+Int64 idOperator, 
+Boolean lTry, Boolean 
+isPathUpdate)\r\n   
+em ControliD.iDSecure.
+db.DALWebAPI`1.Insert(
+T obj)"}
+   ???? Conflito cr??tico de RG no envio.

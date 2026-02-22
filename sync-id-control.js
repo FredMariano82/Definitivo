@@ -430,4 +430,4 @@ async function processarPendentes() {
 
 console.log("🚀 Monitor em modo MANUAL. Aguardando execução...");
 // setInterval(processarPendentes, CHECK_INTERVAL_MS);
-// processarPendentes(); 
+processarPendentes(); 
