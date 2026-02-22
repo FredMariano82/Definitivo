@@ -15,6 +15,7 @@ const ID_CONTROL_PASS = "hebraica";
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
 let sessionToken = null;
+let cacheGrupos = []; // Cache global de grupos da ID Control
 
 // ==========================================
 // 🛠️ FUNÇÕES DE SEGURANÇA E NORMALIZAÇÃO
@@ -88,6 +89,36 @@ async function loginIdControl() {
         console.error("❌ Erro login:", e.message);
         return false;
     }
+}
+
+async function carregarGruposIdControl() {
+    if (!sessionToken && !await loginIdControl()) return;
+    try {
+        console.log("   📡 Carregando lista de grupos da ID Control...");
+        const response = await fetch(`${ID_CONTROL_URL}/api/group/`, {
+            method: "GET",
+            headers: { "Authorization": `Bearer ${sessionToken}` }
+        });
+        if (response.ok) {
+            const result = await response.json();
+            cacheGrupos = result.data || result || [];
+            console.log(`   📦 ${cacheGrupos.length} grupos carregados.`);
+        }
+    } catch (e) {
+        console.error("   ⚠️ Erro ao carregar grupos:", e.message);
+    }
+}
+
+function mapearGrupoPelonome(nome) {
+    if (!nome) return null;
+    const nomeNorm = normalizar(nome);
+    const match = cacheGrupos.find(g => normalizar(g.name) === nomeNorm);
+    if (match) {
+        console.log(`      🔗 Mapeado: "${nome}" -> ID ${match.id}`);
+        return match.id;
+    }
+    console.log(`      ⚠️ Grupo não localizado: "${nome}"`);
+    return null;
 }
 
 async function buscarUsuarioIdControl(documento) {
@@ -202,6 +233,22 @@ async function upsertUsuarioIdControl(prestador, usuarioExistente) {
     // Mapeamento de observação
     const comments = prestador.observacoes || "";
 
+    // 🆕 MAPEAMENTO DE GRUPOS (EMPRESA E DEPARTAMENTO)
+    console.log(`   🏗️ Processando grupos para: [${prestador.empresa}] e [${sol?.departamento}]`);
+    const idEmpresa = mapearGrupoPelonome(prestador.empresa);
+    const idDepto = mapearGrupoPelonome(sol?.departamento);
+
+    const idsGrupos = [];
+    if (idEmpresa) idsGrupos.push(idEmpresa);
+    if (idDepto) idsGrupos.push(idDepto);
+
+    // Formatar userGroupsList conforme F12
+    const userGroupsList = idsGrupos.map(id => ({
+        idGroup: id,
+        idUser: usuarioExistente?.id || 0,
+        isVisitor: 0
+    }));
+
     console.log(`   📅 Datas: [${shelfStart}] -> [${shelfEnd}] | Obs: [${comments}]`);
 
     // 2. Montar Payload (Idêntico ao F12)
@@ -222,14 +269,12 @@ async function upsertUsuarioIdControl(prestador, usuarioExistente) {
         shelfLifeDate: shelfEnd.split(' ')[0],
 
         // Outros
-        // Outros
-        // timeOfRegistration: `/Date(${Date.now()}-0300)/`, // REMOVIDO PARA CRIAÇÃO (F12 não manda)
         comments: comments,
         customFields: {},
         templates: [],
         cards: [],
-        groups: [],
-        userGroupsList: [],
+        groups: idsGrupos, // 🆕 Array de IDs [2039, 1104]
+        userGroupsList: userGroupsList, // 🆕 Lista de objetos
         deleted: false,
         inativo: false,
         Ativacao: "", Validade: "", password: "", password_confirmation: "",
@@ -276,13 +321,16 @@ async function upsertUsuarioIdControl(prestador, usuarioExistente) {
 async function processarPendentes() {
     console.log("🔍 Buscando pendentes (Ordenado por Criação)...");
 
+    // Recarregar cache de grupos a cada ciclo
+    await carregarGruposIdControl();
+
     // Ordenar por ID DESC para pegar os novos (Ligia, etc)
     const { data: pendentes, error } = await supabase
         .from('prestadores')
         .select(`
-            id, nome, doc1, liberacao, observacoes,
+            id, nome, doc1, liberacao, observacoes, empresa,
             solicitacao_id, 
-            solicitacoes:solicitacao_id ( data_inicial, data_final )
+            solicitacoes:solicitacao_id ( data_inicial, data_final, departamento )
         `)
         .eq('liberacao', 'ok')
         .is('integrado_id_control', false)
@@ -380,6 +428,6 @@ async function processarPendentes() {
     }
 }
 
-console.log("🚀 Monitor Final Iniciado");
-setInterval(processarPendentes, CHECK_INTERVAL_MS);
-processarPendentes(); 
+console.log("🚀 Monitor em modo MANUAL. Aguardando execução...");
+// setInterval(processarPendentes, CHECK_INTERVAL_MS);
+// processarPendentes(); 
