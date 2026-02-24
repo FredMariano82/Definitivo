@@ -153,7 +153,8 @@ async function buscarUsuarioIdControl(documento) {
 
         if (response.ok) {
             const data = await response.json();
-            const list = Array.isArray(data) ? data : (data.content || []);
+            // /api/user/list (Datatables) usa .data
+            const list = Array.isArray(data) ? data : (data.data || data.content || []);
             console.log(`   📊 API list retornou ${list.length} resultados.`);
 
             const user = list.find(u => {
@@ -185,14 +186,14 @@ async function buscarUsuarioIdControl(documento) {
 
         // 3. FALLBACK "ULTRA": Baixar uma página maior e filtrar localmente
         // Esta técnica funcionou no script da Hebraica
-        console.log(`   📦 Tentando fallback exaustivo (GET /api/users?size=2000)...`);
-        const resFull = await fetch(`${ID_CONTROL_URL}/api/users?page=0&size=2000`, {
+        console.log(`   📦 Tentando fallback exaustivo (GET /api/users?size=10000)...`);
+        const resFull = await fetch(`${ID_CONTROL_URL}/api/users?page=0&size=10000`, {
             headers: { "Authorization": `Bearer ${sessionToken}` }
         });
 
         if (resFull.ok) {
             const d = await resFull.json();
-            const fullList = Array.isArray(d) ? d : (d.content || []);
+            const fullList = Array.isArray(d) ? d : (d.data || d.content || []);
             console.log(`   📦 Lista exaustiva carregada: ${fullList.length} usuários.`);
             const exhaustiveMatch = fullList.find(u => {
                 const uRg = String(u.rg || "").replace(/[^a-zA-Z0-9]/g, "");
@@ -269,8 +270,13 @@ async function upsertUsuarioIdControl(prestador, usuarioExistente) {
         shelfLifeDate: shelfEnd.split(' ')[0],
 
         // Outros
+        company: prestador.empresa,
+        department: sol?.departamento,
         comments: comments,
-        customFields: {},
+        customFields: {
+            "Empresa": prestador.empresa,
+            "Departamento": sol?.departamento
+        },
         templates: [],
         cards: [],
         groups: idsGrupos, // 🆕 Array de IDs [2039, 1104]
@@ -311,6 +317,7 @@ async function upsertUsuarioIdControl(prestador, usuarioExistente) {
     }
 
     const errText = await response.text();
+    console.error(`   ❌ Falha API (Body):`, errText);
     throw new Error(`${response.status} - ${errText}`);
 }
 
@@ -413,16 +420,19 @@ async function processarPendentes() {
         } catch (err) {
             console.error(`   ❌ Falha:`, err.message);
 
-            // 🛡️ Segurança: Tratar RG Duplicado inesperado
-            if (err.message.includes("RG já cadastrado") || err.message.includes("400")) {
-                console.log(`   🚨 Conflito crítico de RG no envio.`);
+            // 🛡️ Segurança: Tratar erros do robô
+            if (err.message.includes("RG já cadastrado")) {
+                console.log(`   🚨 Conflito de RG detectado (Mensagem explícita).`);
                 await supabase.from('prestadores')
                     .update({
                         liberacao: 'negada',
                         checagem: 'reprovada',
-                        observacoes: '[ERRO RG] RG já cadastrado em outro usuário e não visível na busca principal.'
+                        observacoes: '[ERRO RG] RG já cadastrado em outro usuário.'
                     })
                     .eq('id', p.id);
+            } else {
+                console.log(`   🚨 Erro na Sincronização: ${err.message}`);
+                // Não marca como negada automaticamente para erros genéricos, apenas reporta
             }
         }
     }
