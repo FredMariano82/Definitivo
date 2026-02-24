@@ -16,6 +16,7 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
 
 let sessionToken = null;
 let cacheGrupos = []; // Cache global de grupos da ID Control
+let cacheUsuarios = []; // Cache global de usuários (Segurança Total)
 
 // ==========================================
 // 🛠️ FUNÇÕES DE SEGURANÇA E NORMALIZAÇÃO
@@ -33,8 +34,18 @@ function normalizar(str) {
 function validarSimilaridadeNome(nomeSupabase, nomeIdControl) {
     if (!nomeSupabase || !nomeIdControl) return false;
 
-    const n1 = normalizar(nomeSupabase).split(/\s+/).filter(p => p.length > 0);
-    const n2 = normalizar(nomeIdControl).split(/\s+/).filter(p => p.length > 0);
+    const s1 = normalizar(nomeSupabase);
+    const s2 = normalizar(nomeIdControl);
+
+    console.log(`      🔎 Comparando: [${s1}] vs [${s2}]`);
+
+    if (s1 === s2) {
+        console.log(`      ✅ Match Exato (normalizado).`);
+        return true;
+    }
+
+    const n1 = s1.split(/\s+/).filter(p => p.length > 0);
+    const n2 = s2.split(/\s+/).filter(p => p.length > 0);
 
     // 1. Comparação de Primeiro e Último Nome (ignorando sufixos)
     const sufixos = ["junior", "jr", "filho", "neto", "sobrinho", "segundo", "terceiro"];
@@ -55,7 +66,7 @@ function validarSimilaridadeNome(nomeSupabase, nomeIdControl) {
         return true;
     }
 
-    // 2. Similaridade de intersecção de palavras (ignorando sufixos)
+    // 2. Similaridade de intersecção de palavras
     const palavras1 = new Set(n1.filter(p => !sufixos.includes(p)));
     const palavras2 = new Set(n2.filter(p => !sufixos.includes(p)));
 
@@ -83,7 +94,8 @@ async function loginIdControl() {
         });
         if (!response.ok) throw new Error(`Status ${response.status}`);
         const data = await response.json();
-        sessionToken = data.accessToken || data.token;
+        const rawToken = data.accessToken || data.token;
+        sessionToken = rawToken ? rawToken.replace(/[\r\n]/g, '').trim() : null;
         return !!sessionToken;
     } catch (e) {
         console.error("❌ Erro login:", e.message);
@@ -112,6 +124,11 @@ async function carregarGruposIdControl() {
 function mapearGrupoPelonome(nome) {
     if (!nome) return null;
     const nomeNorm = normalizar(nome);
+
+    // Hardcoded safety for known critical groups
+    if (nomeNorm.includes("hagana")) return 2039;
+    if (nomeNorm.includes("seguranca") && !nomeNorm.includes("trabalho")) return 1104;
+
     const match = cacheGrupos.find(g => normalizar(g.name) === nomeNorm);
     if (match) {
         console.log(`      🔗 Mapeado: "${nome}" -> ID ${match.id}`);
@@ -121,93 +138,59 @@ function mapearGrupoPelonome(nome) {
     return null;
 }
 
+async function carregarTodosUsuariosIdControl() {
+    if (!sessionToken && !await loginIdControl()) return;
+    try {
+        console.log("   📡 [SEGURANÇA] Baixando lista completa de usuários para o Cache...");
+        const response = await fetch(`${ID_CONTROL_URL}/api/users?page=0&size=5000`, {
+            headers: { "Authorization": `Bearer ${sessionToken}` }
+        });
+        if (response.ok) {
+            const result = await response.json();
+            cacheUsuarios = result.data || result.content || result || [];
+            console.log(`   📦 Cache alimentado com ${cacheUsuarios.length} usuários.`);
+        }
+    } catch (e) {
+        console.error("   ⚠️ Erro ao carregar cache de usuários:", e.message);
+    }
+}
+
 async function buscarUsuarioIdControl(documento) {
     if (!sessionToken && !await loginIdControl()) return null;
+
+    const docLimpo = documento.replace(/[^0-9]/g, "");
+    console.log(`   🔎 BUSCANDO IDENTIDADE (RG: ${docLimpo})...`);
+
+    // 1. Tentar no Cache Local primeiro (Super Seguro)
+    const userNoCache = cacheUsuarios.find(u => {
+        const uRg = String(u.rg || "").replace(/[^0-9]/g, "");
+        return uRg === docLimpo;
+    });
+
+    if (userNoCache) {
+        const uid = userNoCache.id || userNoCache.idUser;
+        console.log(`   ✅ ENCONTRADO NO CACHE: "${userNoCache.name}" (ID: ${uid})`);
+        return { ...userNoCache, id: uid };
+    }
+
+    // 2. Tentar busca direta se não estiver no cache
+    console.log(`   🔄 Não está no cache. Tentando busca viva na API...`);
     try {
-        const docLimpo = documento.replace(/[^a-zA-Z0-9]/g, ""); // Permitir letras se houver
-        console.log(`   🔎 Iniciando busca técnica para: [${docLimpo}]`);
-
-        // 1. Tentar busca imitando o Web UI (POST com Query Params)
-        const queryParams = new URLSearchParams({
-            idType: "0",
-            deleted: "false",
-            start: "0",
-            length: "10",
-            "search[value]": docLimpo,
-            "search[regex]": "false",
-            filterCol: "rg",
-            inactive: "0", // Adicionado conforme F12
-            blacklist: "0"  // Adicionado conforme F12
+        const response = await fetch(`${ID_CONTROL_URL}/api/users?rg=${docLimpo}`, {
+            headers: { "Authorization": `Bearer ${sessionToken}` }
         });
-
-        const url = `${ID_CONTROL_URL}/api/user/list?${queryParams.toString()}`;
-
-        const response = await fetch(url, {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${sessionToken}`,
-                "Content-Type": "application/json;charset=utf-8"
-            },
-            body: null
-        });
-
         if (response.ok) {
             const data = await response.json();
-            // /api/user/list (Datatables) usa .data
-            const list = Array.isArray(data) ? data : (data.data || data.content || []);
-            console.log(`   📊 API list retornou ${list.length} resultados.`);
-
-            const user = list.find(u => {
-                const uRg = String(u.rg || "").replace(/[^a-zA-Z0-9]/g, "");
-                const uReg = String(u.registration || "").replace(/[^a-zA-Z0-9]/g, "");
-                return uRg === docLimpo || uReg === docLimpo;
-            });
-
+            const list = Array.isArray(data) ? data : (data.id ? [data] : []);
+            const user = list.find(u => String(u.rg || "").replace(/[^0-9]/g, "") === docLimpo);
             if (user) {
-                console.log(`   ✅ Encontrado via list: "${user.name}" (ID: ${user.id})`);
-                return user;
+                const userId = user.id || user.idUser;
+                console.log(`   ✅ LOCALIZADO VIA API: "${user.name}" (ID: ${userId})`);
+                return { ...user, id: userId };
             }
         }
-
-        // 2. FALLBACK 1: Busca direta pelo RG (Tradicional)
-        console.log(`   🔄 Tentando fallback clássico...`);
-        const resLegacy = await fetch(`${ID_CONTROL_URL}/api/users?rg=${docLimpo}`, {
-            headers: { "Authorization": `Bearer ${sessionToken}` }
-        });
-
-        if (resLegacy.ok) {
-            const data = await resLegacy.json();
-            const found = Array.isArray(data) ? data[0] : (data.id ? data : null);
-            if (found) {
-                console.log(`   🎯 Localizado via fallback: "${found.name}" (ID: ${found.id})`);
-                return found;
-            }
-        }
-
-        // 3. FALLBACK "ULTRA": Baixar uma página maior e filtrar localmente
-        // Esta técnica funcionou no script da Hebraica
-        console.log(`   📦 Tentando fallback exaustivo (GET /api/users?size=10000)...`);
-        const resFull = await fetch(`${ID_CONTROL_URL}/api/users?page=0&size=10000`, {
-            headers: { "Authorization": `Bearer ${sessionToken}` }
-        });
-
-        if (resFull.ok) {
-            const d = await resFull.json();
-            const fullList = Array.isArray(d) ? d : (d.data || d.content || []);
-            console.log(`   📦 Lista exaustiva carregada: ${fullList.length} usuários.`);
-            const exhaustiveMatch = fullList.find(u => {
-                const uRg = String(u.rg || "").replace(/[^a-zA-Z0-9]/g, "");
-                return uRg === docLimpo;
-            });
-            if (exhaustiveMatch) {
-                console.log(`   🏆 Encontrado na lista exaustiva! "${exhaustiveMatch.name}"`);
-                return exhaustiveMatch;
-            }
-        }
-
-        console.log(`   ❌ Ninguém localizado com o RG ${docLimpo} após 3 tentativas.`);
     } catch (e) {
-        console.error("   ⚠️ Erro na busca:", e.message);
+        console.error("   ⚠️ Erro na busca viva:", e.message);
     }
     return null;
 }
@@ -257,8 +240,6 @@ async function upsertUsuarioIdControl(prestador, usuarioExistente) {
     const idDevice = usuarioExistente?.idDevice || 0; // Mantém se existir.
 
     const payload = {
-        // id: id, // <--- REMOVIDO PARA CRIAÇÃO (Adicionado só se > 0 no final)
-        idDevice: idDevice,
         name: prestador.nome,
         rg: prestador.doc1.replace(/[^0-9]/g, ""),
         document: `RG: ${prestador.doc1.replace(/[^0-9]/g, "")}`,
@@ -269,23 +250,20 @@ async function upsertUsuarioIdControl(prestador, usuarioExistente) {
         shelfStartLifeDate: shelfStart.split(' ')[0],
         shelfLifeDate: shelfEnd.split(' ')[0],
 
-        // Outros
-        company: prestador.empresa,
-        department: sol?.departamento,
+        // Vínculos de Grupos (Print 4)
+        groups: idsGrupos,
+        userGroupsList: userGroupsList,
+
         comments: comments,
         customFields: {
             "Empresa": prestador.empresa,
             "Departamento": sol?.departamento
         },
-        templates: [],
-        cards: [],
-        groups: idsGrupos, // 🆕 Array de IDs [2039, 1104]
-        userGroupsList: userGroupsList, // 🆕 Lista de objetos
+
+        // Flags de estado
         deleted: false,
-        inativo: false,
-        Ativacao: "", Validade: "", password: "", password_confirmation: "",
-        pis: 0,
-        foto: null, fotoDoc: null
+        inactive: false,
+        active: true
     };
 
     // Só incluir ID se for UPDATE
@@ -307,18 +285,19 @@ async function upsertUsuarioIdControl(prestador, usuarioExistente) {
         body: JSON.stringify(payload)
     });
 
+    const resRaw = await response.text();
+
     if (response.ok) {
         console.log("   ✅ Sucesso API ID Control");
         try {
-            return await response.json(); // Retorna { newID: ... } na criação
+            return JSON.parse(resRaw); // Retorna { newID: ... } na criação
         } catch (e) {
             return { success: true, id: id };
         }
     }
 
-    const errText = await response.text();
-    console.error(`   ❌ Falha API (Body):`, errText);
-    throw new Error(`${response.status} - ${errText}`);
+    console.error(`   ❌ Falha API (Body):`, resRaw);
+    throw new Error(`${response.status} - ${resRaw}`);
 }
 
 // ==========================================
@@ -326,10 +305,11 @@ async function upsertUsuarioIdControl(prestador, usuarioExistente) {
 // ==========================================
 
 async function processarPendentes() {
-    console.log("🔍 Buscando pendentes (Ordenado por Criação)...");
+    console.log("🔍 Iniciando Ciclo de Sincronização...");
 
-    // Recarregar cache de grupos a cada ciclo
+    // 1. Recarregar lista global de usuários e grupos (Cache Definitivo)
     await carregarGruposIdControl();
+    await carregarTodosUsuariosIdControl();
 
     // Ordenar por ID DESC para pegar os novos (Ligia, etc)
     const { data: pendentes, error } = await supabase
