@@ -76,31 +76,36 @@ async function despacharParaIDControl() {
     const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // 1. Localizar o registro que acabamos de criar (Jonas)
-    console.log("Buscando Jonas Silva para preenchimento de datas...");
-    const { data: prestadores, error: dbError } = await supabase
+    // 1. Buscar o próximo alvo pendente (Universal)
+    console.log("Buscando próximo prestador aprovado sem vínculo...");
+    const { data: pendentes, error: dbError } = await supabase
         .from('prestadores')
         .select('*, solicitacoes:solicitacao_id(*)')
-        .eq('nome', 'Jonas Silva')
+        .eq('checagem', 'aprovado') // Apenas aprovados
+        .is('id_control_id', null)  // Que ainda não têm ID Control
         .limit(1);
 
     if (dbError) throw new Error("Erro no banco: " + dbError.message);
-    const prestador = prestadores[0];
 
-    if (!prestador || !prestador.id_control_id) {
-        return console.log("⚠️ Jonas Silva ainda não tem vínculo! Rode o Passo 1 primeiro.");
+    if (!pendentes || pendentes.length === 0) {
+        return console.log("✨ NADA PARA SINCRONIZAR: Todos os aprovados já têm ID Control.");
     }
 
-    // Datas da Solicitação (conforme o print do usuário e o mapeamento F12)
+    const prestador = pendentes[0];
     const sol = prestador.solicitacoes || {};
-    const dIni = sol.data_inicial; // YYYY-MM-DD
-    const dFim = sol.data_final;   // YYYY-MM-DD
+
+    console.log(`\n🎯 ALVO ENCONTRADO: [${prestador.nome}]`);
+    console.log(`🔗 Link Supabase: ${prestador.id}`);
+
+    // Datas da Solicitação
+    const dIni = sol.data_inicial;
+    const dFim = sol.data_final;
 
     if (!dIni || !dFim) {
-        return console.log("⚠️ Datas não encontradas na solicitação vinculada.");
+        return console.log("⚠️ Datas não encontradas para este prestador. Ignorando...");
     }
 
-    // Formatação conforme o mapeamento real do F12
+    // Formatação
     const formatarDataSimples = (iso) => {
         const [y, m, d] = iso.split('-');
         return `${d}/${m}/${y}`;
@@ -109,8 +114,7 @@ async function despacharParaIDControl() {
     const dataIni = formatarDataSimples(dIni);
     const dataFim = formatarDataSimples(dFim);
 
-    console.log(`🎯 ALVO: [${prestador.nome}] - ID Mestre: ${prestador.id_control_id}`);
-    console.log(`📅 VIGÊNCIA MAPA F12: ${dataIni} até ${dataFim}`);
+    console.log(`📅 VIGÊNCIA: ${dataIni} até ${dataFim}`);
 
     // 2. Autenticação
     const loginRes = await fetch(`${ID_CONTROL_URL}/api/login/`, {
@@ -120,25 +124,42 @@ async function despacharParaIDControl() {
     });
     const { accessToken } = await loginRes.json();
 
-    // 4. Mapeamento de Grupos (Dinâmico)
-    const MAPA_GRUPOS = {
-        "4irmaos": 2193,
-        "seguranca": 1104
-    };
+    // 4. Mapeamento de Grupos (Dinâmico e Inteligente)
+    console.log("Buscando lista de grupos oficial do ID Control...");
+    const groupsRes = await fetch(`${ID_CONTROL_URL}/api/group/`, {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${accessToken}` }
+    });
+    const groupsJson = await groupsRes.json();
+    // A API pode retornar o array direto ou dentro de uma propriedade 'data'
+    const allGroups = Array.isArray(groupsJson) ? groupsJson : (groupsJson.data || []);
+
+    console.log(`📊 Carregados ${allGroups.length} grupos do servidor.`);
 
     const normalize = (n) => (n || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+
+    const findGroupId = (name) => {
+        if (!name) return null;
+        const normTarget = normalize(name);
+        // Tenta achar o grupo cujo nome normalizado bata com o alvo
+        const match = allGroups.find(g => normalize(g.name) === normTarget);
+        return match ? match.id : null;
+    };
 
     const nomeEmpresa = prestador.empresa;
     const nomeDepto = sol.departamento || prestador.departamento || "Segurança";
 
-    const idEmpresa = MAPA_GRUPOS[normalize(nomeEmpresa)];
-    const idDepto = MAPA_GRUPOS[normalize(nomeDepto)];
+    const idEmpresa = findGroupId(nomeEmpresa);
+    const idDepto = findGroupId(nomeDepto);
 
     const idsGrupos = [];
     if (idDepto) idsGrupos.push(idDepto);
-    if (idEmpresa) idsGrupos.push(idEmpresa);
+    else if (nomeDepto) console.log(`⚠️ Alerta: Departamento '${nomeDepto}' não encontrado no ID Control.`);
 
-    console.log(`🏢 GRUPOS: Empresa(${nomeEmpresa}=${idEmpresa}) | Depto(${nomeDepto}=${idDepto})`);
+    if (idEmpresa) idsGrupos.push(idEmpresa);
+    else if (nomeEmpresa) console.log(`⚠️ Alerta: Empresa '${nomeEmpresa}' não encontrada no ID Control.`);
+
+    console.log(`🏢 GRUPOS LOCALIZADOS: Empresa(${nomeEmpresa}=${idEmpresa || 'N/A'}) | Depto(${nomeDepto}=${idDepto || 'N/A'})`);
 
     // 5. Verificar se o usuário já existe para decidir entre POST (Novo) ou PUT (Edição)
     console.log("Verificando existência no ID Control...");
