@@ -1,6 +1,6 @@
 const ID_CONTROL_URL = "https://192.168.100.20:30443";
 const ID_CONTROL_USER = "mariano";
-const ID_CONTROL_PASS = "hebraica";
+const ID_CONTROL_PASS = "123456789";
 
 async function listUsers() {
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
@@ -12,13 +12,15 @@ async function listUsers() {
     });
     const { accessToken } = await loginRes.json();
 
-    const url = `${ID_CONTROL_URL}/api/users?page=0&size=5`;
+    const url = `${ID_CONTROL_URL}/api/user/list`;
 
     const res = await fetch(url, {
-        method: "GET",
+        method: "POST",
         headers: {
-            "Authorization": `Bearer ${accessToken}`
-        }
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({})
     });
 
     if (res.ok) {

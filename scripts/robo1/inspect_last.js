@@ -3,22 +3,24 @@ require('dotenv').config({ path: '.env.local' });
 const { createClient } = require('@supabase/supabase-js');
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
-async function checkLatest() {
+async function inspectLastProvider() {
     const { data, error } = await supabase
         .from('prestadores')
         .select('*')
         .order('id', { ascending: false })
-        .limit(5);
+        .limit(1);
 
     if (error) {
         console.error("❌ Erro:", error.message);
         return;
     }
 
-    console.log(`📦 Últimos 5 registros:`);
-    data.forEach(p => {
-        console.log(`- ID: ${p.id} | Nome: ${p.nome} | Liberação: ${p.liberacao} | Integrado: ${p.integrado_id_control}`);
-    });
+    if (data.length > 0) {
+        console.log("DETALHES DO PRESTADOR:");
+        console.log(JSON.stringify(data[0], null, 2));
+    } else {
+        console.log("Nenhum registro encontrado.");
+    }
 }
 
-checkLatest();
+inspectLastProvider();

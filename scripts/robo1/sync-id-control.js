@@ -9,7 +9,7 @@ const { createClient } = require('@supabase/supabase-js');
 const ID_CONTROL_URL = "https://192.168.100.20:30443";
 const CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
 const ID_CONTROL_USER = "mariano";
-const ID_CONTROL_PASS = "hebraica";
+const ID_CONTROL_PASS = "123456789";
 
 // Inicializar Supabase
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
@@ -255,10 +255,6 @@ async function upsertUsuarioIdControl(prestador, usuarioExistente) {
         userGroupsList: userGroupsList,
 
         comments: comments,
-        customFields: {
-            "Empresa": prestador.empresa,
-            "Departamento": sol?.departamento
-        },
 
         // Flags de estado
         deleted: false,
@@ -286,6 +282,63 @@ async function upsertUsuarioIdControl(prestador, usuarioExistente) {
     });
 
     const resRaw = await response.text();
+
+    // --- RG COLLISION RECOVERY ---
+    const isDuplicateError = String(resRaw).includes("RG já cadastrado") || String(resRaw).includes("DALWebAPI");
+    if (!response.ok && isDuplicateError) {
+        console.log("   🔄 ALERTA: Usuário / RG já existe na ID Control! Tentando recuperar o ID original pelo Nome...");
+
+        // Vamos buscar ativamente pelo Nome ou RG via Endpoint Confiável (POST /api/user/list)
+        const docLimpo = prestador.doc1.replace(/[^0-9]/g, "");
+        const searchPayload = {
+            search: { value: prestador.nome, regex: false },
+            filterCol: "name",
+            length: 10,
+            start: 0
+        };
+
+        const searchRes = await fetch(`${ID_CONTROL_URL}/api/user/list`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${sessionToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify(searchPayload)
+        });
+
+        if (searchRes.ok) {
+            const searchData = await searchRes.json();
+            const list = Array.isArray(searchData) ? searchData : (searchData.content || []);
+            // Tenta achar com o mesmo RG primeiro
+            let recoveredUser = list.find(u => String(u.rg || "").replace(/[^0-9]/g, "") === docLimpo);
+            if (!recoveredUser) {
+                // Se não achar por RG, pega pelo Nome exato
+                recoveredUser = list.find(u => u.name === prestador.nome);
+            }
+
+            if (recoveredUser && recoveredUser.id) {
+                console.log(`   ✅ ID Recuperado com sucesso: ${recoveredUser.id} (${recoveredUser.name})! Transformando em UPDATE.`);
+
+                // Muda o método para PUT
+                const updateUrl = `${ID_CONTROL_URL}/api/user/`;
+                payload.id = recoveredUser.id; // Agora temos o ID!
+
+                const putResponse = await fetch(updateUrl, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${sessionToken}` },
+                    body: JSON.stringify(payload)
+                });
+
+                const putRaw = await putResponse.text();
+
+                if (putResponse.ok) {
+                    console.log("   ✅ Update forçado com sucesso após colisão.");
+                    try { return JSON.parse(putRaw); } catch (e) { return { success: true, id: recoveredUser.id }; }
+                } else {
+                    throw new Error(`Falha no Update de Recuperação: ${putResponse.status} - ${putRaw}`);
+                }
+            }
+        }
+        console.log("   ❌ Não foi possível recuperar o ID (busca falhou ou usuário não encontrado).");
+    }
+    // -----------------------------
 
     if (response.ok) {
         console.log("   ✅ Sucesso API ID Control");
@@ -400,19 +453,18 @@ async function processarPendentes() {
         } catch (err) {
             console.error(`   ❌ Falha:`, err.message);
 
-            // 🛡️ Segurança: Tratar erros do robô
-            if (err.message.includes("RG já cadastrado")) {
-                console.log(`   🚨 Conflito de RG detectado (Mensagem explícita).`);
+            // 🛡️ Segurança: Tratar erros intransponíveis
+            if (err.message.includes("RG já cadastrado") || err.message.includes("Conflito de RG")) {
+                console.log(`   🚨 Conflito de RG persistente ou nomes divergentes.`);
                 await supabase.from('prestadores')
                     .update({
                         liberacao: 'negada',
                         checagem: 'reprovada',
-                        observacoes: '[ERRO RG] RG já cadastrado em outro usuário.'
+                        observacoes: err.message.includes("Conflito de RG") ? err.message : '[ERRO RG] RG já cadastrado em outro usuário e não pôde ser recuperado.'
                     })
                     .eq('id', p.id);
             } else {
                 console.log(`   🚨 Erro na Sincronização: ${err.message}`);
-                // Não marca como negada automaticamente para erros genéricos, apenas reporta
             }
         }
     }
