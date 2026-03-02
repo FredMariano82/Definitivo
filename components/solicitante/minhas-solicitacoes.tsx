@@ -123,6 +123,7 @@ const MinhasSolicitacoes = () => {
                       <SelectItem value="pendente">Pendente</SelectItem>
                       <SelectItem value="aprovado">Aprovado</SelectItem>
                       <SelectItem value="reprovado">Reprovado</SelectItem>
+                      <SelectItem value="revisar">Revisar</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

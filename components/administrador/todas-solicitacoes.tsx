@@ -889,6 +889,7 @@ export default function TodasSolicitacoes() {
                           <SelectItem value="pendente">Pendente</SelectItem>
                           <SelectItem value="aprovado">Aprovado</SelectItem>
                           <SelectItem value="reprovado">Reprovado</SelectItem>
+                          <SelectItem value="revisar">Revisar</SelectItem>
                           <SelectItem value="excecao">Exceção</SelectItem>
                           <SelectItem value="vencida">Vencida</SelectItem>
                         </SelectContent>
@@ -1107,6 +1108,12 @@ export default function TodasSolicitacoes() {
                                     <Badge className="bg-purple-100 text-purple-800 border-purple-200">Exceção</Badge>
                                   </>
                                 )}
+                                {prestador.checagem === "revisar" && (
+                                  <>
+                                    <ShieldAlert className="h-4 w-4 text-fuchsia-600" />
+                                    <Badge className="bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200">Revisar</Badge>
+                                  </>
+                                )}
                                 {(prestador.checagem === "erro_rg" || (prestador.checagem === "reprovada" || (prestador.checagem as string) === "reprovado") && prestador.observacoes?.includes('[ERRO RG]')) && (
                                   <>
                                     <ShieldAlert className="h-4 w-4 text-orange-600" />
@@ -1310,7 +1317,7 @@ export default function TodasSolicitacoes() {
                 ) : (
                   <>
                     <X className="h-4 w-4 mr-1" />
-                    Confirmar Negação
+                    Confirmar Devolução
                   </>
                 )}
               </Button>

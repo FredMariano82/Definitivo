@@ -91,6 +91,8 @@ export default function SolicitacoesPendentes() {
         return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Reprovado</Badge>
       case "pendente":
         return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Pendente</Badge>
+      case "revisar":
+        return <Badge className="bg-fuchsia-100 text-fuchsia-800 hover:bg-fuchsia-100 border-fuchsia-200">Revisar</Badge>
       case "parcial":
         return <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">Parcial</Badge>
       default:
@@ -106,6 +108,8 @@ export default function SolicitacoesPendentes() {
         return <XCircle className="h-3 w-3 text-red-600" />
       case "pendente":
         return <Clock className="h-3 w-3 text-yellow-600" />
+      case "revisar":
+        return <AlertTriangle className="h-3 w-3 text-fuchsia-600" />
       case "parcial":
         return <AlertTriangle className="h-3 w-3 text-orange-600" />
       default:
@@ -130,9 +134,9 @@ export default function SolicitacoesPendentes() {
   }
 
   const getPrioridade = (prestador: PrestadorAvaliacao, solicitacao: Solicitacao) => {
-    // 🚨 PRIORIDADE 0 (TOPO): Status Pendente
-    if (prestador.checagem === "pendente") {
-      return 0 // Qualquer prestador pendente tem prioridade máxima
+    // 🚨 PRIORIDADE 0 (TOPO): Status Pendente ou Revisar
+    if (prestador.checagem === "pendente" || prestador.checagem === "revisar") {
+      return 0 // Qualquer prestador pendente ou em Revisar tem prioridade máxima
     }
 
     // ⚪ PRIORIDADE 1 (FINAL): Todos os outros status
@@ -318,7 +322,16 @@ export default function SolicitacoesPendentes() {
             ...s,
             prestadores: s.prestadores.map((p) => {
               if (p.id !== prestadorAvaliando.prestador.id) return p
-              return { ...p, checagem: novoStatus as any, justificativa: justificativa || undefined }
+
+              // Ajuste Mágico no Frontend Optimistic Update
+              let newDoc1 = p.doc1;
+              let newDoc2 = p.doc2;
+              if (p.checagem === "revisar" && novoStatus === "aprovado") {
+                newDoc2 = p.doc1;
+                newDoc1 = ""; // limpar
+              }
+
+              return { ...p, checagem: novoStatus as any, justificativa: justificativa || undefined, doc1: newDoc1, doc2: newDoc2 }
             }),
           }
         }),
@@ -336,6 +349,12 @@ export default function SolicitacoesPendentes() {
         const validadeChecagem = new Date()
         validadeChecagem.setMonth(validadeChecagem.getMonth() + 6)
         updateData.checagem_valida_ate = validadeChecagem.toISOString().split("T")[0]
+      }
+
+      // AJUSTE MÁGICO para ROBO4
+      if (prestadorAvaliando.prestador.checagem === "revisar" && novoStatus === "aprovado") {
+        updateData.doc2 = prestadorAvaliando.prestador.doc1;
+        updateData.doc1 = "";
       }
 
       // CORREÇÃO: Salvar realmente no Supabase
@@ -494,6 +513,7 @@ export default function SolicitacoesPendentes() {
                       <SelectItem value="pendente">Pendente</SelectItem>
                       <SelectItem value="aprovado">Aprovado</SelectItem>
                       <SelectItem value="reprovado">Reprovado</SelectItem>
+                      <SelectItem value="revisar">Revisar</SelectItem>
                       <SelectItem value="vencida">Vencida</SelectItem>
                     </SelectContent>
                   </Select>
@@ -687,6 +707,12 @@ export default function SolicitacoesPendentes() {
                                 <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Pendente</Badge>
                               </>
                             )}
+                            {prestador.checagem === "revisar" && (
+                              <>
+                                <AlertTriangle className="h-4 w-4 text-fuchsia-600" />
+                                <Badge className="bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200">Revisar</Badge>
+                              </>
+                            )}
                           </div>
                         </TableCell>
                       )}
@@ -701,7 +727,7 @@ export default function SolicitacoesPendentes() {
                       )}
                       <TableCell>
                         <div className="flex items-center justify-center gap-1">
-                          {prestador.checagem === "pendente" && (
+                          {(prestador.checagem === "pendente" || prestador.checagem === "revisar") && (
                             <Button
                               onClick={() => handleAvaliar(solicitacao, prestador)}
                               variant="outline"
@@ -807,6 +833,29 @@ export default function SolicitacoesPendentes() {
                     </div>
                   </div>
 
+                  {prestadorAvaliando?.prestador.checagem === "revisar" && (
+                    <div className="bg-fuchsia-50/50 border border-fuchsia-200 text-fuchsia-800 p-3 rounded-md text-sm mt-4">
+                      <div className="flex gap-2">
+                        <AlertTriangle className="h-5 w-5 text-fuchsia-600 shrink-0" />
+                        <div>
+                          <p className="font-semibold mb-1">Ação de Revisão Pendente</p>
+                          <p>
+                            {(() => {
+                              const match = prestadorAvaliando.prestador.observacoes?.match(/\[CONFLITO RG: (.*?)\]/)
+                              const rgConflito = match ? match[1] : "não identificado"
+
+                              return (
+                                <>
+                                  Foi detectado duplicidade para <strong className="font-semibold">{prestadorAvaliando.prestador.nome}</strong> no cadastro do ID Control. Se você tiver certeza que é a mesma pessoa, ao <strong className="font-semibold">Aprovar</strong> o documento <strong className="font-semibold">{prestadorAvaliando.prestador.doc1}</strong> será automaticamente gravado no sistema como o <strong className="font-semibold">CPF</strong> (preenchendo a vaga), uma vez que o campo de RG já está ocupado com <strong className="font-semibold">{rgConflito}</strong>.
+                                </>
+                              )
+                            })()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <Label htmlFor="status" className="text-base font-medium">
                       Decisão da Avaliação *
@@ -817,7 +866,7 @@ export default function SolicitacoesPendentes() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="aprovado">✅ Aprovar</SelectItem>
-                        <SelectItem value="reprovado">❌ Reprovar</SelectItem>
+                        <SelectItem value="reprovado">❌ Devolver</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -832,7 +881,7 @@ export default function SolicitacoesPendentes() {
                       onChange={(e) => setJustificativa(e.target.value)}
                       placeholder={
                         novoStatus === "reprovado"
-                          ? "Justificativa obrigatória para reprovação..."
+                          ? "Justificativa obrigatória para devolução..."
                           : "Observações adicionais (opcional)..."
                       }
                       className="mt-2"
@@ -846,10 +895,10 @@ export default function SolicitacoesPendentes() {
                     </Button>
                     <Button
                       onClick={handleSalvarAvaliacao}
-                      className="flex-1 bg-slate-600 hover:bg-slate-700"
+                      className={`flex-1 ${novoStatus === "reprovado" ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"} text-white`}
                       disabled={!novoStatus}
                     >
-                      Salvar Avaliação
+                      {novoStatus === "aprovado" ? "Confirmar Aprovação" : novoStatus === "reprovado" ? "Confirmar Devolução" : "Salvar Avaliação"}
                     </Button>
                   </div>
                 </div>

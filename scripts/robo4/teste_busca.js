@@ -4,7 +4,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../../.env.local') 
 async function testarBuscaIDControl() {
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"; // Bypass SSL
     const ID_CONTROL_URL = "https://192.168.100.20:30443";
-    const nomeParaBuscar = "Pedro Cabral";
+    const nomeParaBuscar = "Thiago Barros";
 
     console.log(`[TESTE] Buscando "${nomeParaBuscar}" exatamente como a interface web do C# faz...`);
 
@@ -43,12 +43,11 @@ async function testarBuscaIDControl() {
     console.log(`[TOTAL ENCONTRADOS]:`, list.length);
 
     if (list.length > 0) {
-        // ID Control returns an array of objects
-        const firstHit = list[0];
-        console.log(`\n[PRIMEIRO RESULTADO]:`);
-        console.log(`   -> Nome: ${firstHit.name}`);
-        console.log(`   -> RG: ${firstHit.rg}`);
-        console.log(`   -> ID Oculto no Banco: ${firstHit.id || firstHit.idUser}`);
+        console.log(`\n[LISTAGEM COMPLETA]:`);
+        list.forEach((hit, index) => {
+            console.log(`\n--- RESULTADO #${index + 1} ---`);
+            console.log(JSON.stringify(hit, null, 2));
+        });
     } else {
         console.log(`\nNinguém encontrado com esse nome.`);
     }

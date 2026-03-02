@@ -7,7 +7,7 @@ export interface Usuario {
   perfil: "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte" | "superadmin"
 }
 
-export type StatusChecagem = "pendente" | "aprovada" | "reprovada" | "vencida" | "excecao" | "erro_rg" | "aprovado" | "reprovado"
+export type StatusChecagem = "pendente" | "aprovada" | "reprovada" | "vencida" | "excecao" | "erro_rg" | "aprovado" | "reprovado" | "revisar"
 export type StatusLiberacao = "pendente" | "urgente" | "vencida" | "Ok" | "Não Ok" | "ok" | "negada"
 
 // Atualizar a interface PrestadorAvaliacao

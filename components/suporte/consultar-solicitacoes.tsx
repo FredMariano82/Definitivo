@@ -1042,6 +1042,7 @@ export default function ConsultarSolicitacoes() {
                       <SelectItem value="pendente">Pendente</SelectItem>
                       <SelectItem value="aprovado">Aprovado</SelectItem>
                       <SelectItem value="reprovado">Reprovado</SelectItem>
+                      <SelectItem value="revisar">Revisar</SelectItem>
                       <SelectItem value="vencida">Vencida</SelectItem>
                     </SelectContent>
                   </Select>

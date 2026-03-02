@@ -52,6 +52,7 @@ export function StatusChecagemBadge({ status }: { status: StatusChecagem }) {
     vencida: "bg-gray-100 text-gray-800 border-gray-200",
     excecao: "bg-purple-100 text-purple-800 border-purple-200",
     erro_rg: "bg-orange-100 text-orange-800 border-orange-200",
+    revisar: "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200",
   }
 
   const labels: Record<string, string> = {
@@ -63,6 +64,7 @@ export function StatusChecagemBadge({ status }: { status: StatusChecagem }) {
     vencida: "Vencida",
     excecao: "Exceção",
     erro_rg: "Erro RG",
+    revisar: "Revisar",
   }
 
   // Normalizar o status para garantir compatibilidade
@@ -123,6 +125,7 @@ export function StatusChecagemIcon({ status }: { status: StatusChecagem }) {
     vencida: <AlertTriangle className="h-4 w-4 text-gray-600" />,
     excecao: <ShieldAlert className="h-4 w-4 text-purple-600" />,
     erro_rg: <ShieldAlert className="h-4 w-4 text-orange-600" />,
+    revisar: <ShieldAlert className="h-4 w-4 text-fuchsia-600" />,
   }
 
   return icons[normalizedStatus] || icons.pendente
