@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { useAuth } from "../contexts/auth-context"
 import { CheckCircle, FileText, Users, BarChart3, HeadphonesIcon, Crown } from "lucide-react"
 import { getSolicitacoesByDepartamento } from "../services/solicitacoes-service"
-import { getCadastroStatus } from "./ui/status-badges"
+import { getLiberacaoStatus } from "./ui/status-badges"
 import { converterDataBrParaDate, getCurrentDate } from "../utils/date-helpers"
 
 export default function Navigation() {
@@ -26,11 +26,17 @@ export default function Navigation() {
       const prestadoresLiberados = solicitacoes
         .filter((solicitacao) => solicitacao.departamento === usuario?.departamento)
         .filter((solicitacao) =>
-          solicitacao.prestadores.some((p: any) => getCadastroStatus(p, solicitacao.dataFinal) === "ok"),
+          solicitacao.prestadores.some((p: any) => {
+            const status = getLiberacaoStatus(p, solicitacao.dataFinal)
+            return String(status).toLowerCase() === "ok"
+          }),
         )
         .flatMap((solicitacao) =>
           solicitacao.prestadores
-            .filter((prestador: any) => getCadastroStatus(prestador, solicitacao.dataFinal) === "ok")
+            .filter((prestador: any) => {
+              const status = getLiberacaoStatus(prestador, solicitacao.dataFinal)
+              return String(status).toLowerCase() === "ok"
+            })
             .map((prestador: any) => ({
               solicitacao,
               prestador,
@@ -170,6 +176,12 @@ export default function Navigation() {
             icon: BarChart3,
             className: getButtonClass("/admin/produtividade"),
           },
+          {
+            href: "/op/painel",
+            label: "Gestão Operacional",
+            icon: Users,
+            className: getButtonClass("/op/painel"),
+          },
         ]
 
       case "gestor":
@@ -239,6 +251,12 @@ export default function Navigation() {
             label: "Upload Histórico",
             icon: Users,
             className: getButtonClass("/admin/upload"),
+          },
+          {
+            href: "/op/painel",
+            label: "Gestão Operacional",
+            icon: Users,
+            className: getButtonClass("/op/painel"),
           },
         ]
 
