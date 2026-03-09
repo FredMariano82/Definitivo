@@ -26,8 +26,10 @@ export interface OpEscalaDiaria {
     data_plantao: string;
     horario_inicio: string;
     horario_fim: string;
-    status_dia: string;
+    status_dia: string; // Trabalhando, Folga, Falta...
     posto_id?: string;
+    tipo_plantao?: string; // Normal, FT, Evento, Extra
+    evento_id?: string;
     observacoes?: string;
 }
 
