@@ -38,6 +38,9 @@ export default function PainelControle() {
       case "consultar-solicitacoes":
         router.push("/suporte/consulta")
         break
+      case "gestao-usuarios":
+        router.push("/superadmin/usuarios")
+        break
       default:
         console.warn(`Rota não encontrada para ID: ${id}`)
     }
@@ -50,6 +53,7 @@ export default function PainelControle() {
       icone: <Settings className="h-5 w-5" />,
       itens: [
         { id: "dashboard", label: "Dashboard Geral", descricao: "Métricas e relatórios" },
+        { id: "gestao-usuarios", label: "Gestão de Usuários (MVP)", descricao: "Criar contas, senhas e perfis de departamentos" },
         { id: "todas-solicitacoes", label: "Todas Solicitações", descricao: "Gerenciar todas as solicitações" },
         { id: "nova-solicitacao-admin", label: "Nova Solicitação (Admin)", descricao: "Criar solicitação como admin" },
       ],

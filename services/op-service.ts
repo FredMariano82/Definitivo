@@ -33,6 +33,19 @@ export interface OpEscalaDiaria {
     observacoes?: string;
 }
 
+export interface OpRodizioPausas {
+    id: string;
+    escala_diaria_id: string;
+    posto_rendido_id: string;
+    horario_inicio: string;
+    horario_fim: string;
+    tipo_pausa: string; // "Almoço", "Janta", "Café", "Banheiro"
+    created_at?: string;
+    // Para relacionamentos ao carregar:
+    op_escala_diaria?: OpEscalaDiaria & { op_equipe?: OpEquipe };
+    op_postos?: OpPosto;
+}
+
 export class OpService {
     // --- EQUIPE ---
     static async getEquipe(): Promise<OpEquipe[]> {
@@ -88,5 +101,40 @@ export class OpService {
             return [];
         }
         return data || [];
+    }
+
+    // --- RODÍZIO DE PAUSAS (RENDIÇÕES) ---
+    static async getPausasPorData(dataString: string): Promise<OpRodizioPausas[]> {
+        const { data, error } = await supabase
+            .from('op_rodizio_pausas')
+            .select(`
+        *,
+        op_escala_diaria!inner(*, op_equipe(*)),
+        op_postos(*)
+      `)
+            .eq('op_escala_diaria.data_plantao', dataString);
+
+        if (error) {
+            console.error('Erro ao buscar pausas do roteiro:', error);
+            return [];
+        }
+        return data || [];
+    }
+
+    static async salvarPausa(pausa: Omit<OpRodizioPausas, 'id' | 'created_at' | 'op_escala_diaria' | 'op_postos'>): Promise<OpRodizioPausas | null> {
+        const { data, error } = await supabase.from('op_rodizio_pausas').insert([pausa]).select().single();
+        if (error) {
+            console.error('Erro ao salvar pausa:', error);
+            throw error;
+        }
+        return data;
+    }
+
+    static async deletarPausa(id: string): Promise<void> {
+        const { error } = await supabase.from('op_rodizio_pausas').delete().eq('id', id);
+        if (error) {
+            console.error('Erro ao deletar pausa:', error);
+            throw error;
+        }
     }
 }
