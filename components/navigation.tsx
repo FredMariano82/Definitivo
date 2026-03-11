@@ -280,7 +280,7 @@ export default function Navigation() {
   const menuButtons = getMenuButtons()
 
   return (
-    <div className="sticky top-[89px] z-40 w-full px-4 py-4 pointer-events-none">
+    <aside className="fixed left-0 top-[88px] bottom-0 w-72 bg-slate-900/95 backdrop-blur-md border-r border-white/10 z-40 overflow-y-auto hidden md:block transition-all duration-300">
       <style jsx>{`
         @keyframes pulse-glow {
           0%, 100% {
@@ -297,41 +297,57 @@ export default function Navigation() {
           animation: pulse-glow 2s ease-in-out infinite;
         }
       `}</style>
-      <div className="max-w-7xl mx-auto pointer-events-auto">
-        <div className="glass shadow-xl rounded-2xl p-2 flex flex-wrap gap-2 justify-center border-white/40">
-          {menuButtons.map((button) => {
-            const IconComponent = button.icon
-            const isActive = pathname === button.href || pathname?.startsWith(button.href + "/")
 
-            return (
-              <Link key={button.href} href={button.href}>
-                <Button
-                  className={`
-                    ${button.className.split("rounded-lg")[0]} rounded-xl px-5 py-6 transition-soft
-                    ${isActive
-                      ? "bg-slate-800 text-white shadow-lg ring-2 ring-blue-500/20"
-                      : "bg-white/50 text-slate-700 hover:bg-white hover:translate-y-[-2px] hover:shadow-md border-transparent"}
-                    ${button.hasAlert && !isActive ? "animate-pulse-glow border-red-500/50" : ""}
-                  `}
-                  variant="ghost"
-                  asChild
-                >
-                  <span className="flex items-center gap-3">
-                    <IconComponent className={`h-5 w-5 ${isActive ? "text-blue-400" : "text-slate-500"}`} />
-                    <span className="font-semibold tracking-wide">{button.label}</span>
-                    {button.hasAlert && (
-                      <span className="relative flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                      </span>
-                    )}
-                  </span>
-                </Button>
-              </Link>
-            )
-          })}
+      <div className="p-4 space-y-2">
+        <div className="px-4 py-2 mb-4">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Menu Principal</p>
+        </div>
+
+        {menuButtons.map((button) => {
+          const IconComponent = button.icon
+          const isActive = pathname === button.href || pathname?.startsWith(button.href + "/")
+
+          return (
+            <Link key={button.href} href={button.href} className="block group">
+              <Button
+                className={`
+                  w-full justify-start rounded-xl px-4 py-6 transition-soft mb-1
+                  ${isActive
+                    ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20"
+                    : "bg-transparent text-slate-300 hover:bg-white/5 hover:text-white border-transparent"}
+                  ${button.hasAlert && !isActive ? "animate-pulse-glow border-red-500/50" : ""}
+                `}
+                variant="ghost"
+                asChild
+              >
+                <span className="flex items-center gap-3">
+                  <IconComponent className={`h-5 w-5 ${isActive ? "text-white" : "text-slate-400 group-hover:text-blue-400"}`} />
+                  <span className="font-medium tracking-wide">{button.label}</span>
+                  {button.hasAlert && (
+                    <span className="ml-auto relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    </span>
+                  )}
+                </span>
+              </Button>
+            </Link>
+          )
+        })}
+      </div>
+
+      {/* Footer do Sidebar */}
+      <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-white/5 bg-slate-900/50">
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-500/30">
+            <span className="text-xs font-bold text-blue-400">{usuario?.nome?.charAt(0)}</span>
+          </div>
+          <div className="overflow-hidden">
+            <p className="text-xs font-bold text-white truncate">{usuario?.nome}</p>
+            <p className="text-[10px] text-slate-400 truncate">{usuario?.departamento}</p>
+          </div>
         </div>
       </div>
-    </div>
+    </aside>
   )
 }

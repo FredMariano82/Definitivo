@@ -34,10 +34,16 @@ export default function AuthenticatedLayout({
     if (!usuario) return null
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-800 via-slate-900 to-blue-900">
+        <div className="min-h-screen bg-slate-50 flex flex-col">
             <Header />
-            <Navigation />
-            <main className="max-w-7xl mx-auto p-6">{children}</main>
+            <div className="flex flex-1">
+                <Navigation />
+                <main className="flex-1 p-6 md:ml-72 transition-all duration-300">
+                    <div className="max-w-7xl mx-auto">
+                        {children}
+                    </div>
+                </main>
+            </div>
         </div>
     )
 }

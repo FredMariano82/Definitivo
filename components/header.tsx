@@ -14,34 +14,29 @@ export default function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 premium-gradient shadow-xl border-b border-white/10 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4">
+      <header className="sticky top-0 z-50 premium-gradient shadow-xl border-b border-white/10 backdrop-blur-sm h-[88px] flex items-center">
+        <div className="w-full px-6">
           <div className="flex items-center justify-between">
-            {/* Logo e Título */}
+            {/* Logo e Info do Sistema */}
             <div className="flex items-center space-x-5 group">
               <div className="relative">
                 <div className="absolute -inset-1 bg-gradient-to-r from-blue-400 to-cyan-400 rounded-lg blur opacity-25 group-hover:opacity-50 transition-soft"></div>
-                <img src="/images/mvm-solutions-logo.png" alt="MVM Solutions" className="relative h-14 w-auto transition-soft group-hover:scale-105" />
+                <img src="/images/mvm-solutions-logo.png" alt="MVM Solutions" className="relative h-12 w-auto transition-soft group-hover:scale-105" />
               </div>
-              <div>
-                <h1 className="text-2xl font-extrabold text-white tracking-tight">Sistema de Solicitações</h1>
-                <p className="text-xs font-medium text-blue-300/80 uppercase tracking-widest">MVM Solutions • Gestão de Prestadores</p>
+              <div className="hidden sm:block">
+                <h1 className="text-xl font-bold text-white tracking-tight leading-none">MVM SOLUTIONS</h1>
+                <p className="text-[10px] font-medium text-blue-300/60 uppercase tracking-widest mt-1">Gestão de Prestadores</p>
               </div>
             </div>
 
-            {/* Área do Usuário - Premium */}
-            <div className="flex items-center space-x-6">
-              <div className="hidden md:flex flex-col items-end">
-                <span className="text-sm font-semibold text-white">{usuario.nome}</span>
-                <span className="text-xs text-blue-300/70">{usuario.departamento}</span>
-              </div>
-
+            {/* Ações Rápidas */}
+            <div className="flex items-center space-x-4">
               <div className="flex items-center bg-white/5 p-1 rounded-xl border border-white/10">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowAlterarSenha(true)}
-                  className="text-white hover:bg-white/10 transition-soft rounded-lg"
+                  className="text-white hover:bg-white/10 transition-soft rounded-lg h-9 w-9 p-0"
                   title="Configurações"
                 >
                   <Settings className="h-4 w-4" />
@@ -53,7 +48,7 @@ export default function Header() {
                   variant="ghost"
                   size="sm"
                   onClick={logout}
-                  className="text-red-300 hover:text-red-100 hover:bg-red-500/20 transition-soft rounded-lg"
+                  className="text-red-300 hover:text-red-100 hover:bg-red-500/20 transition-soft rounded-lg h-9 w-9 p-0"
                   title="Sair"
                 >
                   <LogOut className="h-4 w-4" />
