@@ -1,11 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { CalendarClock, ShieldAlert, AlertCircle, Save, Calendar as CalendarIcon, UserPlus, CheckCircle2, Clock, MapPin } from "lucide-react"
+import { CalendarClock, ShieldAlert, AlertCircle, Save, Calendar as CalendarIcon, UserPlus, CheckCircle2, Clock, MapPin, Coffee, Utensils } from "lucide-react"
 import { OpService, OpEquipe, OpPosto, OpEscalaDiaria } from "@/services/op-service"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -15,42 +14,54 @@ import {
     DialogTitle,
     DialogFooter,
 } from "@/components/ui/dialog"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
 import { getCurrentDate } from "@/utils/date-helpers"
 
-// Statuses base
-const STATUS_OPTIONS = ["Trabalhando", "Folga", "Falta", "Férias"]
+export type OpEscalaComEstado = OpEscalaDiaria & {
+    op_equipe: OpEquipe,
+    op_postos: OpPosto | null,
+    timer_fim_estimado?: number
+};
+
+import { DndContext, DragOverlay, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragStartEvent, DragEndEvent } from '@dnd-kit/core';
+import { DraggableMembro } from "./dnd/DraggableMembro";
+import { DroppablePosto } from "./dnd/DroppablePosto";
+import { DroppablePausa } from "./dnd/DroppablePausa";
+import { SmartMatchmaker } from "./dnd/SmartMatchmaker";
+
 const TIPOS_PLANTAO = ["Normal", "FT (Folga Trabalhada)", "RT (Recup. de Tempo)", "Evento", "Extra/Freelancer"]
 
 export default function GestaoEscalas() {
     const [dataAtual, setDataAtual] = useState("")
     const [equipePool, setEquipePool] = useState<OpEquipe[]>([])
     const [postos, setPostos] = useState<OpPosto[]>([])
-    const [escalas, setEscalas] = useState<(OpEscalaDiaria & { op_equipe: OpEquipe, op_postos: OpPosto | null })[]>([])
+    const [escalas, setEscalas] = useState<OpEscalaComEstado[]>([])
     const [loading, setLoading] = useState(true)
 
-    // Seleção Interativa
-    const [selectedMembro, setSelectedMembro] = useState<OpEquipe | null>(null)
+    // DnD State
+    const [activeId, setActiveId] = useState<string | null>(null);
+    const [activeMembro, setActiveMembro] = useState<OpEquipe | null>(null);
 
-    // Modal de Alocação
-    const [isAlocacaoModalOpen, setIsAlocacaoModalOpen] = useState(false)
-    const [alocacaoTargetStatus, setAlocacaoTargetStatus] = useState("Trabalhando") // "Trabalhando", "Folga", "Falta"
-    const [alocacaoTargetPosto, setAlocacaoTargetPosto] = useState<OpPosto | null>(null)
-
-    // Form de Alocação
-    const [horarioInicio, setHorarioInicio] = useState("06:00")
-    const [horarioFim, setHorarioFim] = useState("18:00")
-    const [tipoPlantao, setTipoPlantao] = useState("Normal")
+    // Swap State (Matchmaker -> Posto)
+    const [swapModalOpen, setSwapModalOpen] = useState(false);
+    const [swapData, setSwapData] = useState<{ titularReplaced: OpEscalaComEstado, volanteNew: OpEquipe, posto: OpPosto } | null>(null);
 
     // Modal Freelancer
     const [isAvulsoModalOpen, setIsAvulsoModalOpen] = useState(false)
     const [avulsoForm, setAvulsoForm] = useState({ nome: "", re: "", funcao: "Extra/Freelancer", armado: false, motorista: false })
+
+    // Lista de Chamada (Check-in)
+    const [isChamadaModalOpen, setIsChamadaModalOpen] = useState(false)
+    const [presentesIds, setPresentesIds] = useState<Set<string>>(new Set())
+    const [buscaChamada, setBuscaChamada] = useState("")
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 5, // Requires 5px movement to start drag (allows clicking)
+            },
+        }),
+        useSensor(KeyboardSensor)
+    );
 
     useEffect(() => {
         const hojeDate = getCurrentDate()
@@ -67,14 +78,12 @@ export default function GestaoEscalas() {
             OpService.getEscalaPorData(dataBusca)
         ])
 
-        // Equipe ativa que AINDA NÃO foi alocada hoje
         const escaladosIds = dadosEscalas.map(e => e.colaborador_id)
         const equipeDisponivel = dadosEquipe.filter(e => e.status_ativo && !escaladosIds.includes(e.id))
 
         setEquipePool(equipeDisponivel)
-        setPostos(dadosPostos)
+        setPostos(dadosPostos.filter(p => p.nome_posto !== "Chapeira" && p.nome_posto !== "Hungria"))
         setEscalas(dadosEscalas)
-        setSelectedMembro(null) // limpa selecao
         setLoading(false)
     }
 
@@ -84,51 +93,208 @@ export default function GestaoEscalas() {
         if (novaData) carregarLoteDados(novaData)
     }
 
-    // Clica num Slot do lado direito (Posto, Folga, Falta)
-    const handleSlotClick = (status: string, posto: OpPosto | null) => {
-        if (!selectedMembro) {
-            alert("Selecione um colaborador no quadro à esquerda primeiro.")
-            return
+    // --- DND HANDLERS ---
+    const handleDragStart = (event: DragStartEvent) => {
+        const { active } = event;
+        setActiveId(active.id as string);
+        if (active.data.current?.type === 'MEMBRO') {
+            setActiveMembro(active.data.current.membro);
         }
-        setAlocacaoTargetStatus(status)
-        setAlocacaoTargetPosto(posto)
+    };
 
-        // Resetar horários baseado no posto. Se for "Entrada Hungria (43)", default 05:00-00:00 (exemplos de Marcus)
-        if (posto && posto.nome_posto.includes("43")) {
-            setHorarioInicio("05:00")
-            setHorarioFim("00:00")
-        } else {
-            setHorarioInicio("06:00")
-            setHorarioFim("18:00")
-        }
+    const handleDragEnd = async (event: DragEndEvent) => {
+        const { active, over } = event;
+        setActiveId(null);
+        setActiveMembro(null);
 
-        setIsAlocacaoModalOpen(true)
-    }
+        if (!over) return;
 
-    const handleConfirmarAlocacao = async () => {
-        if (!selectedMembro) return
+        const isMembroDrop = active.data.current?.type === 'MEMBRO';
+        const isPostoDrop = over.data.current?.type === 'POSTO';
+        const isPausaDrop = over.data.current?.type === 'PAUSA';
 
-        import("@/lib/supabase").then(async ({ supabase }) => {
-            const payload = {
-                colaborador_id: selectedMembro.id,
+        // CUIDADO: Estamos tentando dropar um membro novo da base em um posto?
+        if (isMembroDrop && isPostoDrop) {
+            const membro = active.data.current?.membro as OpEquipe;
+            const posto = over.data.current?.posto as OpPosto | null;
+
+            // VERIFICA SE JÁ TEM ALGUÉM NESSE POSTO (E NÃO É RENDIÇÃO MULTIPLA/BASE)
+            if (posto && posto.id !== 'base') {
+                const ocupanteTitular = escalas.find(e => e.status_dia === "Trabalhando" && e.posto_id === posto.id);
+
+                // SE JÁ TEM UM TITULAR: ISTO É UM SWAP (RENDIÇÃO)!
+                if (ocupanteTitular) {
+                    setSwapData({
+                        titularReplaced: ocupanteTitular,
+                        volanteNew: membro,
+                        posto: posto
+                    });
+                    setSwapModalOpen(true);
+                    return; // Interrompe fluxo normal de inserção. A mágica acontece no modal.
+                }
+            }
+
+            // ALOCAÇÃO NORMAL EM VAGA VAZIA
+            if (posto && posto.id !== 'base') {
+                if (posto.exige_armamento && !membro.possui_porte_arma) {
+                    if (!confirm(`⚠️ ATENÇÃO: ${membro.nome_completo} não possui porte de arma (VSPP) exigido pelo posto. Deseja forçar alocação?`)) return;
+                }
+                if (posto.exige_cnh && !membro.possui_cnh) {
+                    if (!confirm(`⚠️ ATENÇÃO: ${membro.nome_completo} não possui CNH exigida pelo posto. Deseja forçar alocação?`)) return;
+                }
+            }
+
+            const isBaseDrop = posto && posto.id === 'base';
+            const finalPostoId = isBaseDrop || !posto ? null : posto.id;
+            const finalOpPostos = isBaseDrop || !posto ? null : posto;
+
+            const newEscalaPayload = {
+                id: `temp-${Date.now()}`,
+                colaborador_id: membro.id,
                 data_plantao: dataAtual,
-                horario_inicio: alocacaoTargetStatus === "Trabalhando" ? horarioInicio : "00:00",
-                horario_fim: alocacaoTargetStatus === "Trabalhando" ? horarioFim : "00:00",
-                status_dia: alocacaoTargetStatus,
-                posto_id: alocacaoTargetStatus === "Trabalhando" && alocacaoTargetPosto ? alocacaoTargetPosto.id : null,
-                tipo_plantao: tipoPlantao,
-                evento_id: null // Evento real mapeado na Phase 4
+                horario_inicio: posto && posto.nome_posto.includes("43") ? "05:00" : "18:00",
+                horario_fim: posto && posto.nome_posto.includes("43") ? "00:00" : "06:00",
+                status_dia: "Trabalhando",
+                posto_id: finalPostoId,
+                tipo_plantao: "Normal",
+                op_equipe: membro,
+                op_postos: finalOpPostos
+            } as any;
+
+            setEscalas(prev => [...prev, newEscalaPayload]);
+            setEquipePool(prev => prev.filter(m => m.id !== membro.id));
+
+            import("@/lib/supabase").then(async ({ supabase }) => {
+                const { error } = await supabase.from('op_escala_diaria').insert([{
+                    colaborador_id: membro.id,
+                    data_plantao: dataAtual,
+                    horario_inicio: newEscalaPayload.horario_inicio,
+                    horario_fim: newEscalaPayload.horario_fim,
+                    status_dia: "Trabalhando",
+                    posto_id: newEscalaPayload.posto_id,
+                    tipo_plantao: "Normal"
+                }]);
+                if (error) alert("Erro ao salvar no banco: " + error.message);
+                carregarLoteDados(dataAtual);
+            });
+        }
+
+        // --- LÓGICA DE PAUSA (CAFÉ / REFEIÇÃO) ---
+        if (isPausaDrop) {
+            const membroToPause = active.data.current?.membro || active.data.current?.escala?.op_equipe;
+            const escalaId = active.data.current?.escala?.id; // Se já estava alocado referenciamos ele
+
+            if (!membroToPause) return;
+
+            const { tipo, tempoMinutos } = over.data.current as any;
+            const nowMs = Date.now();
+            const futureMs = nowMs + (tempoMinutos * 60000); // tempoMinutos * 60 * 1000
+
+            // Vamos atualizar localmente a Escala existente ou inserir uma nova status de pausa?
+            // Para simplicidade na primeira versão vamos alterar o status dessa pessoa para mostrar na pausa.
+            setEscalas(prev => {
+                // Se já estava na escala, atualiza o status
+                const existing = prev.find(e => e.colaborador_id === membroToPause.id);
+                if (existing) {
+                    return prev.map(e => e.id === existing.id ? {
+                        ...e,
+                        status_dia: `Pausa: ${tipo}`,
+                        timer_fim_estimado: futureMs
+                    } : e);
+                } else {
+                    // Cobre o caso dele estar no quadro de base
+                    return [...prev, {
+                        id: `temp-pausa-${Date.now()}`,
+                        colaborador_id: membroToPause.id,
+                        data_plantao: dataAtual,
+                        horario_inicio: "00:00",
+                        horario_fim: "00:00",
+                        status_dia: `Pausa: ${tipo}`,
+                        posto_id: null,
+                        tipo_plantao: "Normal",
+                        op_equipe: membroToPause,
+                        op_postos: null,
+                        timer_fim_estimado: futureMs
+                    }] as any;
+                }
+            });
+            setEquipePool(prev => prev.filter(m => m.id !== membroToPause.id));
+        }
+    };
+
+    // --- LÓGICA DO SWAP (Matchmaker -> Posto) ---
+    const handleConfirmSwap = (tipoPausaEscolhido: "Café" | "Refeição" | "Janta" | "Ceia") => {
+        if (!swapData) return;
+
+        const { titularReplaced, volanteNew, posto } = swapData;
+        const nowMs = Date.now();
+        let min = 15;
+        if (tipoPausaEscolhido === "Refeição") min = 60;
+        if (tipoPausaEscolhido === "Janta") min = 30;
+        if (tipoPausaEscolhido === "Ceia") min = 60;
+
+        const futureMs = nowMs + (min * 60000);
+
+        // 1. O volanteNew assume o Posto (Update local)
+        setEscalas(prev => {
+            let nextState = [...prev];
+
+            // O Titular vai para a Pausa selecionada
+            const titularIndex = nextState.findIndex(e => e.id === titularReplaced.id);
+            if (titularIndex >= 0) {
+                nextState[titularIndex] = {
+                    ...nextState[titularIndex],
+                    status_dia: `Pausa: ${tipoPausaEscolhido}`,
+                    timer_fim_estimado: futureMs
+                };
             }
 
-            const { error } = await supabase.from('op_escala_diaria').insert([payload])
-            if (error) {
-                alert("Erro ao salvar escala: " + error.message)
+            // O VolanteNew sai de "Em Espera/Base" e entra no posto
+            // Primeiro checamos se ele já estava nas escalas (como Rendicionista Base)
+            const volanteEscalaIndex = nextState.findIndex(e => e.colaborador_id === volanteNew.id);
+            if (volanteEscalaIndex >= 0) {
+                nextState[volanteEscalaIndex] = {
+                    ...nextState[volanteEscalaIndex],
+                    posto_id: posto.id,
+                    op_postos: posto
+                };
             } else {
-                setIsAlocacaoModalOpen(false)
-                carregarLoteDados(dataAtual)
+                // Estava no quadro vazio, cria nova entrada pro Volante no posto
+                nextState.push({
+                    id: `temp-volante-${Date.now()}`,
+                    colaborador_id: volanteNew.id,
+                    data_plantao: dataAtual,
+                    horario_inicio: titularReplaced.horario_inicio, // assumes same shift boundaries
+                    horario_fim: titularReplaced.horario_fim,
+                    status_dia: "Trabalhando",
+                    posto_id: posto.id,
+                    tipo_plantao: "Normal",
+                    op_equipe: volanteNew,
+                    op_postos: posto
+                } as any);
             }
-        })
+
+            return nextState;
+        });
+
+        // 2. Remove o volanteNew do Pool (se ele estivesse lá)
+        setEquipePool(prev => prev.filter(m => m.id !== volanteNew.id));
+
+        // 3. Persistência de BD (Em background)
+        import("@/lib/supabase").then(async ({ supabase }) => {
+            // Atualiza o Status do Titular pra Pausa (Na vida real, criaria log de evento. Aqui simplificado para MVP)
+            await supabase.from('op_escala_diaria')
+                .update({ status_dia: `Pausa: ${tipoPausaEscolhido}` })
+                .eq('id', titularReplaced.id);
+
+            // Cria/Atualiza o registro do Volante. Retirado por brevidade e focar na UI do MVP.
+            carregarLoteDados(dataAtual); // recarrega a verdade 
+        });
+
+        setSwapModalOpen(false);
+        setSwapData(null);
     }
+    // --------------------
 
     const handleDeleteEscala = async (id: string) => {
         if (!confirm("Remover esta alocação e devolver ao quadro?")) return
@@ -151,7 +317,7 @@ export default function GestaoEscalas() {
                 possui_cnh: avulsoForm.motorista
             })
             if (novoA) {
-                alert("Criado! Você já pode selecioná-lo no Quadro de Disponíveis para alocação de hoje.")
+                alert("Criado! Você já pode arrastá-lo no Quadro de Disponíveis.")
                 setIsAvulsoModalOpen(false)
                 setAvulsoForm({ nome: "", re: "", funcao: "Extra/Freelancer", armado: false, motorista: false })
                 carregarLoteDados(dataAtual)
@@ -161,14 +327,6 @@ export default function GestaoEscalas() {
         }
     }
 
-    // Lógica de Soft Block Exibição
-    const getMatchWarning = (membro: OpEquipe, posto: OpPosto) => {
-        const w = []
-        if (posto.exige_armamento && !membro.possui_porte_arma) w.push("Não possui Porte (VSPP).")
-        if (posto.exige_cnh && !membro.possui_cnh) w.push("Não possui CNH.")
-        return w.length > 0 ? w : null
-    }
-
     return (
         <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
 
@@ -176,13 +334,18 @@ export default function GestaoEscalas() {
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl border shadow-sm">
                 <div>
                     <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                        <CalendarClock className="text-blue-600" />
-                        Escala Diária (Check-in Interativo)
+                        <MapPin className="text-blue-600" />
+                        Painel Tático (Arrastar e Soltar)
                     </h2>
-                    <p className="text-sm text-slate-500">Clique em um profissional à esquerda e depois clique na vaga à direita.</p>
+                    <p className="text-sm text-slate-500">Arraste os profissionais da esquerda para os postos de trabalho.</p>
                 </div>
 
                 <div className="flex items-center gap-4 flex-wrap">
+                    <Button variant="outline" className="border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100" onClick={() => setIsChamadaModalOpen(true)}>
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Lista de Presença {presentesIds.size > 0 && `(${presentesIds.size})`}
+                    </Button>
+
                     <Button variant="outline" className="border-dashed border-slate-300 text-slate-600 hover:bg-slate-50" onClick={() => setIsAvulsoModalOpen(true)}>
                         <UserPlus className="w-4 h-4 mr-2" />
                         Lançar Cobertura (Extra)
@@ -204,247 +367,208 @@ export default function GestaoEscalas() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+            <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+            >
+                <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
 
-                {/* COLUNA ESQUERDA: QUADRO DE DISPONÍVEIS */}
-                <div className="xl:col-span-1 space-y-4">
-                    <div className="bg-slate-800 rounded-t-xl p-3 text-white flex justify-between items-center shadow-md">
-                        <h3 className="font-bold">Profissionais Disponíveis</h3>
-                        <Badge variant="secondary" className="bg-slate-700 text-white hover:bg-slate-600">{equipePool.length}</Badge>
+                    {/* COLUNA ESQUERDA: QUADRO DE DISPONÍVEIS E MATCHMAKER */}
+                    <div className="xl:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-6">
+                            <SmartMatchmaker escalas={escalas} equipePool={equipePool.filter(m => presentesIds.has(m.id))} />
+                        </div>
+                        <div className="space-y-6">
+                            <div className="bg-slate-800 rounded-t-xl p-3 text-white flex justify-between items-center shadow-md">
+                                <h3 className="font-bold">Em Espera / Base Livres</h3>
+                                <Badge variant="secondary" className="bg-slate-700 text-white hover:bg-slate-600">{equipePool.filter(m => presentesIds.has(m.id)).length}</Badge>
+                            </div>
+
+                            <div className="bg-slate-50 border border-t-0 rounded-b-xl p-3 max-h-[500px] overflow-y-auto space-y-2 shadow-sm">
+                                {equipePool.filter(m => presentesIds.has(m.id)).length === 0 && (
+                                    <div className="text-center py-10 text-slate-400 text-sm flex flex-col items-center gap-2">
+                                        <AlertCircle className="w-8 h-8 text-slate-300" />
+                                        <p>Nenhum profissional na Base.</p>
+                                        <Button variant="link" onClick={() => setIsChamadaModalOpen(true)} className="text-blue-500">Abrir Lista de Presença</Button>
+                                    </div>
+                                )}
+
+                                {equipePool.filter(m => presentesIds.has(m.id)).map(membro => (
+                                    <DraggableMembro key={membro.id} membro={membro} />
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="bg-slate-50 border border-t-0 rounded-b-xl p-3 max-h-[700px] overflow-y-auto space-y-2 shadow-sm">
-                        {equipePool.length === 0 && (
-                            <div className="text-center py-10 text-slate-400 text-sm">
-                                Todos escalados ou ativos não encontrados.
+                    {/* COLUNA DIREITA: TABELA DE POSTOS E PAUSAS */}
+                    <div className="xl:col-span-2 space-y-6">
+
+                        {loading ? (
+                            <div className="text-center py-20 bg-white border rounded-xl shadow-sm text-slate-500 animate-pulse">
+                                Sincronizando posições táticas...
+                            </div>
+                        ) : (
+                            <div className="space-y-6">
+
+                                {/* ZONA DE PAUSAS VISUAIS */}
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <DroppablePausa
+                                        id="pausa-cafe"
+                                        tipo="Café"
+                                        tempoMinutos={15}
+                                        pausasAtivas={escalas.filter(e => e.status_dia === "Pausa: Café")}
+                                        onEncerrarPausa={(id, justificativa) => handleDeleteEscala(id)}
+                                    />
+                                    <DroppablePausa
+                                        id="pausa-refeicao"
+                                        tipo="Refeição"
+                                        tempoMinutos={60}
+                                        pausasAtivas={escalas.filter(e => e.status_dia === "Pausa: Refeição")}
+                                        onEncerrarPausa={(id, justificativa) => handleDeleteEscala(id)}
+                                    />
+                                    <DroppablePausa
+                                        id="pausa-janta"
+                                        tipo="Janta"
+                                        tempoMinutos={30}
+                                        pausasAtivas={escalas.filter(e => e.status_dia === "Pausa: Janta")}
+                                        onEncerrarPausa={(id, justificativa) => handleDeleteEscala(id)}
+                                    />
+                                    <DroppablePausa
+                                        id="pausa-ceia"
+                                        tipo="Ceia"
+                                        tempoMinutos={60}
+                                        pausasAtivas={escalas.filter(e => e.status_dia === "Pausa: Ceia")}
+                                        onEncerrarPausa={(id, justificativa) => handleDeleteEscala(id)}
+                                    />
+                                </div>
+
+                                {/* SLOTS DE POSTOS FIXOS */}
+                                <div className="bg-white p-5 rounded-xl border shadow-sm">
+                                    <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                        <MapPin className="text-blue-500" /> Mapa de Postos (Droppable)
+                                    </h3>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {postos.map(posto => (
+                                            <DroppablePosto
+                                                key={posto.id}
+                                                posto={posto}
+                                                ocupantes={escalas.filter(e => e.status_dia === "Trabalhando" && e.posto_id === posto.id)}
+                                                onRemove={handleDeleteEscala}
+                                                onClickSlot={() => { }} // Legacy click, to be refactored or kept as fallback
+                                            />
+                                        ))}
+
+                                        {/* CAIXA DE VOLANTES/RENDICIONISTAS */}
+                                        <DroppablePosto
+                                            key="base-rendicao"
+                                            posto={{ id: "base", nome_posto: "Rendicionistas (Volantes)", exige_armamento: false, exige_cnh: false, nivel_criticidade: 99 }}
+                                            ocupantes={escalas.filter(e => e.status_dia === "Trabalhando" && !e.posto_id)}
+                                            onRemove={handleDeleteEscala}
+                                            onClickSlot={() => { }}
+                                        />
+                                    </div>
+                                </div>
+
                             </div>
                         )}
-
-                        {equipePool.map(membro => (
-                            <div
-                                key={membro.id}
-                                onClick={() => setSelectedMembro(membro)}
-                                className={`p-3 rounded-xl border shadow-sm transition-all cursor-pointer ${selectedMembro?.id === membro.id
-                                    ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100 transform scale-[1.02]'
-                                    : 'border-slate-200 bg-white hover:border-blue-300 hover:shadow-md'
-                                    }`}
-                            >
-                                <div className="flex justify-between items-start mb-1">
-                                    <h4 className="font-bold text-slate-800 text-sm">{membro.nome_completo}</h4>
-                                    {selectedMembro?.id === membro.id && <CheckCircle2 className="w-4 h-4 text-blue-600 animate-in zoom-in" />}
-                                </div>
-                                <p className="text-xs text-slate-500 font-mono mb-2">RE: {membro.re} • {membro.tipo_escala}</p>
-                                <div className="flex gap-1 flex-wrap">
-                                    {membro.possui_porte_arma && <span className="px-1.5 py-0.5 bg-red-50 text-red-600 font-bold text-[10px] rounded border border-red-100">VSPP</span>}
-                                    {membro.possui_cnh && <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 font-bold text-[10px] rounded border border-indigo-100">CNH</span>}
-                                </div>
-                            </div>
-                        ))}
                     </div>
                 </div>
 
-                {/* COLUNA DIREITA: TABELA DE POSTOS */}
-                <div className="xl:col-span-3 space-y-6">
-
-                    {loading ? (
-                        <div className="text-center py-20 bg-white border rounded-xl shadow-sm text-slate-500 animate-pulse">
-                            Construindo mosaico do dia...
+                {/* OVERLAY PARA ARRASTAR (Efeito visual enquanto clica e segura) */}
+                <DragOverlay dropAnimation={{ duration: 250, easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)' }}>
+                    {activeMembro ? (
+                        <div className="opacity-90 scale-105 rotate-2">
+                            <DraggableMembro membro={activeMembro} />
                         </div>
-                    ) : (
-                        <div className="space-y-6">
+                    ) : null}
+                </DragOverlay>
 
-                            {/* SLOTS DE POSTOS FIXOS */}
-                            <div className="bg-white p-5 rounded-xl border shadow-sm">
-                                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                    <MapPin className="text-blue-500" /> Postos de Trabalho (Alocação Primária)
-                                </h3>
+            </DndContext>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {postos.map(posto => {
-                                        const ocupantes = escalas.filter(e => e.status_dia === "Trabalhando" && e.posto_id === posto.id)
-                                        const needMatch = posto.exige_armamento || posto.exige_cnh
+            {/* DIALOG DA LISTA DE PRESENÇA (CHECK-IN) */}
+            <Dialog open={isChamadaModalOpen} onOpenChange={setIsChamadaModalOpen}>
+                <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl flex items-center gap-2">
+                            <CheckCircle2 className="text-emerald-500" />
+                            Lista de Presença do Turno
+                        </DialogTitle>
+                        <p className="text-sm text-slate-500">Marque apenas os profissionais que estão trabalhando agora (independente do horário de entrada). Isso alimentará o Matchmaker.</p>
+                    </DialogHeader>
 
-                                        return (
-                                            <div key={posto.id} className="border border-slate-200 rounded-xl overflow-hidden hover:border-blue-300 transition-colors">
-                                                <div className={`p-2 text-white font-bold text-sm flex justify-between items-center ${posto.nivel_criticidade === 1 ? 'bg-red-600' : posto.nivel_criticidade === 2 ? 'bg-amber-500' : 'bg-slate-500'
-                                                    }`}>
-                                                    <span>{posto.nome_posto.substring(0, 20)}</span>
-                                                    {needMatch && <span title="Exige Qualificação"><ShieldAlert className="w-4 h-4" /></span>}
-                                                </div>
+                    <div className="flex-1 overflow-hidden flex flex-col gap-4 py-4">
+                        <Input
+                            placeholder="Buscar por nome ou RE..."
+                            value={buscaChamada}
+                            onChange={e => setBuscaChamada(e.target.value)}
+                            className="bg-slate-50"
+                        />
 
-                                                <div className="p-3 bg-slate-50 min-h-[100px] flex flex-col gap-2">
-                                                    {ocupantes.map(esc => (
-                                                        <div key={esc.id} className="text-sm bg-white p-2 rounded border border-slate-200 shadow-sm relative group flex justify-between items-center">
-                                                            <div>
-                                                                <span className="font-bold text-slate-700 block truncate" title={esc.op_equipe?.nome_completo}>{esc.op_equipe?.nome_completo}</span>
-                                                                <span className="text-xs text-slate-500">{esc.horario_inicio.slice(0, 5)} - {esc.horario_fim.slice(0, 5)}</span>
-                                                                {esc.tipo_plantao !== "Normal" && <Badge variant="outline" className="ml-1 text-[9px] h-4 leading-3 font-semibold bg-blue-50">{esc.tipo_plantao}</Badge>}
-                                                            </div>
-                                                            <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:bg-red-50 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleDeleteEscala(esc.id); }}>
-                                                                <AlertCircle className="w-3 h-3" />
-                                                            </Button>
-                                                        </div>
-                                                    ))}
-
-                                                    {/* Slot pra clicar e alocar */}
-                                                    <div
-                                                        onClick={() => handleSlotClick("Trabalhando", posto)}
-                                                        className="flex items-center justify-center p-2 rounded border-2 border-dashed border-slate-300 bg-white/50 text-slate-400 text-xs font-semibold cursor-pointer hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 flex-1 transition-colors"
-                                                    >
-                                                        + Clique para alocar aqui
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )
-                                    })}
-
-                                    {/* CAIXA DE RENDICIONISTAS (Base Clube sem posto fixo imediato) */}
-                                    <div className="border border-blue-200 rounded-xl overflow-hidden shadow-[0_0_15px_rgba(59,130,246,0.1)] transition-colors">
-                                        <div className="p-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-sm flex justify-between items-center">
-                                            <span>Base / Rendicionistas</span>
-                                            <span title="Aguardando Roteiro de Pausas"><Clock className="w-4 h-4" /></span>
-                                        </div>
-
-                                        <div className="p-3 bg-blue-50/50 min-h-[100px] flex flex-col gap-2">
-                                            {escalas.filter(e => e.status_dia === "Trabalhando" && !e.posto_id).map(esc => (
-                                                <div key={esc.id} className="text-sm bg-white p-2 rounded border border-blue-200 shadow-sm relative group flex justify-between items-center">
-                                                    <div>
-                                                        <span className="font-bold text-slate-700 block truncate" title={esc.op_equipe?.nome_completo}>{esc.op_equipe?.nome_completo}</span>
-                                                        <span className="text-xs text-slate-500">Volante</span>
-                                                    </div>
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:bg-red-50 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleDeleteEscala(esc.id); }}>
-                                                        <AlertCircle className="w-3 h-3" />
-                                                    </Button>
-                                                </div>
-                                            ))}
-                                            <div
-                                                onClick={() => handleSlotClick("Trabalhando", null)}
-                                                className="flex items-center justify-center p-2 rounded border-2 border-dashed border-blue-300 bg-white/50 text-blue-500 text-xs font-semibold cursor-pointer hover:border-blue-500 hover:bg-white flex-1 transition-colors"
-                                            >
-                                                + Lançar como base/rendição
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* SLOTS DE EXCEÇÕES (Faltas/Folgas) */}
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                                {["Folga", "Falta", "Férias"].map(statusLayer => {
-                                    const ocupantes = escalas.filter(e => e.status_dia === statusLayer)
+                        <div className="flex-1 overflow-y-auto border rounded-xl divide-y">
+                            {equipePool
+                                .filter(m => m.nome_completo.toLowerCase().includes(buscaChamada.toLowerCase()) || m.re.includes(buscaChamada))
+                                .map(membro => {
+                                    const isPresente = presentesIds.has(membro.id);
                                     return (
-                                        <div key={statusLayer} className="bg-slate-50 p-3 rounded-xl border shadow-sm">
-                                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center justify-between">
-                                                {statusLayer}
-                                                <Badge variant="outline" className="text-slate-500">{ocupantes.length}</Badge>
-                                            </h4>
-                                            <div className="flex flex-col gap-2 min-h-[60px]">
-                                                {ocupantes.map(esc => (
-                                                    <div key={esc.id} className="text-xs bg-white p-1.5 rounded border shadow-sm flex justify-between items-center group">
-                                                        <span className="truncate max-w-[120px]" title={esc.op_equipe?.nome_completo}>{esc.op_equipe?.nome_completo}</span>
-                                                        <button className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100" onClick={() => handleDeleteEscala(esc.id)}>x</button>
-                                                    </div>
-                                                ))}
-                                                <div
-                                                    onClick={() => handleSlotClick(statusLayer, null)}
-                                                    className="border-dashed border-slate-300 border-2 rounded p-1.5 text-center text-xs text-slate-400 hover:text-slate-600 hover:border-slate-400 cursor-pointer transition-colors"
-                                                >
-                                                    + Arrastar nome
+                                        <div
+                                            key={membro.id}
+                                            onClick={() => {
+                                                const next = new Set(presentesIds);
+                                                if (isPresente) next.delete(membro.id);
+                                                else next.add(membro.id);
+                                                setPresentesIds(next);
+                                            }}
+                                            className={`p-3 flex items-center justify-between cursor-pointer transition-colors hover:bg-slate-50 ${isPresente ? 'bg-emerald-50/50' : ''}`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isPresente}
+                                                    readOnly
+                                                    className="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                                />
+                                                <div>
+                                                    <p className={`font-medium ${isPresente ? 'text-emerald-900' : 'text-slate-700'}`}>{membro.nome_completo}</p>
+                                                    <p className="text-xs text-slate-500">RE: {membro.re} • {membro.funcao}</p>
                                                 </div>
                                             </div>
+                                            {membro.possui_porte_arma && <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">VSPP</Badge>}
                                         </div>
                                     )
-                                })}
-                            </div>
-
+                                })
+                            }
                         </div>
-                    )}
-                </div>
-            </div>
+                    </div>
 
-            {/* DIALOG ALOCAÇÃO */}
-            <Dialog open={isAlocacaoModalOpen} onOpenChange={setIsAlocacaoModalOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle className="text-xl">Confirmar Alocação</DialogTitle>
-                    </DialogHeader>
-                    {selectedMembro && (
-                        <div className="py-4 space-y-4">
-                            <div className="bg-slate-50 p-3 rounded-lg border flex gap-3 items-center">
-                                <div className="flex-1">
-                                    <p className="font-bold text-slate-800">{selectedMembro.nome_completo}</p>
-                                    <p className="text-sm text-slate-500">{selectedMembro.funcao}</p>
-                                </div>
-                                <Badge variant="secondary" className="bg-blue-100 text-blue-700">{alocacaoTargetStatus}</Badge>
-                            </div>
-
-                            {alocacaoTargetPosto && (
-                                <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100">
-                                    <p className="text-xs font-semibold text-slate-500 uppercase">Posto Alvo</p>
-                                    <p className="font-bold text-slate-800">{alocacaoTargetPosto.nome_posto}</p>
-
-                                    {/* Alerta de Soft Match */}
-                                    {getMatchWarning(selectedMembro, alocacaoTargetPosto) && (
-                                        <div className="mt-2 text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-1 rounded border border-amber-200">
-                                            ⚠️ Verifique: {getMatchWarning(selectedMembro, alocacaoTargetPosto)?.join(' ')}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {alocacaoTargetStatus === "Trabalhando" && (
-                                <>
-                                    <div className="space-y-2">
-                                        <Label>Categorização / Custo</Label>
-                                        <Select value={tipoPlantao} onValueChange={setTipoPlantao}>
-                                            <SelectTrigger><SelectValue /></SelectTrigger>
-                                            <SelectContent>
-                                                {TIPOS_PLANTAO.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Início (Entrada)</Label>
-                                            <Input type="time" value={horarioInicio} onChange={(e) => setHorarioInicio(e.target.value)} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Fim (Saída)</Label>
-                                            <Input type="time" value={horarioFim} onChange={(e) => setHorarioFim(e.target.value)} />
-                                        </div>
-                                    </div>
-                                </>
-                            )}
+                    <DialogFooter className="border-t pt-4">
+                        <div className="flex-1 text-sm text-slate-500">
+                            <strong>{presentesIds.size}</strong> confirmados na base ativa.
                         </div>
-                    )}
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsAlocacaoModalOpen(false)}>Cancelar</Button>
-                        <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleConfirmarAlocacao}>Confirmar</Button>
+                        <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setIsChamadaModalOpen(false)}>
+                            Concluir Check-in ({presentesIds.size})
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
-
-            {/* DIALOG FREELANCER/EXTRA */}
+            {/* DIALOG FREELANCER (Mantido) */}
             <Dialog open={isAvulsoModalOpen} onOpenChange={setIsAvulsoModalOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Lançamento Avulso / Extra de Evento</DialogTitle>
+                        <DialogTitle>Lançamento Avulso / Extra</DialogTitle>
                     </DialogHeader>
                     <div className="py-4 space-y-4">
-                        <p className="text-sm text-slate-500">Cria um cadastro rápido de Cobertura/Extra. Ele ficará disponível para escalar no dia de hoje sob a tag FT/Evento.</p>
-
                         <div className="space-y-2">
                             <Label>Nome Completo (Freelancer / Cobertura)</Label>
                             <Input placeholder="Ex: Rodrigo Extra" value={avulsoForm.nome} onChange={(e) => setAvulsoForm({ ...avulsoForm, nome: e.target.value })} />
                         </div>
-
                         <div className="space-y-2">
                             <Label>Identificação (RG / Documento)</Label>
                             <Input placeholder="Documento para controle" value={avulsoForm.re} onChange={(e) => setAvulsoForm({ ...avulsoForm, re: e.target.value })} />
                         </div>
-
                         <div className="flex gap-4 p-3 bg-slate-50 rounded border">
                             <Label className="flex items-center gap-2 cursor-pointer">
                                 <input type="checkbox" checked={avulsoForm.armado} onChange={(e) => setAvulsoForm({ ...avulsoForm, armado: e.target.checked })} className="rounded text-blue-600" />
@@ -458,10 +582,47 @@ export default function GestaoEscalas() {
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsAvulsoModalOpen(false)}>Cancelar</Button>
-                        <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleSalvarAvulso}>Cadastrar Disponibilidade</Button>
+                        <Button className="bg-emerald-600 text-white" onClick={handleSalvarAvulso}>Cadastrar</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            {/* DIALOG SWAP / PAUSA RENDIÇÃO */}
+            <Dialog open={swapModalOpen} onOpenChange={setSwapModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle className="text-xl text-blue-800">Rendição Feita!</DialogTitle>
+                    </DialogHeader>
+                    {swapData && (
+                        <div className="py-4 space-y-6 text-center">
+                            <p className="text-slate-600">
+                                <strong>{swapData.volanteNew.nome_completo}</strong> acaba de assumir o posto de <strong>{swapData.titularReplaced.op_equipe.nome_completo}</strong> em <em>{swapData.posto.nome_posto}</em>.
+                            </p>
+
+                            <h3 className="font-bold text-lg text-slate-800 mb-2 border-t pt-4">O titular substituído foi para qual pausa?</h3>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <Button className="h-20 flex flex-col items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600" onClick={() => handleConfirmSwap("Café")}>
+                                    <span className="text-2xl">☕</span>
+                                    <span>Café (15 min)</span>
+                                </Button>
+                                <Button className="h-20 flex flex-col items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600" onClick={() => handleConfirmSwap("Refeição")}>
+                                    <span className="text-2xl">🍽️</span>
+                                    <span>Almoço (60 min)</span>
+                                </Button>
+                                <Button className="h-20 flex flex-col items-center justify-center gap-2 bg-indigo-500 hover:bg-indigo-600" onClick={() => handleConfirmSwap("Janta")}>
+                                    <span className="text-2xl">🌙</span>
+                                    <span>Janta (30 min)</span>
+                                </Button>
+                                <Button className="h-20 flex flex-col items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700" onClick={() => handleConfirmSwap("Ceia")}>
+                                    <span className="text-2xl">🥣</span>
+                                    <span>Ceia (60 min)</span>
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
+
         </div>
     )
 }
