@@ -1,15 +1,11 @@
 "use client"
 
 import { useState } from "react"
-<<<<<<< HEAD
-import { Users, MapPin, CalendarClock } from "lucide-react"
-=======
 import { useAuth } from "@/contexts/auth-context"
 import Header from "@/components/header"
 import Navigation from "@/components/navigation"
 import { Users, MapPin, CalendarClock, ShieldAlert, Clock } from "lucide-react"
 import GestaoEquipe from "@/components/op/gestao-equipe"
->>>>>>> 71654de0c7b5b52a3611ed3d61844ed1616577f6
 import GestaoPostos from "@/components/op/gestao-postos"
 import GestaoEscalas from "@/components/op/gestao-escalas"
 import GestaoRendicoes from "@/components/op/gestao-rendicoes"
