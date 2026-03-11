@@ -182,6 +182,12 @@ export default function Navigation() {
             icon: Users,
             className: getButtonClass("/op/painel"),
           },
+          {
+            href: "/admin/kanban",
+            label: "Kanban",
+            icon: BarChart3,
+            className: getButtonClass("/admin/kanban"),
+          },
         ]
 
       case "gestor":
@@ -257,6 +263,12 @@ export default function Navigation() {
             label: "Gestão Operacional",
             icon: Users,
             className: getButtonClass("/op/painel"),
+          },
+          {
+            href: "/admin/kanban",
+            label: "Kanban",
+            icon: BarChart3,
+            className: getButtonClass("/admin/kanban"),
           },
         ]
 

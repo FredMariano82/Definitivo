@@ -1,9 +1,18 @@
 "use client"
 
 import { useState } from "react"
+<<<<<<< HEAD
 import { Users, MapPin, CalendarClock } from "lucide-react"
+=======
+import { useAuth } from "@/contexts/auth-context"
+import Header from "@/components/header"
+import Navigation from "@/components/navigation"
+import { Users, MapPin, CalendarClock, ShieldAlert, Clock } from "lucide-react"
+import GestaoEquipe from "@/components/op/gestao-equipe"
+>>>>>>> 71654de0c7b5b52a3611ed3d61844ed1616577f6
 import GestaoPostos from "@/components/op/gestao-postos"
 import GestaoEscalas from "@/components/op/gestao-escalas"
+import GestaoRendicoes from "@/components/op/gestao-rendicoes"
 import { Button } from "@/components/ui/button"
 
 export default function PainelOperacional() {
@@ -30,6 +39,14 @@ export default function PainelOperacional() {
                         Painel Tático (Escala)
                     </Button>
                     <Button
+                        variant={activeTab === "rendicoes" ? "default" : "ghost"}
+                        onClick={() => setActiveTab("rendicoes")}
+                        className={`gap-2 ${activeTab === "rendicoes" ? "bg-indigo-600 text-white shadow-md hover:bg-indigo-700" : "text-slate-600"}`}
+                    >
+                        <Clock className="w-4 h-4" />
+                        Roteiro de Pausas
+                    </Button>
+                    <Button
                         variant={activeTab === "equipe" ? "default" : "ghost"}
                         onClick={() => setActiveTab("equipe")}
                         className={`gap-2 ${activeTab === "equipe" ? "bg-blue-600 text-white shadow-md hover:bg-blue-700" : "text-slate-600"}`}
@@ -51,6 +68,10 @@ export default function PainelOperacional() {
                 <div className="min-h-[500px]">
                     {activeTab === "escala" && (
                         <GestaoEscalas />
+                    )}
+
+                    {activeTab === "rendicoes" && (
+                        <GestaoRendicoes />
                     )}
 
                     {activeTab === "equipe" && (

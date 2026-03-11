@@ -11,10 +11,11 @@ import { SolicitacoesService } from "../../services/solicitacoes-service"
 import { PrestadoresService } from "../../services/prestadores-service"
 import AvisoPrazo from "./aviso-prazo"
 import type { Prestador } from "../../types"
-import { Plus, Trash2, AlertTriangle, User, FileSpreadsheet, X } from "lucide-react"
+import { Plus, Trash2, AlertTriangle, User, FileSpreadsheet, X, Wand2, Camera } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import UploadListaExcel from "./upload-lista-excel"
+import UploadFotoLista from "./upload-foto-lista"
 import ModalPreviaSolicitacao from "./modal-previa-solicitacao"
 import FinalidadeSolicitacao from "./finalidade-solicitacao"
 
@@ -89,6 +90,7 @@ export default function NovaSolicitacao({
 
   // Adicionar estado para controlar modal de upload
   const [mostrarUploadLista, setMostrarUploadLista] = useState(false)
+  const [mostrarUploadFoto, setMostrarUploadFoto] = useState(false)
 
   // 🎯 NOVOS ESTADOS PARA CORREÇÕES
   const [dadosVieramDoExcel, setDadosVieramDoExcel] = useState(false)
@@ -688,7 +690,23 @@ export default function NovaSolicitacao({
               </Button>
             </div>
             <div className="p-4">
-              <UploadListaExcel onListaProcessada={processarListaExcel} />
+              <UploadListaExcel onListaProcessada={(prestadores) => { processarListaExcel(prestadores); setMostrarUploadLista(false); }} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {finalidade && mostrarUploadFoto && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b flex justify-between items-center text-fuchsia-700">
+              <h2 className="text-xl font-bold flex items-center gap-2"><Camera className="w-5 h-5" /> Tirar Foto da Lista (OCR)</h2>
+              <Button onClick={() => setMostrarUploadFoto(false)} variant="ghost" size="sm">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-4">
+              <UploadFotoLista onListaProcessada={(prestadores) => { processarListaExcel(prestadores); setMostrarUploadFoto(false); }} />
             </div>
           </div>
         </div>
@@ -757,13 +775,22 @@ export default function NovaSolicitacao({
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <Label className="text-lg font-medium text-slate-700">Prestadores</Label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2 justify-end md:justify-start mt-2">
+                    <Button
+                      type="button"
+                      onClick={() => setMostrarUploadFoto(true)}
+                      className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-[0_0_15px_rgba(192,38,211,0.3)] transition-all order-1"
+                      size="sm"
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      Tirar Foto da Lista
+                    </Button>
                     <Button
                       type="button"
                       onClick={() => setMostrarUploadLista(true)}
                       variant="outline"
                       size="sm"
-                      className="border-slate-600 text-slate-600 hover:bg-slate-50"
+                      className="border-slate-600 text-slate-600 hover:bg-slate-50 order-2"
                     >
                       <FileSpreadsheet className="h-4 w-4 mr-2" />
                       Upload Excel
