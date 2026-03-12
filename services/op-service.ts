@@ -10,6 +10,10 @@ export interface OpEquipe {
     status_ativo: boolean;
     possui_porte_arma: boolean;
     possui_cnh: boolean;
+    data_reciclagem?: string;
+    data_inicio_ferias?: string;
+    data_fim_ferias?: string;
+    referencia_escala?: string; // Data para base do Par/Impar (escala 12x36)
 }
 
 export interface OpPosto {
@@ -61,6 +65,15 @@ export class OpService {
         const { data, error } = await supabase.from('op_equipe').insert([membro]).select().single();
         if (error) {
             console.error('Erro ao adicionar membro:', error);
+            throw error;
+        }
+        return data;
+    }
+
+    static async atualizarMembroEquipe(id: string, membro: Partial<OpEquipe>): Promise<OpEquipe | null> {
+        const { data, error } = await supabase.from('op_equipe').update(membro).eq('id', id).select().single();
+        if (error) {
+            console.error('Erro ao atualizar membro:', error);
             throw error;
         }
         return data;

@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { Users, MapPin, CalendarClock, Clock } from "lucide-react"
 import GestaoPostos from "@/components/op/gestao-postos"
 import GestaoEscalas from "@/components/op/gestao-escalas"
+import GestaoEquipe from "@/components/op/gestao-equipe"
 import GestaoRendicoes from "@/components/op/gestao-rendicoes"
 import { Button } from "@/components/ui/button"
 import PageHeader from "@/components/page-header"
@@ -67,11 +68,7 @@ export default function PainelOperacional() {
                 )}
 
                 {activeTab === "equipe" && (
-                    <div className="bg-white border rounded-xl shadow-sm p-6 text-center py-20 text-slate-500">
-                        <Users className="w-16 h-16 mx-auto mb-4 text-slate-300" />
-                        <h3 className="text-xl font-medium text-slate-700">Gestão da Equipe</h3>
-                        <p className="mt-2">Módulo em construção.</p>
-                    </div>
+                    <GestaoEquipe />
                 )}
 
                 {activeTab === "postos" && (
