@@ -37,6 +37,8 @@ import { formatarDataParaBR } from "../../utils/date-helpers"
 import { Badge } from "../ui/badge"
 // import * as XLSX from "xlsx"
 
+import PageHeader from "@/components/page-header"
+
 type StatusCadastro = "pendente" | "ok" | "urgente" | "vencida"
 
 // Definir todas as colunas disponíveis
@@ -204,12 +206,12 @@ export default function ConsultarSolicitacoes() {
           if (buscaGeral.trim()) {
             const termoBusca = buscaGeral.trim()
             const nomeNormalizado = normalizarTexto(prestador.nome)
-            const documentoNormalizado = normalizarDocumento(prestador.doc1)
+            const doc1Normalizado = normalizarDocumento(prestador.doc1)
             const termoBuscaNormalizado = normalizarTexto(termoBusca)
-            const termoBuscaDocumento = normalizarDocumento(termoBusca)
+            const termoBuscaDoc1 = normalizarDocumento(termoBusca)
 
             buscaMatch =
-              nomeNormalizado.includes(termoBuscaNormalizado) || documentoNormalizado.includes(termoBuscaDocumento)
+              nomeNormalizado.includes(termoBuscaNormalizado) || doc1Normalizado.includes(termoBuscaDoc1)
           }
 
           return statusMatch && cadastroMatch && buscaMatch
@@ -710,856 +712,858 @@ export default function ConsultarSolicitacoes() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-purple-100 p-4">
-      <div className="max-w-7xl mx-auto">
-        <Card className="shadow-lg border-0">
-          <CardHeader className="pb-6">
-            <CardTitle className="text-2xl font-bold text-purple-800 text-center">
-              🔍 SUPORTE - Consultar Solicitações
-            </CardTitle>
-            <div className="w-24 h-1 bg-purple-600 mx-auto rounded-full"></div>
-          </CardHeader>
+    <div className="min-h-screen bg-transparent p-6">
+      <PageHeader
+        title="Consulta de Solicitações"
+        subtitle="Ferramenta de suporte para localização e auditoria de pedidos."
+      />
+      <Card className="shadow-lg border-0">
+        <CardHeader className="pb-6">
+          <CardTitle className="text-2xl font-bold text-purple-800 text-center uppercase">
+            🔍 SUPORTE - Consultar Solicitações
+          </CardTitle>
+          <div className="w-24 h-1 bg-purple-600 mx-auto rounded-full"></div>
+        </CardHeader>
 
-          <CardContent>
-            {/* Filtros */}
-            <div className="mb-6 p-4 bg-purple-50 rounded-lg">
-              <div className="flex items-center gap-2 mb-4">
-                <Filter className="h-5 w-5 text-purple-600" />
-                <Label className="text-lg font-medium text-purple-700">Filtros</Label>
-                <Button
-                  onClick={buscarSolicitacoes}
-                  variant="outline"
-                  size="sm"
-                  className="ml-auto border-purple-600 text-purple-600 hover:bg-purple-50"
-                >
-                  🔄 Atualizar
-                </Button>
-                {/* Botão Download */}
-                <Button
-                  onClick={() => setModalDownloadAberto(true)}
-                  variant="outline"
-                  size="sm"
-                  className="ml-2 border-green-600 text-green-600 hover:bg-green-50"
-                >
-                  <Download className="h-4 w-4 mr-1" />
-                  Download
-                </Button>
+        <CardContent>
+          {/* Filtros */}
+          <div className="mb-6 p-4 bg-purple-50 rounded-lg">
+            <div className="flex items-center gap-2 mb-4">
+              <Filter className="h-5 w-5 text-purple-600" />
+              <Label className="text-lg font-medium text-purple-700">Filtros</Label>
+              <Button
+                onClick={buscarSolicitacoes}
+                variant="outline"
+                size="sm"
+                className="ml-auto border-purple-600 text-purple-600 hover:bg-purple-50"
+              >
+                🔄 Atualizar
+              </Button>
+              {/* Botão Download */}
+              <Button
+                onClick={() => setModalDownloadAberto(true)}
+                variant="outline"
+                size="sm"
+                className="ml-2 border-green-600 text-green-600 hover:bg-green-50"
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Download
+              </Button>
 
-                {/* Botão Modal de Colunas */}
-                <Button
-                  onClick={() => {
-                    console.log("🔧 BOTÃO COLUNAS CLICADO!")
-                    setModalColunasAberto(true)
-                  }}
-                  variant="outline"
-                  size="sm"
-                  className="ml-2 border-blue-600 text-blue-600 hover:bg-blue-50"
-                >
-                  <Columns className="h-4 w-4 mr-1" />
-                  Colunas
-                </Button>
+              {/* Botão Modal de Colunas */}
+              <Button
+                onClick={() => {
+                  console.log("🔧 BOTÃO COLUNAS CLICADO!")
+                  setModalColunasAberto(true)
+                }}
+                variant="outline"
+                size="sm"
+                className="ml-2 border-blue-600 text-blue-600 hover:bg-blue-50"
+              >
+                <Columns className="h-4 w-4 mr-1" />
+                Colunas
+              </Button>
 
-                {/* Modal Customizado */}
-                {modalColunasAberto && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center">
-                    {/* Overlay */}
-                    <div
-                      className="fixed inset-0 bg-black bg-opacity-50"
-                      onClick={() => setModalColunasAberto(false)}
-                    ></div>
+              {/* Modal Customizado */}
+              {modalColunasAberto && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                  {/* Overlay */}
+                  <div
+                    className="fixed inset-0 bg-black bg-opacity-50"
+                    onClick={() => setModalColunasAberto(false)}
+                  ></div>
 
-                    {/* Modal Content */}
-                    <div className="relative bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
-                      <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-semibold text-purple-800">🔧 Configurar Colunas</h2>
+                  {/* Modal Content */}
+                  <div className="relative bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-lg font-semibold text-purple-800">🔧 Configurar Colunas</h2>
+                      <Button
+                        onClick={() => setModalColunasAberto(false)}
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Botões para selecionar/deselecionar todas */}
+                      <div className="flex gap-2 pb-2 border-b border-purple-200">
                         <Button
-                          onClick={() => setModalColunasAberto(false)}
+                          onClick={() => {
+                            console.log("🟢 MOSTRAR TODAS CLICADO!")
+                            toggleTodasColunas(true)
+                          }}
                           variant="outline"
                           size="sm"
-                          className="h-8 w-8 p-0"
+                          className="flex-1 border-green-600 text-green-600 hover:bg-green-50"
                         >
-                          <X className="h-4 w-4" />
+                          ✅ Mostrar Todas
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            console.log("🔴 ESCONDER TODAS CLICADO!")
+                            toggleTodasColunas(false)
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 border-red-600 text-red-600 hover:bg-red-50"
+                        >
+                          ❌ Esconder Todas
                         </Button>
                       </div>
 
-                      <div className="space-y-4">
-                        {/* Botões para selecionar/deselecionar todas */}
-                        <div className="flex gap-2 pb-2 border-b border-purple-200">
-                          <Button
-                            onClick={() => {
-                              console.log("🟢 MOSTRAR TODAS CLICADO!")
-                              toggleTodasColunas(true)
-                            }}
-                            variant="outline"
-                            size="sm"
-                            className="flex-1 border-green-600 text-green-600 hover:bg-green-50"
-                          >
-                            ✅ Mostrar Todas
-                          </Button>
-                          <Button
-                            onClick={() => {
-                              console.log("🔴 ESCONDER TODAS CLICADO!")
-                              toggleTodasColunas(false)
-                            }}
-                            variant="outline"
-                            size="sm"
-                            className="flex-1 border-red-600 text-red-600 hover:bg-red-50"
-                          >
-                            ❌ Esconder Todas
-                          </Button>
-                        </div>
+                      {/* Lista de checkboxes para cada coluna */}
+                      <div className="space-y-3 max-h-80 overflow-y-auto">
+                        {COLUNAS_DISPONIVEIS.map((coluna) => (
+                          <div key={coluna.key} className="flex items-center space-x-3">
+                            <input
+                              type="checkbox"
+                              id={coluna.key}
+                              checked={colunasVisiveis[coluna.key] || false}
+                              onChange={() => {
+                                console.log("☑️ CHECKBOX CLICADO:", coluna.key)
+                                toggleColuna(coluna.key)
+                              }}
+                              className="h-4 w-4 text-purple-600 border-purple-300 rounded focus:ring-purple-500"
+                            />
+                            <label
+                              htmlFor={coluna.key}
+                              className="text-sm font-medium text-purple-700 cursor-pointer"
+                            >
+                              {coluna.label}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
 
-                        {/* Lista de checkboxes para cada coluna */}
-                        <div className="space-y-3 max-h-80 overflow-y-auto">
-                          {COLUNAS_DISPONIVEIS.map((coluna) => (
-                            <div key={coluna.key} className="flex items-center space-x-3">
-                              <input
-                                type="checkbox"
-                                id={coluna.key}
-                                checked={colunasVisiveis[coluna.key] || false}
-                                onChange={() => {
-                                  console.log("☑️ CHECKBOX CLICADO:", coluna.key)
-                                  toggleColuna(coluna.key)
-                                }}
-                                className="h-4 w-4 text-purple-600 border-purple-300 rounded focus:ring-purple-500"
+                      {/* Resumo */}
+                      <div className="pt-2 border-t border-purple-200 text-center">
+                        <p className="text-xs text-purple-600">
+                          {Object.values(colunasVisiveis).filter(Boolean).length} de {COLUNAS_DISPONIVEIS.length}{" "}
+                          colunas visíveis
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal de Download */}
+              {modalDownloadAberto && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                  {/* Overlay */}
+                  <div
+                    className="fixed inset-0 bg-black bg-opacity-50"
+                    onClick={() => setModalDownloadAberto(false)}
+                  ></div>
+
+                  {/* Modal Content */}
+                  <div className="relative bg-white rounded-lg shadow-lg p-6 max-w-lg w-full mx-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-lg font-semibold text-purple-800">📥 Download das Solicitações</h2>
+                      <Button
+                        onClick={() => setModalDownloadAberto(false)}
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <div className="space-y-6">
+                      {/* Opções de Filtro */}
+                      <div>
+                        <Label className="text-sm font-medium text-purple-700 mb-3 block">
+                          📊 Dados para Download
+                        </Label>
+                        <div className="space-y-3">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="radio"
+                              id="todos"
+                              name="filtro"
+                              checked={opcoesFiltro === "todos"}
+                              onChange={() => setOpcoesFiltro("todos")}
+                              className="text-purple-600"
+                            />
+                            <label htmlFor="todos" className="text-sm text-purple-700">
+                              Baixar todos os dados (ignorar filtros atuais)
+                            </label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="radio"
+                              id="periodo"
+                              name="filtro"
+                              checked={opcoesFiltro === "periodo"}
+                              onChange={() => setOpcoesFiltro("periodo")}
+                              className="text-purple-600"
+                            />
+                            <label htmlFor="periodo" className="text-sm text-purple-700">
+                              Período personalizado
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Seletor de Período */}
+                      {opcoesFiltro === "periodo" && (
+                        <div className="bg-purple-50 p-4 rounded-lg">
+                          <Label className="text-sm font-medium text-purple-700 mb-2 block">
+                            <Calendar className="h-4 w-4 inline mr-1" />
+                            Selecionar Período
+                          </Label>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-xs text-purple-600">Data Início</Label>
+                              <Input
+                                type="date"
+                                value={dataInicioDownload}
+                                onChange={(e) => setDataInicioDownload(e.target.value)}
+                                className="text-sm"
                               />
-                              <label
-                                htmlFor={coluna.key}
-                                className="text-sm font-medium text-purple-700 cursor-pointer"
-                              >
-                                {coluna.label}
-                              </label>
                             </div>
-                          ))}
+                            <div>
+                              <Label className="text-xs text-purple-600">Data Fim</Label>
+                              <Input
+                                type="date"
+                                value={dataFimDownload}
+                                onChange={(e) => setDataFimDownload(e.target.value)}
+                                className="text-sm"
+                              />
+                            </div>
+                          </div>
                         </div>
+                      )}
 
-                        {/* Resumo */}
-                        <div className="pt-2 border-t border-purple-200 text-center">
-                          <p className="text-xs text-purple-600">
-                            {Object.values(colunasVisiveis).filter(Boolean).length} de {COLUNAS_DISPONIVEIS.length}{" "}
-                            colunas visíveis
+                      {/* Opções Extras */}
+                      <div>
+                        <Label className="text-sm font-medium text-purple-700 mb-3 block">⚙️ Opções Extras</Label>
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id="graficos"
+                              checked={incluirGraficos}
+                              onChange={(e) => setIncluirGraficos(e.target.checked)}
+                              className="text-purple-600"
+                            />
+                            <label htmlFor="graficos" className="text-sm text-purple-700">
+                              Incluir aba de estatísticas e gráficos
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Resumo */}
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <Label className="text-sm font-medium text-gray-700">Resumo:</Label>
+                        <div className="text-xs text-gray-600 mt-1 space-y-1">
+                          <p>
+                            • Formato: <strong>Excel (.xlsx)</strong> formatado
+                          </p>
+                          <p>
+                            • Layout: <strong>Uma linha por prestador</strong>
+                          </p>
+                          <p>
+                            • Dados:{" "}
+                            <strong>
+                              {opcoesFiltro === "todos" ? "Todos os registros" : "Período personalizado"}
+                            </strong>
+                          </p>
+                          <p>
+                            • Estatísticas: <strong>{incluirGraficos ? "Incluídas" : "Não incluídas"}</strong>
                           </p>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                )}
 
-                {/* Modal de Download */}
-                {modalDownloadAberto && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center">
-                    {/* Overlay */}
-                    <div
-                      className="fixed inset-0 bg-black bg-opacity-50"
-                      onClick={() => setModalDownloadAberto(false)}
-                    ></div>
-
-                    {/* Modal Content */}
-                    <div className="relative bg-white rounded-lg shadow-lg p-6 max-w-lg w-full mx-4">
-                      <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-semibold text-purple-800">📥 Download das Solicitações</h2>
+                      {/* Botões */}
+                      <div className="flex gap-3 pt-4">
                         <Button
-                          onClick={() => setModalDownloadAberto(false)}
                           variant="outline"
-                          size="sm"
-                          className="h-8 w-8 p-0"
+                          onClick={() => setModalDownloadAberto(false)}
+                          className="flex-1"
+                          disabled={baixandoArquivo}
                         >
-                          <X className="h-4 w-4" />
+                          Cancelar
+                        </Button>
+                        <Button
+                          onClick={gerarDownloadExcel}
+                          className="flex-1 bg-green-600 hover:bg-green-700"
+                          disabled={
+                            baixandoArquivo ||
+                            (opcoesFiltro === "periodo" && (!dataInicioDownload || !dataFimDownload))
+                          }
+                        >
+                          {baixandoArquivo ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-white mr-2"></div>
+                              Gerando...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="h-4 w-4 mr-2" />
+                              Download Excel
+                            </>
+                          )}
                         </Button>
                       </div>
-
-                      <div className="space-y-6">
-                        {/* Opções de Filtro */}
-                        <div>
-                          <Label className="text-sm font-medium text-purple-700 mb-3 block">
-                            📊 Dados para Download
-                          </Label>
-                          <div className="space-y-3">
-                            <div className="flex items-center space-x-2">
-                              <input
-                                type="radio"
-                                id="todos"
-                                name="filtro"
-                                checked={opcoesFiltro === "todos"}
-                                onChange={() => setOpcoesFiltro("todos")}
-                                className="text-purple-600"
-                              />
-                              <label htmlFor="todos" className="text-sm text-purple-700">
-                                Baixar todos os dados (ignorar filtros atuais)
-                              </label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <input
-                                type="radio"
-                                id="periodo"
-                                name="filtro"
-                                checked={opcoesFiltro === "periodo"}
-                                onChange={() => setOpcoesFiltro("periodo")}
-                                className="text-purple-600"
-                              />
-                              <label htmlFor="periodo" className="text-sm text-purple-700">
-                                Período personalizado
-                              </label>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Seletor de Período */}
-                        {opcoesFiltro === "periodo" && (
-                          <div className="bg-purple-50 p-4 rounded-lg">
-                            <Label className="text-sm font-medium text-purple-700 mb-2 block">
-                              <Calendar className="h-4 w-4 inline mr-1" />
-                              Selecionar Período
-                            </Label>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <Label className="text-xs text-purple-600">Data Início</Label>
-                                <Input
-                                  type="date"
-                                  value={dataInicioDownload}
-                                  onChange={(e) => setDataInicioDownload(e.target.value)}
-                                  className="text-sm"
-                                />
-                              </div>
-                              <div>
-                                <Label className="text-xs text-purple-600">Data Fim</Label>
-                                <Input
-                                  type="date"
-                                  value={dataFimDownload}
-                                  onChange={(e) => setDataFimDownload(e.target.value)}
-                                  className="text-sm"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Opções Extras */}
-                        <div>
-                          <Label className="text-sm font-medium text-purple-700 mb-3 block">⚙️ Opções Extras</Label>
-                          <div className="space-y-2">
-                            <div className="flex items-center space-x-2">
-                              <input
-                                type="checkbox"
-                                id="graficos"
-                                checked={incluirGraficos}
-                                onChange={(e) => setIncluirGraficos(e.target.checked)}
-                                className="text-purple-600"
-                              />
-                              <label htmlFor="graficos" className="text-sm text-purple-700">
-                                Incluir aba de estatísticas e gráficos
-                              </label>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Resumo */}
-                        <div className="bg-gray-50 p-3 rounded-lg">
-                          <Label className="text-sm font-medium text-gray-700">Resumo:</Label>
-                          <div className="text-xs text-gray-600 mt-1 space-y-1">
-                            <p>
-                              • Formato: <strong>Excel (.xlsx)</strong> formatado
-                            </p>
-                            <p>
-                              • Layout: <strong>Uma linha por prestador</strong>
-                            </p>
-                            <p>
-                              • Dados:{" "}
-                              <strong>
-                                {opcoesFiltro === "todos" ? "Todos os registros" : "Período personalizado"}
-                              </strong>
-                            </p>
-                            <p>
-                              • Estatísticas: <strong>{incluirGraficos ? "Incluídas" : "Não incluídas"}</strong>
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Botões */}
-                        <div className="flex gap-3 pt-4">
-                          <Button
-                            variant="outline"
-                            onClick={() => setModalDownloadAberto(false)}
-                            className="flex-1"
-                            disabled={baixandoArquivo}
-                          >
-                            Cancelar
-                          </Button>
-                          <Button
-                            onClick={gerarDownloadExcel}
-                            className="flex-1 bg-green-600 hover:bg-green-700"
-                            disabled={
-                              baixandoArquivo ||
-                              (opcoesFiltro === "periodo" && (!dataInicioDownload || !dataFimDownload))
-                            }
-                          >
-                            {baixandoArquivo ? (
-                              <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-white mr-2"></div>
-                                Gerando...
-                              </>
-                            ) : (
-                              <>
-                                <Download className="h-4 w-4 mr-2" />
-                                Download Excel
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </div>
                     </div>
                   </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {/* Departamento */}
-                <div>
-                  <Label className="text-sm font-medium text-purple-700 mb-2 block">Departamento</Label>
-                  <select
-                    value={filtroDepartamento}
-                    onChange={(e) => setFiltroDepartamento(e.target.value)}
-                    className="w-full p-2 border border-purple-300 rounded-md"
-                  >
-                    <option value="todos">Todos</option>
-                    {departamentos.map((dept) => (
-                      <option key={dept} value={dept}>
-                        {dept}
-                      </option>
-                    ))}
-                  </select>
                 </div>
-
-                {/* Status Checagem */}
-                <div>
-                  <Label className="text-sm font-medium text-purple-700 mb-2 block">Status Checagem</Label>
-                  <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-                    <SelectTrigger className="border-purple-300">
-                      <SelectValue placeholder="Selecione o status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todos">Todos</SelectItem>
-                      <SelectItem value="pendente">Pendente</SelectItem>
-                      <SelectItem value="aprovado">Aprovado</SelectItem>
-                      <SelectItem value="reprovado">Reprovado</SelectItem>
-                      <SelectItem value="revisar">Revisar</SelectItem>
-                      <SelectItem value="vencida">Vencida</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Status Liberação */}
-                <div>
-                  <Label className="text-sm font-medium text-purple-700 mb-2 block">Status Liberação</Label>
-                  <Select value={filtroCadastro} onValueChange={setFiltroCadastro}>
-                    <SelectTrigger className="border-purple-300">
-                      <SelectValue placeholder="Selecione o cadastro" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todos">Todos</SelectItem>
-                      <SelectItem value="pendente">Pendente</SelectItem>
-                      <SelectItem value="ok">Ok</SelectItem>
-                      <SelectItem value="urgente">Urgente</SelectItem>
-                      <SelectItem value="vencida">Vencida</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Busca Geral */}
-                <div>
-                  <Label className="text-sm font-medium text-purple-700 mb-2 block">Busca Geral</Label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-purple-400" />
-                    <Input
-                      type="text"
-                      placeholder="Nome ou documento..."
-                      value={buscaGeral}
-                      onChange={(e) => setBuscaGeral(e.target.value)}
-                      className="pl-10 border-purple-300 focus:border-purple-600 focus:ring-purple-600"
-                    />
-                  </div>
-                  {buscaGeral && <p className="text-xs text-purple-500 mt-1">{dadosFiltrados.length} resultado(s)</p>}
-                </div>
-              </div>
+              )}
             </div>
 
-            {/* Tabela */}
-            <div className="rounded-lg border border-purple-200 overflow-x-auto">
-              <Table className="min-w-full">
-                <TableHeader>
-                  <TableRow className="bg-purple-50">
-                    {colunasVisiveis.dataSolicitacao && (
-                      <TableHead className="font-semibold text-purple-800 text-center min-w-[110px] whitespace-nowrap">
-                        Data Solicitação
-                      </TableHead>
-                    )}
-                    {colunasVisiveis.prestador && (
-                      <TableHead className="font-semibold text-purple-800 text-center min-w-[160px]">
-                        Prestador
-                      </TableHead>
-                    )}
-                    {colunasVisiveis.doc1 && (
-                      <TableHead className="font-semibold text-purple-800 text-center min-w-[130px]">
-                        Doc1
-                      </TableHead>
-                    )}
-                    {colunasVisiveis.dataInicial && (
-                      <TableHead className="font-semibold text-purple-800 text-center min-w-[100px] whitespace-nowrap">
-                        Data Inicial
-                      </TableHead>
-                    )}
-                    {colunasVisiveis.dataFinal && (
-                      <TableHead className="font-semibold text-purple-800 text-center min-w-[100px] whitespace-nowrap">
-                        Data Final
-                      </TableHead>
-                    )}
-                    {colunasVisiveis.liberacao && (
-                      <TableHead className="font-semibold text-purple-800 text-center min-w-[90px]">
-                        Liberação
-                      </TableHead>
-                    )}
-                    {colunasVisiveis.checagem && (
-                      <TableHead className="font-semibold text-purple-800 text-center min-w-[100px]">
-                        Checagem
-                      </TableHead>
-                    )}
-                    {colunasVisiveis.validaAte && (
-                      <TableHead className="font-semibold text-purple-800 text-center min-w-[130px] whitespace-nowrap">
-                        Válida até
-                      </TableHead>
-                    )}
-                    {colunasVisiveis.acoes && (
-                      <TableHead className="font-semibold text-purple-800 text-center min-w-[120px]">Ações</TableHead>
-                    )}
-                    {colunasVisiveis.justificativa && (
-                      <TableHead className="font-semibold text-purple-800 text-center min-w-[200px]">
-                        Justificativa
-                      </TableHead>
-                    )}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {dadosPaginados.map(({ solicitacao, prestador, prioridade }, index) => {
-                    const prestadorIndex = solicitacao.prestadores
-                      ? solicitacao.prestadores.findIndex((p) => p.id === prestador.id)
-                      : -1
-                    const isFirstPrestadorOfSolicitacao =
-                      index === 0 || dadosPaginados[index - 1].solicitacao.id !== solicitacao.id
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {/* Departamento */}
+              <div>
+                <Label className="text-sm font-medium text-purple-700 mb-2 block">Departamento</Label>
+                <select
+                  value={filtroDepartamento}
+                  onChange={(e) => setFiltroDepartamento(e.target.value)}
+                  className="w-full p-2 border border-purple-300 rounded-md"
+                >
+                  <option value="todos">Todos</option>
+                  {departamentos.map((dept) => (
+                    <option key={dept} value={dept}>
+                      {dept}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                    return (
-                      <TableRow key={`${solicitacao.id}-${prestador.id}`} className="hover:bg-purple-50">
-                        {colunasVisiveis.dataSolicitacao && (
-                          <TableCell className="text-sm whitespace-nowrap text-center">
-                            {solicitacao.dataSolicitacao}
-                          </TableCell>
-                        )}
-                        {colunasVisiveis.prestador && (
-                          <TableCell className="text-sm text-center">
-                            <div className="whitespace-nowrap font-medium">{prestador.nome}</div>
-                          </TableCell>
-                        )}
-                        {colunasVisiveis.doc1 && (
-                          <TableCell className="text-sm text-center">
-                            <div className="text-xs font-mono whitespace-nowrap">{prestador.doc1}</div>
-                          </TableCell>
-                        )}
-                        {colunasVisiveis.dataInicial && (
-                          <TableCell className="text-sm whitespace-nowrap text-center">
-                            {prestador.checagem === "reprovado" ? (
-                              <span className="text-purple-400">-</span>
-                            ) : (
-                              solicitacao.dataInicial
-                            )}
-                          </TableCell>
-                        )}
-                        {colunasVisiveis.dataFinal && (
-                          <TableCell className="text-sm whitespace-nowrap text-center">
-                            {prestador.checagem === "reprovado" ? (
-                              <span className="text-purple-400">-</span>
-                            ) : (
-                              solicitacao.dataFinal
-                            )}
-                          </TableCell>
-                        )}
-                        {colunasVisiveis.liberacao && (
-                          <TableCell className="whitespace-nowrap text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              <StatusLiberacaoIcon status={getLiberacaoStatus(prestador, solicitacao.dataFinal)} />
-                              <StatusLiberacaoBadge status={getLiberacaoStatus(prestador, solicitacao.dataFinal)} />
-                            </div>
-                          </TableCell>
-                        )}
-                        {colunasVisiveis.checagem && (
-                          <TableCell className="text-center">
-                            <div className="flex items-center justify-center gap-2 whitespace-nowrap">
-                              <StatusChecagemIcon status={prestador.checagem} />
-                              <StatusChecagemBadge status={prestador.checagem} />
-                            </div>
-                          </TableCell>
-                        )}
-                        {colunasVisiveis.validaAte && (
-                          <TableCell className="text-sm whitespace-nowrap text-center">
-                            {prestador.checagemValidaAte ? (
-                              <span>{formatarDataParaBR(prestador.checagemValidaAte)}</span>
-                            ) : (
-                              <span className="text-purple-400">-</span>
-                            )}
-                          </TableCell>
-                        )}
-                        {colunasVisiveis.acoes && (
-                          <TableCell>
-                            <div className="flex items-center justify-center gap-1 relative">
-                              <div className="relative">
-                                <Button
-                                  onClick={() => iniciarEdicao(solicitacao, prestador)}
-                                  variant="outline"
-                                  size="sm"
-                                  className="border-purple-600 text-purple-600 hover:bg-purple-50 h-7 w-7 p-0"
-                                >
-                                  <Edit className="h-3 w-3" />
-                                </Button>
+              {/* Status Checagem */}
+              <div>
+                <Label className="text-sm font-medium text-purple-700 mb-2 block">Status Checagem</Label>
+                <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                  <SelectTrigger className="border-purple-300">
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="pendente">Pendente</SelectItem>
+                    <SelectItem value="aprovado">Aprovado</SelectItem>
+                    <SelectItem value="reprovado">Reprovado</SelectItem>
+                    <SelectItem value="revisar">Revisar</SelectItem>
+                    <SelectItem value="vencida">Vencida</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-                                {/* Modal de Edição */}
-                                {prestadorEditando === prestador.id && (
-                                  <div className="fixed inset-0 z-50 flex items-center justify-center">
-                                    {/* Overlay */}
-                                    <div
-                                      className="fixed inset-0 bg-black bg-opacity-50"
-                                      onClick={cancelarEdicao}
-                                    ></div>
+              {/* Status Liberação */}
+              <div>
+                <Label className="text-sm font-medium text-purple-700 mb-2 block">Status Liberação</Label>
+                <Select value={filtroCadastro} onValueChange={setFiltroCadastro}>
+                  <SelectTrigger className="border-purple-300">
+                    <SelectValue placeholder="Selecione o cadastro" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="pendente">Pendente</SelectItem>
+                    <SelectItem value="ok">Ok</SelectItem>
+                    <SelectItem value="urgente">Urgente</SelectItem>
+                    <SelectItem value="vencida">Vencida</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-                                    {/* Modal Content */}
-                                    <div className="relative bg-white rounded-lg shadow-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-                                      <div className="flex items-center justify-between mb-4">
-                                        <h2 className="text-lg font-semibold text-purple-800">
-                                          ✏️ Editar Prestador: {prestador.nome}
-                                        </h2>
-                                        <Button
-                                          onClick={cancelarEdicao}
-                                          variant="outline"
-                                          size="sm"
-                                          className="h-8 w-8 p-0"
-                                        >
-                                          <X className="h-4 w-4" />
-                                        </Button>
-                                      </div>
+              {/* Busca Geral */}
+              <div>
+                <Label className="text-sm font-medium text-purple-700 mb-2 block">Busca Geral</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-purple-400" />
+                  <Input
+                    type="text"
+                    placeholder="Nome ou documento..."
+                    value={buscaGeral}
+                    onChange={(e) => setBuscaGeral(e.target.value)}
+                    className="pl-10 border-purple-300 focus:border-purple-600 focus:ring-purple-600"
+                  />
+                </div>
+                {buscaGeral && <p className="text-xs text-purple-500 mt-1">{dadosFiltrados.length} resultado(s)</p>}
+              </div>
+            </div>
+          </div>
 
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {/* Dados do Prestador */}
-                                        <div className="space-y-3">
-                                          <h3 className="font-medium text-purple-700 border-b pb-1">
-                                            👤 Dados do Prestador
-                                          </h3>
+          {/* Tabela */}
+          <div className="rounded-lg border border-purple-200 overflow-x-auto">
+            <Table className="min-w-full">
+              <TableHeader>
+                <TableRow className="bg-purple-50">
+                  {colunasVisiveis.dataSolicitacao && (
+                    <TableHead className="font-semibold text-purple-800 text-center min-w-[110px] whitespace-nowrap">
+                      Data Solicitação
+                    </TableHead>
+                  )}
+                  {colunasVisiveis.prestador && (
+                    <TableHead className="font-semibold text-purple-800 text-center min-w-[160px]">
+                      Prestador
+                    </TableHead>
+                  )}
+                  {colunasVisiveis.doc1 && (
+                    <TableHead className="font-semibold text-purple-800 text-center min-w-[130px]">
+                      Doc1
+                    </TableHead>
+                  )}
+                  {colunasVisiveis.dataInicial && (
+                    <TableHead className="font-semibold text-purple-800 text-center min-w-[100px] whitespace-nowrap">
+                      Data Inicial
+                    </TableHead>
+                  )}
+                  {colunasVisiveis.dataFinal && (
+                    <TableHead className="font-semibold text-purple-800 text-center min-w-[100px] whitespace-nowrap">
+                      Data Final
+                    </TableHead>
+                  )}
+                  {colunasVisiveis.liberacao && (
+                    <TableHead className="font-semibold text-purple-800 text-center min-w-[90px]">
+                      Liberação
+                    </TableHead>
+                  )}
+                  {colunasVisiveis.checagem && (
+                    <TableHead className="font-semibold text-purple-800 text-center min-w-[100px]">
+                      Checagem
+                    </TableHead>
+                  )}
+                  {colunasVisiveis.validaAte && (
+                    <TableHead className="font-semibold text-purple-800 text-center min-w-[130px] whitespace-nowrap">
+                      Válida até
+                    </TableHead>
+                  )}
+                  {colunasVisiveis.acoes && (
+                    <TableHead className="font-semibold text-purple-800 text-center min-w-[120px]">Ações</TableHead>
+                  )}
+                  {colunasVisiveis.justificativa && (
+                    <TableHead className="font-semibold text-purple-800 text-center min-w-[200px]">
+                      Justificativa
+                    </TableHead>
+                  )}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {dadosPaginados.map(({ solicitacao, prestador, prioridade }, index) => {
+                  const prestadorIndex = solicitacao.prestadores
+                    ? solicitacao.prestadores.findIndex((p) => p.id === prestador.id)
+                    : -1
+                  const isFirstPrestadorOfSolicitacao =
+                    index === 0 || dadosPaginados[index - 1].solicitacao.id !== solicitacao.id
 
-                                          <div>
-                                            <Label className="text-xs text-purple-600">Nome</Label>
-                                            <Input
-                                              value={dadosEdicao.nome || ""}
-                                              onChange={(e) =>
-                                                setDadosEdicao((prev: any) => ({ ...prev, nome: e.target.value }))
-                                              }
-                                              className="text-sm"
-                                            />
-                                          </div>
+                  return (
+                    <TableRow key={`${solicitacao.id}-${prestador.id}`} className="hover:bg-purple-50">
+                      {colunasVisiveis.dataSolicitacao && (
+                        <TableCell className="text-sm whitespace-nowrap text-center">
+                          {solicitacao.dataSolicitacao}
+                        </TableCell>
+                      )}
+                      {colunasVisiveis.prestador && (
+                        <TableCell className="text-sm text-center">
+                          <div className="whitespace-nowrap font-medium">{prestador.nome}</div>
+                        </TableCell>
+                      )}
+                      {colunasVisiveis.doc1 && (
+                        <TableCell className="text-sm text-center">
+                          <div className="text-xs font-mono whitespace-nowrap">{prestador.doc1}</div>
+                        </TableCell>
+                      )}
+                      {colunasVisiveis.dataInicial && (
+                        <TableCell className="text-sm whitespace-nowrap text-center">
+                          {prestador.checagem === "reprovado" ? (
+                            <span className="text-purple-400">-</span>
+                          ) : (
+                            solicitacao.dataInicial
+                          )}
+                        </TableCell>
+                      )}
+                      {colunasVisiveis.dataFinal && (
+                        <TableCell className="text-sm whitespace-nowrap text-center">
+                          {prestador.checagem === "reprovado" ? (
+                            <span className="text-purple-400">-</span>
+                          ) : (
+                            solicitacao.dataFinal
+                          )}
+                        </TableCell>
+                      )}
+                      {colunasVisiveis.liberacao && (
+                        <TableCell className="whitespace-nowrap text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <StatusLiberacaoIcon status={getLiberacaoStatus(prestador, solicitacao.dataFinal)} />
+                            <StatusLiberacaoBadge status={getLiberacaoStatus(prestador, solicitacao.dataFinal)} />
+                          </div>
+                        </TableCell>
+                      )}
+                      {colunasVisiveis.checagem && (
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-2 whitespace-nowrap">
+                            <StatusChecagemIcon status={prestador.checagem} />
+                            <StatusChecagemBadge status={prestador.checagem} />
+                          </div>
+                        </TableCell>
+                      )}
+                      {colunasVisiveis.validaAte && (
+                        <TableCell className="text-sm whitespace-nowrap text-center">
+                          {prestador.checagemValidaAte ? (
+                            <span>{formatarDataParaBR(prestador.checagemValidaAte)}</span>
+                          ) : (
+                            <span className="text-purple-400">-</span>
+                          )}
+                        </TableCell>
+                      )}
+                      {colunasVisiveis.acoes && (
+                        <TableCell>
+                          <div className="flex items-center justify-center gap-1 relative">
+                            <div className="relative">
+                              <Button
+                                onClick={() => iniciarEdicao(solicitacao, prestador)}
+                                variant="outline"
+                                size="sm"
+                                className="border-purple-600 text-purple-600 hover:bg-purple-50 h-7 w-7 p-0"
+                              >
+                                <Edit className="h-3 w-3" />
+                              </Button>
 
-                                          <div>
-                                            <Label className="text-xs text-purple-600">Doc1</Label>
-                                            <Input
-                                              value={dadosEdicao.doc1 || ""}
-                                              onChange={(e) =>
-                                                setDadosEdicao((prev: any) => ({ ...prev, doc1: e.target.value }))
-                                              }
-                                              className="text-sm"
-                                            />
-                                          </div>
+                              {/* Modal de Edição */}
+                              {prestadorEditando === prestador.id && (
+                                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                                  {/* Overlay */}
+                                  <div
+                                    className="fixed inset-0 bg-black bg-opacity-50"
+                                    onClick={cancelarEdicao}
+                                  ></div>
 
-                                          <div>
-                                            <Label className="text-xs text-purple-600">Doc2</Label>
-                                            <Input
-                                              value={dadosEdicao.doc2 || ""}
-                                              onChange={(e) =>
-                                                setDadosEdicao((prev: any) => ({ ...prev, doc2: e.target.value }))
-                                              }
-                                              className="text-sm"
-                                            />
-                                          </div>
+                                  {/* Modal Content */}
+                                  <div className="relative bg-white rounded-lg shadow-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                                    <div className="flex items-center justify-between mb-4">
+                                      <h2 className="text-lg font-semibold text-purple-800">
+                                        ✏️ Editar Prestador: {prestador.nome}
+                                      </h2>
+                                      <Button
+                                        onClick={cancelarEdicao}
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </div>
 
-                                          <div>
-                                            <Label className="text-xs text-purple-600">Empresa</Label>
-                                            <Input
-                                              value={dadosEdicao.empresa || ""}
-                                              onChange={(e) =>
-                                                setDadosEdicao((prev: any) => ({ ...prev, empresa: e.target.value }))
-                                              }
-                                              className="text-sm"
-                                            />
-                                          </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      {/* Dados do Prestador */}
+                                      <div className="space-y-3">
+                                        <h3 className="font-medium text-purple-700 border-b pb-1">
+                                          👤 Dados do Prestador
+                                        </h3>
 
-                                          <div>
-                                            <Label className="text-xs text-purple-600">Checagem</Label>
-                                            <select
-                                              value={dadosEdicao.checagem || ""}
-                                              onChange={(e) =>
-                                                setDadosEdicao((prev: any) => ({ ...prev, checagem: e.target.value }))
-                                              }
-                                              className="w-full p-2 border border-purple-300 rounded-md text-sm"
-                                            >
-                                              <option value="pendente">Pendente</option>
-                                              <option value="aprovado">Aprovado</option>
-                                              <option value="reprovado">Reprovado</option>
-                                              <option value="excecao">Exceção</option>
-                                            </select>
-                                          </div>
-
-                                          <div>
-                                            <Label className="text-xs text-purple-600">Liberação</Label>
-                                            <select
-                                              value={dadosEdicao.liberacao || ""}
-                                              onChange={(e) =>
-                                                setDadosEdicao((prev: any) => ({ ...prev, liberacao: e.target.value }))
-                                              }
-                                              className="w-full p-2 border border-purple-300 rounded-md text-sm"
-                                            >
-                                              <option value="pendente">Pendente</option>
-                                              <option value="ok">Ok</option>
-                                              <option value="urgente">Urgente</option>
-                                            </select>
-                                          </div>
-
-                                          <div>
-                                            <Label className="text-xs text-purple-600">Checagem Válida Até</Label>
-                                            <Input
-                                              type="date"
-                                              value={dadosEdicao.checagemValidaAte || ""}
-                                              onChange={(e) =>
-                                                setDadosEdicao((prev: any) => ({
-                                                  ...prev,
-                                                  checagemValidaAte: e.target.value,
-                                                }))
-                                              }
-                                              className="text-sm"
-                                            />
-                                          </div>
-                                        </div>
-
-                                        {/* Dados da Solicitação */}
-                                        <div className="space-y-3">
-                                          <h3 className="font-medium text-purple-700 border-b pb-1">
-                                            📋 Dados da Solicitação
-                                          </h3>
-
-                                          <div>
-                                            <Label className="text-xs text-purple-600">Data Solicitação</Label>
-                                            <Input
-                                              type="date"
-                                              value={dadosEdicao.dataSolicitacao || ""}
-                                              onChange={(e) =>
-                                                setDadosEdicao((prev: any) => ({ ...prev, dataSolicitacao: e.target.value }))
-                                              }
-                                              className="text-sm"
-                                            />
-                                          </div>
-
-                                          <div>
-                                            <Label className="text-xs text-purple-600">Solicitante</Label>
-                                            <Input
-                                              value={dadosEdicao.solicitante || ""}
-                                              onChange={(e) =>
-                                                setDadosEdicao((prev: any) => ({ ...prev, solicitante: e.target.value }))
-                                              }
-                                              className="text-sm"
-                                            />
-                                          </div>
-
-                                          <div>
-                                            <Label className="text-xs text-purple-600">Departamento</Label>
-                                            <Input
-                                              value={dadosEdicao.departamento || ""}
-                                              onChange={(e) =>
-                                                setDadosEdicao((prev: any) => ({ ...prev, departamento: e.target.value }))
-                                              }
-                                              className="text-sm"
-                                            />
-                                          </div>
-
-                                          <div>
-                                            <Label className="text-xs text-purple-600">Local</Label>
-                                            <Input
-                                              value={dadosEdicao.local || ""}
-                                              onChange={(e) =>
-                                                setDadosEdicao((prev: any) => ({ ...prev, local: e.target.value }))
-                                              }
-                                              className="text-sm"
-                                            />
-                                          </div>
-
-                                          <div>
-                                            <Label className="text-xs text-purple-600">Empresa Geral</Label>
-                                            <Input
-                                              value={dadosEdicao.empresaGeral || ""}
-                                              onChange={(e) =>
-                                                setDadosEdicao((prev: any) => ({ ...prev, empresaGeral: e.target.value }))
-                                              }
-                                              className="text-sm"
-                                            />
-                                          </div>
-
-                                          <div>
-                                            <Label className="text-xs text-purple-600">Data Inicial</Label>
-                                            <Input
-                                              type="date"
-                                              value={dadosEdicao.dataInicial || ""}
-                                              onChange={(e) =>
-                                                setDadosEdicao((prev: any) => ({ ...prev, dataInicial: e.target.value }))
-                                              }
-                                              className="text-sm"
-                                            />
-                                          </div>
-
-                                          <div>
-                                            <Label className="text-xs text-purple-600">Data Final</Label>
-                                            <Input
-                                              type="date"
-                                              value={dadosEdicao.dataFinal || ""}
-                                              onChange={(e) =>
-                                                setDadosEdicao((prev: any) => ({ ...prev, dataFinal: e.target.value }))
-                                              }
-                                              className="text-sm"
-                                            />
-                                          </div>
-                                        </div>
-
-                                        {/* Justificativa - Largura completa */}
-                                        <div className="md:col-span-2">
-                                          <Label className="text-xs text-purple-600">Justificativa</Label>
-                                          <Textarea
-                                            value={dadosEdicao.justificativa || ""}
+                                        <div>
+                                          <Label className="text-xs text-purple-600">Nome</Label>
+                                          <Input
+                                            value={dadosEdicao.nome || ""}
                                             onChange={(e) =>
-                                              setDadosEdicao((prev: any) => ({ ...prev, justificativa: e.target.value }))
+                                              setDadosEdicao((prev: any) => ({ ...prev, nome: e.target.value }))
                                             }
                                             className="text-sm"
-                                            rows={3}
-                                            placeholder="Observações, justificativas..."
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <Label className="text-xs text-purple-600">Doc1</Label>
+                                          <Input
+                                            value={dadosEdicao.doc1 || ""}
+                                            onChange={(e) =>
+                                              setDadosEdicao((prev: any) => ({ ...prev, doc1: e.target.value }))
+                                            }
+                                            className="text-sm"
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <Label className="text-xs text-purple-600">Doc2</Label>
+                                          <Input
+                                            value={dadosEdicao.doc2 || ""}
+                                            onChange={(e) =>
+                                              setDadosEdicao((prev: any) => ({ ...prev, doc2: e.target.value }))
+                                            }
+                                            className="text-sm"
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <Label className="text-xs text-purple-600">Empresa</Label>
+                                          <Input
+                                            value={dadosEdicao.empresa || ""}
+                                            onChange={(e) =>
+                                              setDadosEdicao((prev: any) => ({ ...prev, empresa: e.target.value }))
+                                            }
+                                            className="text-sm"
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <Label className="text-xs text-purple-600">Checagem</Label>
+                                          <select
+                                            value={dadosEdicao.checagem || ""}
+                                            onChange={(e) =>
+                                              setDadosEdicao((prev: any) => ({ ...prev, checagem: e.target.value }))
+                                            }
+                                            className="w-full p-2 border border-purple-300 rounded-md text-sm"
+                                          >
+                                            <option value="pendente">Pendente</option>
+                                            <option value="aprovado">Aprovado</option>
+                                            <option value="reprovado">Reprovado</option>
+                                            <option value="excecao">Exceção</option>
+                                          </select>
+                                        </div>
+
+                                        <div>
+                                          <Label className="text-xs text-purple-600">Liberação</Label>
+                                          <select
+                                            value={dadosEdicao.liberacao || ""}
+                                            onChange={(e) =>
+                                              setDadosEdicao((prev: any) => ({ ...prev, liberacao: e.target.value }))
+                                            }
+                                            className="w-full p-2 border border-purple-300 rounded-md text-sm"
+                                          >
+                                            <option value="pendente">Pendente</option>
+                                            <option value="ok">Ok</option>
+                                            <option value="urgente">Urgente</option>
+                                          </select>
+                                        </div>
+
+                                        <div>
+                                          <Label className="text-xs text-purple-600">Checagem Válida Até</Label>
+                                          <Input
+                                            type="date"
+                                            value={dadosEdicao.checagemValidaAte || ""}
+                                            onChange={(e) =>
+                                              setDadosEdicao((prev: any) => ({
+                                                ...prev,
+                                                checagemValidaAte: e.target.value,
+                                              }))
+                                            }
+                                            className="text-sm"
                                           />
                                         </div>
                                       </div>
 
-                                      {/* Botões */}
-                                      <div className="flex justify-end gap-2 mt-6 pt-4 border-t">
-                                        <Button
-                                          onClick={cancelarEdicao}
-                                          variant="outline"
-                                          size="sm"
-                                          className="border-gray-300 text-gray-600"
-                                        >
-                                          <X className="h-3 w-3 mr-1" />
-                                          Cancelar
-                                        </Button>
-                                        <Button
-                                          onClick={() => salvarEdicao(solicitacao, prestador)}
-                                          disabled={salvandoEdicao}
-                                          size="sm"
-                                          className="bg-green-600 hover:bg-green-700 text-white"
-                                        >
-                                          {salvandoEdicao ? (
-                                            <>
-                                              <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-white mr-1"></div>
-                                              Salvando...
-                                            </>
-                                          ) : (
-                                            <>
-                                              <Save className="h-3 w-3 mr-1" />
-                                              Salvar
-                                            </>
-                                          )}
-                                        </Button>
+                                      {/* Dados da Solicitação */}
+                                      <div className="space-y-3">
+                                        <h3 className="font-medium text-purple-700 border-b pb-1">
+                                          📋 Dados da Solicitação
+                                        </h3>
+
+                                        <div>
+                                          <Label className="text-xs text-purple-600">Data Solicitação</Label>
+                                          <Input
+                                            type="date"
+                                            value={dadosEdicao.dataSolicitacao || ""}
+                                            onChange={(e) =>
+                                              setDadosEdicao((prev: any) => ({ ...prev, dataSolicitacao: e.target.value }))
+                                            }
+                                            className="text-sm"
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <Label className="text-xs text-purple-600">Solicitante</Label>
+                                          <Input
+                                            value={dadosEdicao.solicitante || ""}
+                                            onChange={(e) =>
+                                              setDadosEdicao((prev: any) => ({ ...prev, solicitante: e.target.value }))
+                                            }
+                                            className="text-sm"
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <Label className="text-xs text-purple-600">Departamento</Label>
+                                          <Input
+                                            value={dadosEdicao.departamento || ""}
+                                            onChange={(e) =>
+                                              setDadosEdicao((prev: any) => ({ ...prev, departamento: e.target.value }))
+                                            }
+                                            className="text-sm"
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <Label className="text-xs text-purple-600">Local</Label>
+                                          <Input
+                                            value={dadosEdicao.local || ""}
+                                            onChange={(e) =>
+                                              setDadosEdicao((prev: any) => ({ ...prev, local: e.target.value }))
+                                            }
+                                            className="text-sm"
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <Label className="text-xs text-purple-600">Empresa Geral</Label>
+                                          <Input
+                                            value={dadosEdicao.empresaGeral || ""}
+                                            onChange={(e) =>
+                                              setDadosEdicao((prev: any) => ({ ...prev, empresaGeral: e.target.value }))
+                                            }
+                                            className="text-sm"
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <Label className="text-xs text-purple-600">Data Inicial</Label>
+                                          <Input
+                                            type="date"
+                                            value={dadosEdicao.dataInicial || ""}
+                                            onChange={(e) =>
+                                              setDadosEdicao((prev: any) => ({ ...prev, dataInicial: e.target.value }))
+                                            }
+                                            className="text-sm"
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <Label className="text-xs text-purple-600">Data Final</Label>
+                                          <Input
+                                            type="date"
+                                            value={dadosEdicao.dataFinal || ""}
+                                            onChange={(e) =>
+                                              setDadosEdicao((prev: any) => ({ ...prev, dataFinal: e.target.value }))
+                                            }
+                                            className="text-sm"
+                                          />
+                                        </div>
+                                      </div>
+
+                                      {/* Justificativa - Largura completa */}
+                                      <div className="md:col-span-2">
+                                        <Label className="text-xs text-purple-600">Justificativa</Label>
+                                        <Textarea
+                                          value={dadosEdicao.justificativa || ""}
+                                          onChange={(e) =>
+                                            setDadosEdicao((prev: any) => ({ ...prev, justificativa: e.target.value }))
+                                          }
+                                          className="text-sm"
+                                          rows={3}
+                                          placeholder="Observações, justificativas..."
+                                        />
                                       </div>
                                     </div>
-                                  </div>
-                                )}
-                              </div>
 
-                              {/* Mensagem de sucesso */}
-                              {mensagemSucesso === prestador.id && (
-                                <div className="absolute top-8 right-0 z-40 bg-green-100 border border-green-200 rounded-lg p-2 text-xs text-green-700">
-                                  ✅ Dados atualizados!
+                                    {/* Botões */}
+                                    <div className="flex justify-end gap-2 mt-6 pt-4 border-t">
+                                      <Button
+                                        onClick={cancelarEdicao}
+                                        variant="outline"
+                                        size="sm"
+                                        className="border-gray-300 text-gray-600"
+                                      >
+                                        <X className="h-3 w-3 mr-1" />
+                                        Cancelar
+                                      </Button>
+                                      <Button
+                                        onClick={() => salvarEdicao(solicitacao, prestador)}
+                                        disabled={salvandoEdicao}
+                                        size="sm"
+                                        className="bg-green-600 hover:bg-green-700 text-white"
+                                      >
+                                        {salvandoEdicao ? (
+                                          <>
+                                            <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-white mr-1"></div>
+                                            Salvando...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Save className="h-3 w-3 mr-1" />
+                                            Salvar
+                                          </>
+                                        )}
+                                      </Button>
+                                    </div>
+                                  </div>
                                 </div>
                               )}
                             </div>
-                          </TableCell>
-                        )}
-                        {colunasVisiveis.justificativa && (
-                          <TableCell className="text-sm text-center">
-                            {prestador.justificativa ? (
-                              <div className="max-w-xs truncate" title={prestador.justificativa}>
-                                {prestador.justificativa}
+
+                            {/* Mensagem de sucesso */}
+                            {mensagemSucesso === prestador.id && (
+                              <div className="absolute top-8 right-0 z-40 bg-green-100 border border-green-200 rounded-lg p-2 text-xs text-green-700">
+                                ✅ Dados atualizados!
                               </div>
-                            ) : null}
-                          </TableCell>
-                        )}
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
+                      {colunasVisiveis.justificativa && (
+                        <TableCell className="text-sm text-center">
+                          {prestador.justificativa ? (
+                            <div className="max-w-xs truncate" title={prestador.justificativa}>
+                              {prestador.justificativa}
+                            </div>
+                          ) : null}
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Controles de Paginação */}
+          <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-purple-600">
+              <strong>
+                Página {paginaAtual} de {totalPaginas}
+              </strong>{" "}
+              | Mostrando {indiceInicio + 1}-{Math.min(indiceFim, totalItens)} de {totalItens} prestadores
             </div>
 
-            {/* Controles de Paginação */}
-            <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-sm text-purple-600">
-                <strong>
-                  Página {paginaAtual} de {totalPaginas}
-                </strong>{" "}
-                | Mostrando {indiceInicio + 1}-{Math.min(indiceFim, totalItens)} de {totalItens} prestadores
-              </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => irParaPagina(1)}
+                disabled={paginaAtual === 1}
+                variant="outline"
+                size="sm"
+                className="border-purple-600 text-purple-600 disabled:opacity-50"
+              >
+                ⏮️ Primeira
+              </Button>
+              <Button
+                onClick={() => irParaPagina(paginaAtual - 1)}
+                disabled={paginaAtual === 1}
+                variant="outline"
+                size="sm"
+                className="border-purple-600 text-purple-600 disabled:opacity-50"
+              >
+                ⬅️ Anterior
+              </Button>
 
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={() => irParaPagina(1)}
-                  disabled={paginaAtual === 1}
-                  variant="outline"
-                  size="sm"
-                  className="border-purple-600 text-purple-600 disabled:opacity-50"
-                >
-                  ⏮️ Primeira
-                </Button>
-                <Button
-                  onClick={() => irParaPagina(paginaAtual - 1)}
-                  disabled={paginaAtual === 1}
-                  variant="outline"
-                  size="sm"
-                  className="border-purple-600 text-purple-600 disabled:opacity-50"
-                >
-                  ⬅️ Anterior
-                </Button>
+              <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded text-sm font-medium">
+                {paginaAtual}
+              </span>
 
-                <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded text-sm font-medium">
-                  {paginaAtual}
-                </span>
-
-                <Button
-                  onClick={() => irParaPagina(paginaAtual + 1)}
-                  disabled={paginaAtual === totalPaginas}
-                  variant="outline"
-                  size="sm"
-                  className="border-purple-600 text-purple-600 disabled:opacity-50"
-                >
-                  Próxima ➡️
-                </Button>
-                <Button
-                  onClick={() => irParaPagina(totalPaginas)}
-                  disabled={paginaAtual === totalPaginas}
-                  variant="outline"
-                  size="sm"
-                  className="border-purple-600 text-purple-600 disabled:opacity-50"
-                >
-                  Última ⏭️
-                </Button>
-              </div>
+              <Button
+                onClick={() => irParaPagina(paginaAtual + 1)}
+                disabled={paginaAtual === totalPaginas}
+                variant="outline"
+                size="sm"
+                className="border-purple-600 text-purple-600 disabled:opacity-50"
+              >
+                Próxima ➡️
+              </Button>
+              <Button
+                onClick={() => irParaPagina(totalPaginas)}
+                disabled={paginaAtual === totalPaginas}
+                variant="outline"
+                size="sm"
+                className="border-purple-600 text-purple-600 disabled:opacity-50"
+              >
+                Última ⏭️
+              </Button>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -72,7 +72,8 @@ export default function RelatorioModal({
           if (filtroTipo === "economia") {
             tipoMatch = s.economia === "economia1" || s.economia === "economia2"
           } else if (filtroTipo === "urgente") {
-            tipoMatch = s.prestadores.some((p) => p.cadastro === "urgente")
+            const pFiltrados = s.prestadores.filter((p: any) => p.liberacao === "urgente")
+            tipoMatch = pFiltrados.length > 0
           }
 
           // Filtro por data se especificado
@@ -138,8 +139,8 @@ export default function RelatorioModal({
 
           // Adicionar dados reais fielmente
           dadosRelatorio.forEach((s) => {
-            s.prestadores.forEach((prestador) => {
-              const statusFormatado = prestador.status.charAt(0).toUpperCase() + prestador.status.slice(1)
+            s.prestadores.forEach((prestador: any) => {
+              const statusFormatado = (prestador.checagem || "pendente").charAt(0).toUpperCase() + (prestador.checagem || "pendente").slice(1)
               const tipoEconomia =
                 s.economia === "economia1" ? "Checagem Válida" : s.economia === "economia2" ? "Data Extrapolada" : "-"
 
@@ -156,7 +157,7 @@ export default function RelatorioModal({
           <td class="data">${s.local}</td>
           <td class="data">${s.empresa}</td>
           <td class="data">${prestador.nome}</td>
-          <td class="data">${prestador.documento}</td>
+          <td class="data">${prestador.doc1 || "-"}</td>
           <td class="data">${s.dataInicial}</td>
           <td class="data">${s.dataFinal}</td>
           <td class="data">${statusFormatado}</td>
@@ -186,7 +187,7 @@ export default function RelatorioModal({
 `
 
           // Calcular resumo por departamento
-          const resumoPorDepartamento = {}
+          const resumoPorDepartamento: Record<string, { prestadores: number, custo: number, economia: number }> = {}
           dadosRelatorio.forEach((s) => {
             if (!resumoPorDepartamento[s.departamento]) {
               resumoPorDepartamento[s.departamento] = {
@@ -254,14 +255,14 @@ export default function RelatorioModal({
 
           alert(
             `✅ Relatório Excel gerado com sucesso!\n\n` +
-              `📊 ${totalSolicitacoes} solicitações encontradas\n` +
-              `👥 ${totalPrestadores} prestadores analisados\n` +
-              `💰 R$ ${totalCustos.toFixed(2)} em custos\n` +
-              `💚 R$ ${totalEconomias.toFixed(2)} em economias\n` +
-              `📈 Saldo: R$ ${(totalEconomias - totalCustos).toFixed(2)}\n\n` +
-              `📁 Relatório com duas seções:\n` +
-              `• Dados detalhados por prestador\n` +
-              `• Resumo consolidado por departamento`,
+            `📊 ${totalSolicitacoes} solicitações encontradas\n` +
+            `👥 ${totalPrestadores} prestadores analisados\n` +
+            `💰 R$ ${totalCustos.toFixed(2)} em custos\n` +
+            `💚 R$ ${totalEconomias.toFixed(2)} em economias\n` +
+            `📈 Saldo: R$ ${(totalEconomias - totalCustos).toFixed(2)}\n\n` +
+            `📁 Relatório com duas seções:\n` +
+            `• Dados detalhados por prestador\n` +
+            `• Resumo consolidado por departamento`,
           )
         } else {
           alert("Funcionalidade PDF será implementada em breve. Use Excel por enquanto.")

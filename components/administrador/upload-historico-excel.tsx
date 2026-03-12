@@ -5,7 +5,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Loader2, RefreshCw, CheckCircle2 } from "lucide-react"
 
-export default function UploadHistoricoExcel() {
+interface UploadHistoricoExcelProps {
+  onUploadCompleto?: () => void
+}
+
+export default function UploadHistoricoExcel({ onUploadCompleto }: UploadHistoricoExcelProps) {
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -21,7 +25,7 @@ export default function UploadHistoricoExcel() {
   const PREDEFINED_ORDER = [
     "Data",
     "Cliente",
-    "Nome / Documento (sem ponto)",
+    "Nome / Doc1 (sem ponto)",
     "A Sim/Não",
     "A Empresa",
     "# Q",
@@ -149,7 +153,7 @@ export default function UploadHistoricoExcel() {
   const splitRowsByName = (records: any[], nomeColumnName: string) => {
     const newRecords: any[] = [];
 
-    // Helper to detect if a string is likely just a document number (formatted or unformatted)
+    // Helper to detect if a string is likely just a Doc1 number (formatted or unformatted)
     const isLikelyDocument = (text: string) => {
       const clean = text.trim();
       // Allow RG chars: digits, ., -, spaces, and X/x at end.
@@ -217,8 +221,8 @@ export default function UploadHistoricoExcel() {
     return newRecords;
   }
 
-  // Helper to format Name/Document
-  const formatNomeDocumento = (value: string) => {
+  // Helper to format Name/Doc1
+  const formatNomeDoc1 = (value: string) => {
     if (!value) return ''
     let text = String(value)
 
@@ -235,7 +239,7 @@ export default function UploadHistoricoExcel() {
   }
 
   const DATE_COLUMNS = ["Data", "Data Inicial do Acesso", "Data Final do Acesso", "Validade"]
-  const NOME_COLUMN = "Nome / Documento (sem ponto)"
+  const NOME_COLUMN = "Nome / Doc1 (sem ponto)"
   const CHECK_COLUMN = "A Sim/Não" // Needs to match exact Airtable column name for boolean check
 
   return (
@@ -330,7 +334,7 @@ export default function UploadHistoricoExcel() {
                                 if (isDate) {
                                   content = formatDate(strContent);
                                 } else if (isName) {
-                                  content = formatNomeDocumento(strContent);
+                                  content = formatNomeDoc1(strContent);
                                 }
                               }
                             } else {

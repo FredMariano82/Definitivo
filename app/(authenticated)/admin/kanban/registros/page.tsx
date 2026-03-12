@@ -88,13 +88,13 @@ export default function LivroRegistrosPage() {
   }
 
   const filteredTarefas = tarefas.filter(tarefa => {
-    const matchesSearch = 
+    const matchesSearch =
       tarefa.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tarefa.descricao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tarefa.created_by_name?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesCategoria = categoriaFilter === "todas" || tarefa.categoria === categoriaFilter;
-    
+
     return matchesSearch && matchesCategoria;
   })
 
@@ -119,7 +119,7 @@ export default function LivroRegistrosPage() {
 
       const { error } = await supabase
         .from('kanban_tarefas')
-        .update({ 
+        .update({
           dados_especificos: novosDadosEspecificos,
           updated_at: new Date().toISOString()
         })
@@ -127,14 +127,14 @@ export default function LivroRegistrosPage() {
 
       if (error) throw error
 
-      setTarefas(tarefas.map(t => 
-        t.id === tarefaId 
+      setTarefas(tarefas.map(t =>
+        t.id === tarefaId
           ? { ...t, dados_especificos: novosDadosEspecificos, updated_at: new Date().toISOString() }
           : t
       ))
-      
+
       if (tarefaSelecionada?.id === tarefaId) {
-         setTarefaSelecionada({ ...tarefa, dados_especificos: novosDadosEspecificos, updated_at: new Date().toISOString() })
+        setTarefaSelecionada({ ...tarefa, dados_especificos: novosDadosEspecificos, updated_at: new Date().toISOString() })
       }
 
     } catch (error) {
@@ -161,7 +161,7 @@ export default function LivroRegistrosPage() {
             className="pl-9 bg-background"
           />
         </div>
-        
+
         <Select value={categoriaFilter} onValueChange={setCategoriaFilter}>
           <SelectTrigger className="w-[200px] bg-background">
             <SelectValue placeholder="Todas as Categorias" />
@@ -184,6 +184,8 @@ export default function LivroRegistrosPage() {
             <TableRow>
               <TableHead>Título</TableHead>
               <TableHead>Categoria</TableHead>
+              <TableHead>Ocorrência</TableHead>
+              <TableHead>Solicitação</TableHead>
               <TableHead>Desfecho</TableHead>
               <TableHead>Criado Por</TableHead>
               <TableHead>Arquivado Em</TableHead>
@@ -192,34 +194,50 @@ export default function LivroRegistrosPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center h-24 text-muted-foreground">
                   Carregando registros...
                 </TableCell>
               </TableRow>
             ) : filteredTarefas.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center h-24 text-muted-foreground">
                   Nenhum registro encontrado.
                 </TableCell>
               </TableRow>
             ) : (
               filteredTarefas.map((tarefa) => (
-                <TableRow 
-                  key={tarefa.id} 
+                <TableRow
+                  key={tarefa.id}
                   className="cursor-pointer hover:bg-muted/50 transition-colors"
                   onClick={() => handleRowClick(tarefa)}
                 >
                   <TableCell className="font-medium">{tarefa.titulo}</TableCell>
                   <TableCell>{getCategoriaBadge(tarefa.categoria)}</TableCell>
+                  <TableCell className="text-xs whitespace-nowrap">
+                    {(() => {
+                      const dataOcorrencia = tarefa.categoria === 'imagem'
+                        ? tarefa.dados_especificos?.data_hora_evento
+                        : tarefa.categoria === 'eventos'
+                          ? tarefa.dados_especificos?.data_hora_inicio_evento
+                          : null;
+
+                      return dataOcorrencia
+                        ? format(new Date(dataOcorrencia), "dd/MM/yyyy HH:mm", { locale: ptBR })
+                        : <span className="text-muted-foreground">-</span>;
+                    })()}
+                  </TableCell>
+                  <TableCell className="text-xs whitespace-nowrap">
+                    {format(new Date(tarefa.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                  </TableCell>
                   <TableCell>
-                    {tarefa.dados_especificos?.desfecho_final 
-                      ? <span className="uppercase text-xs font-semibold text-primary">{String(tarefa.dados_especificos.desfecho_final).replace('_', ' ')}</span>
+                    {tarefa.dados_especificos?.desfecho_final
+                      ? <span className="uppercase text-[10px] font-semibold text-primary px-2 py-0.5 bg-primary/10 rounded-full">{String(tarefa.dados_especificos.desfecho_final).replace('_', ' ')}</span>
                       : <span className="text-muted-foreground italic text-xs">Não informado</span>
                     }
                   </TableCell>
-                  <TableCell>{tarefa.created_by_name || 'Desconhecido'}</TableCell>
-                  <TableCell>
-                    {tarefa.updated_at 
+                  <TableCell className="text-sm">{tarefa.created_by_name || 'Desconhecido'}</TableCell>
+                  <TableCell className="text-xs whitespace-nowrap">
+                    {tarefa.updated_at
                       ? format(new Date(tarefa.updated_at), "dd/MM/yyyy HH:mm", { locale: ptBR })
                       : '-'
                     }

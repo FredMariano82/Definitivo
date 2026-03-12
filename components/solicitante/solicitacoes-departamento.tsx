@@ -492,23 +492,11 @@ export default function SolicitacoesDepartamento() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 font-sans">
-      <div className="max-w-[1600px] mx-auto space-y-4">
-        {/* Header - Gradient Original */}
-        <div className="bg-gradient-to-b from-slate-900 to-slate-800 rounded-t-xl rounded-b-sm p-8 text-center relative overflow-hidden shadow-lg border-b-4 border-blue-500">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-slate-700/20 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
-          <div className="absolute bottom-0 left-0 w-40 h-40 bg-blue-900/20 rounded-full blur-2xl -ml-10 -mb-10 pointer-events-none"></div>
-
-          <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2 relative z-10 tracking-tight flex items-center justify-center gap-3">
-            <Users className="h-8 w-8 text-blue-400" />
-            Solicitações do Departamento
-            {usuario?.departamento && <span className="text-blue-400">— {usuario.departamento}</span>}
-          </h1>
-          <div className="w-24 h-1.5 bg-blue-500 mx-auto rounded-full mt-4 opacity-80"></div>
-        </div>
+    <div className="bg-transparent p-4 font-sans">
+      <div className="mx-auto space-y-4">
 
         {/* Card Principal */}
-        <Card className="shadow-lg border-0 rounded-xl overflow-hidden bg-white/95 backdrop-blur-sm relative z-20 -mt-2">
+        <Card className="shadow-lg border-0 rounded-xl overflow-hidden bg-white/95 backdrop-blur-sm relative z-20">
           <CardContent className="p-6">
             <div className="mb-6 bg-slate-50 border-l-4 border-slate-400 p-4 rounded-r-md">
               <div className="flex items-center gap-3">

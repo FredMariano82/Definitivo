@@ -41,7 +41,7 @@ export default function GraficoProdutividadeUsuarios() {
       const [dadosIndividuais, dadosPerfis, stats] = await Promise.all([
         ProdutividadeService.buscarProdutividadePorHora(dataInicial || undefined, dataFinal || undefined),
         ProdutividadeService.buscarProdutividadePorPerfil(dataInicial || undefined, dataFinal || undefined),
-        ProdutividadeService.buscarEstatisticasProdutividade(dataInicial || undefined, dataFinal || undefined),
+        ProdutividadeService.buscarEstatisticasProdutividade(dataInicial || undefined, dataFinal || undefined) as Promise<any>,
       ])
 
       setDadosProdutividade(dadosIndividuais)
@@ -321,51 +321,51 @@ export default function GraficoProdutividadeUsuarios() {
           <CardContent className="space-y-3">
             {visualizacaoPorPerfil
               ? // Visualização por Perfil
-                dadosPorPerfil.map((perfil) => (
-                  <div key={perfil.perfil} className="flex items-center space-x-3">
-                    <Checkbox
-                      id={perfil.perfil}
-                      checked={perfisSelecionados.has(perfil.perfil)}
-                      onCheckedChange={() => togglePerfil(perfil.perfil)}
-                    />
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: perfil.cor }} />
-                      <Label
-                        htmlFor={perfil.perfil}
-                        className="text-sm font-medium cursor-pointer truncate capitalize"
-                        title={perfil.perfil}
-                      >
-                        {perfil.perfil}
-                      </Label>
-                    </div>
-                    <Badge variant="secondary" className="text-xs">
-                      {perfil.dadosPorHora.reduce((sum, h) => sum + h.prestadores, 0)}
-                    </Badge>
+              dadosPorPerfil.map((perfil) => (
+                <div key={perfil.perfil} className="flex items-center space-x-3">
+                  <Checkbox
+                    id={perfil.perfil}
+                    checked={perfisSelecionados.has(perfil.perfil)}
+                    onCheckedChange={() => togglePerfil(perfil.perfil)}
+                  />
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: perfil.cor }} />
+                    <Label
+                      htmlFor={perfil.perfil}
+                      className="text-sm font-medium cursor-pointer truncate capitalize"
+                      title={perfil.perfil}
+                    >
+                      {perfil.perfil}
+                    </Label>
                   </div>
-                ))
+                  <Badge variant="secondary" className="text-xs">
+                    {perfil.dadosPorHora.reduce((sum, h) => sum + h.prestadores, 0)}
+                  </Badge>
+                </div>
+              ))
               : // Visualização Individual
-                dadosProdutividade.map((usuario) => (
-                  <div key={usuario.usuario} className="flex items-center space-x-3">
-                    <Checkbox
-                      id={usuario.usuario}
-                      checked={usuariosSelecionados.has(usuario.usuario)}
-                      onCheckedChange={() => toggleUsuario(usuario.usuario)}
-                    />
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: usuario.cor }} />
-                      <Label
-                        htmlFor={usuario.usuario}
-                        className="text-sm font-medium cursor-pointer truncate"
-                        title={`${usuario.usuario} (${usuario.perfil})`}
-                      >
-                        {usuario.usuario}
-                      </Label>
-                    </div>
-                    <Badge variant="secondary" className="text-xs">
-                      {usuario.dadosPorHora.reduce((sum, h) => sum + h.prestadores, 0)}
-                    </Badge>
+              dadosProdutividade.map((usuario) => (
+                <div key={usuario.usuario} className="flex items-center space-x-3">
+                  <Checkbox
+                    id={usuario.usuario}
+                    checked={usuariosSelecionados.has(usuario.usuario)}
+                    onCheckedChange={() => toggleUsuario(usuario.usuario)}
+                  />
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: usuario.cor }} />
+                    <Label
+                      htmlFor={usuario.usuario}
+                      className="text-sm font-medium cursor-pointer truncate"
+                      title={`${usuario.usuario} (${usuario.perfil})`}
+                    >
+                      {usuario.usuario}
+                    </Label>
                   </div>
-                ))}
+                  <Badge variant="secondary" className="text-xs">
+                    {usuario.dadosPorHora.reduce((sum, h) => sum + h.prestadores, 0)}
+                  </Badge>
+                </div>
+              ))}
 
             {(visualizacaoPorPerfil ? dadosPorPerfil.length : dadosProdutividade.length) === 0 && (
               <div className="text-center py-8 text-gray-500">
@@ -418,85 +418,87 @@ export default function GraficoProdutividadeUsuarios() {
                         {/* Linhas por usuário/perfil */}
                         {visualizacaoPorPerfil
                           ? dadosPorPerfil.map((perfil) => {
-                              if (!perfisSelecionados.has(perfil.perfil)) return null
+                            if (!perfisSelecionados.has(perfil.perfil)) return null
 
-                              const pontos = dadosGrafico.map((hora, index) => {
-                                const prestadores = hora[perfil.perfil] || 0
-                                const x = (index / 23) * 100
-                                const y = Math.min((prestadores / escala.max) * 100, 100)
-                                return { x, y, prestadores, hora: hora.hora }
-                              })
-
-                              return (
-                                <div key={perfil.perfil} className="absolute inset-0">
-                                  <svg className="w-full h-full" style={{ overflow: "visible" }}>
-                                    <polyline
-                                      points={pontos.map((p) => `${p.x}%,${100 - p.y}%`).join(" ")}
-                                      fill="none"
-                                      stroke={perfil.cor}
-                                      strokeWidth="3"
-                                      className="drop-shadow-sm"
-                                    />
-                                    {pontos.map(
-                                      (ponto, idx) =>
-                                        ponto.prestadores > 0 && (
-                                          <circle
-                                            key={idx}
-                                            cx={`${ponto.x}%`}
-                                            cy={`${100 - ponto.y}%`}
-                                            r="5"
-                                            fill={perfil.cor}
-                                            stroke="white"
-                                            strokeWidth="2"
-                                            className="drop-shadow-sm hover:r-7 transition-all cursor-pointer"
-                                            title={`${perfil.perfil} - ${ponto.hora}: ${ponto.prestadores} prestadores`}
-                                          />
-                                        ),
-                                    )}
-                                  </svg>
-                                </div>
-                              )
+                            const pontos = dadosGrafico.map((hora, index) => {
+                              const prestadores = hora[perfil.perfil] || 0
+                              const x = (index / 23) * 100
+                              const y = Math.min((prestadores / escala.max) * 100, 100)
+                              return { x, y, prestadores, hora: hora.hora }
                             })
+
+                            return (
+                              <div key={perfil.perfil} className="absolute inset-0">
+                                <svg className="w-full h-full" style={{ overflow: "visible" }}>
+                                  <polyline
+                                    points={pontos.map((p) => `${p.x}%,${100 - p.y}%`).join(" ")}
+                                    fill="none"
+                                    stroke={perfil.cor}
+                                    strokeWidth="3"
+                                    className="drop-shadow-sm"
+                                  />
+                                  {pontos.map(
+                                    (ponto, idx) =>
+                                      ponto.prestadores > 0 && (
+                                        <circle
+                                          key={idx}
+                                          cx={`${ponto.x}%`}
+                                          cy={`${100 - ponto.y}%`}
+                                          r="5"
+                                          fill={perfil.cor}
+                                          stroke="white"
+                                          strokeWidth="2"
+                                          className="drop-shadow-sm hover:r-7 transition-all cursor-pointer"
+                                        >
+                                          <title>{`${perfil.perfil} - ${ponto.hora}: ${ponto.prestadores} prestadores`}</title>
+                                        </circle>
+                                      ),
+                                  )}
+                                </svg>
+                              </div>
+                            )
+                          })
                           : dadosProdutividade.map((usuario) => {
-                              if (!usuariosSelecionados.has(usuario.usuario)) return null
+                            if (!usuariosSelecionados.has(usuario.usuario)) return null
 
-                              const pontos = dadosGrafico.map((hora, index) => {
-                                const prestadores = hora[usuario.usuario] || 0
-                                const x = (index / 23) * 100
-                                const y = Math.min((prestadores / escala.max) * 100, 100)
-                                return { x, y, prestadores, hora: hora.hora }
-                              })
+                            const pontos = dadosGrafico.map((hora, index) => {
+                              const prestadores = hora[usuario.usuario] || 0
+                              const x = (index / 23) * 100
+                              const y = Math.min((prestadores / escala.max) * 100, 100)
+                              return { x, y, prestadores, hora: hora.hora }
+                            })
 
-                              return (
-                                <div key={usuario.usuario} className="absolute inset-0">
-                                  <svg className="w-full h-full" style={{ overflow: "visible" }}>
-                                    <polyline
-                                      points={pontos.map((p) => `${p.x}%,${100 - p.y}%`).join(" ")}
-                                      fill="none"
-                                      stroke={usuario.cor}
-                                      strokeWidth="2"
-                                      className="drop-shadow-sm"
-                                    />
-                                    {pontos.map(
-                                      (ponto, idx) =>
-                                        ponto.prestadores > 0 && (
-                                          <circle
-                                            key={idx}
-                                            cx={`${ponto.x}%`}
-                                            cy={`${100 - ponto.y}%`}
-                                            r="4"
-                                            fill={usuario.cor}
-                                            stroke="white"
-                                            strokeWidth="2"
-                                            className="drop-shadow-sm hover:r-6 transition-all cursor-pointer"
-                                            title={`${usuario.usuario} - ${ponto.hora}: ${ponto.prestadores} prestadores`}
-                                          />
-                                        ),
-                                    )}
-                                  </svg>
-                                </div>
-                              )
-                            })}
+                            return (
+                              <div key={usuario.usuario} className="absolute inset-0">
+                                <svg className="w-full h-full" style={{ overflow: "visible" }}>
+                                  <polyline
+                                    points={pontos.map((p) => `${p.x}%,${100 - p.y}%`).join(" ")}
+                                    fill="none"
+                                    stroke={usuario.cor}
+                                    strokeWidth="2"
+                                    className="drop-shadow-sm"
+                                  />
+                                  {pontos.map(
+                                    (ponto, idx) =>
+                                      ponto.prestadores > 0 && (
+                                        <circle
+                                          key={idx}
+                                          cx={`${ponto.x}%`}
+                                          cy={`${100 - ponto.y}%`}
+                                          r="4"
+                                          fill={usuario.cor}
+                                          stroke="white"
+                                          strokeWidth="2"
+                                          className="drop-shadow-sm hover:r-6 transition-all cursor-pointer"
+                                        >
+                                          <title>{`${usuario.usuario} - ${ponto.hora}: ${ponto.prestadores} prestadores`}</title>
+                                        </circle>
+                                      ),
+                                  )}
+                                </svg>
+                              </div>
+                            )
+                          })}
 
                         {/* Labels do eixo X */}
                         <div className="absolute -bottom-6 left-0 right-0 flex justify-between text-xs text-gray-500">
@@ -515,23 +517,23 @@ export default function GraficoProdutividadeUsuarios() {
                     <div className="mt-4 flex flex-wrap gap-4">
                       {visualizacaoPorPerfil
                         ? dadosPorPerfil.map(
-                            (perfil) =>
-                              perfisSelecionados.has(perfil.perfil) && (
-                                <div key={perfil.perfil} className="flex items-center gap-2">
-                                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: perfil.cor }} />
-                                  <span className="text-sm capitalize">{perfil.perfil}</span>
-                                </div>
-                              ),
-                          )
+                          (perfil) =>
+                            perfisSelecionados.has(perfil.perfil) && (
+                              <div key={perfil.perfil} className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: perfil.cor }} />
+                                <span className="text-sm capitalize">{perfil.perfil}</span>
+                              </div>
+                            ),
+                        )
                         : dadosProdutividade.map(
-                            (usuario) =>
-                              usuariosSelecionados.has(usuario.usuario) && (
-                                <div key={usuario.usuario} className="flex items-center gap-2">
-                                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: usuario.cor }} />
-                                  <span className="text-sm">{usuario.usuario}</span>
-                                </div>
-                              ),
-                          )}
+                          (usuario) =>
+                            usuariosSelecionados.has(usuario.usuario) && (
+                              <div key={usuario.usuario} className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: usuario.cor }} />
+                                <span className="text-sm">{usuario.usuario}</span>
+                              </div>
+                            ),
+                        )}
                     </div>
                   </div>
 

@@ -10,11 +10,12 @@ import { useAuth } from "../../contexts/auth-context"
 import { SolicitacoesService } from "../../services/solicitacoes-service"
 import { PrestadoresService } from "../../services/prestadores-service"
 import type { Prestador } from "../../types"
-import { Plus, Trash2, User, FileSpreadsheet, X, AlertTriangle, CheckCircle } from "lucide-react"
+import { Plus, Trash2, User, FileSpreadsheet, X, AlertTriangle, CheckCircle, Camera } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
 import UploadListaExcel from "../solicitante/upload-lista-excel"
+import UploadFotoLista from "../solicitante/upload-foto-lista"
 import ModalPreviaSolicitacao from "../solicitante/modal-previa-solicitacao"
 import UploadHistoricoExcel from "./upload-historico-excel"
 
@@ -24,7 +25,7 @@ interface NovaSolicitacaoAdminProps {
     finalidade?: string
     local?: string
     empresa?: string
-    prestadores?: Array<{ id: string; nome: string; documento: string; documento2?: string; empresa?: string }>
+    prestadores?: Array<{ id: string; nome: string; doc1: string; doc2?: string; empresa?: string }>
     dataInicial?: string
     dataFinal?: string
   }
@@ -42,8 +43,8 @@ export default function NovaSolicitacaoAdmin({
     {
       id: `prestador_inicial_${Date.now()}`,
       nome: "",
-      documento: "",
-      documento2: "",
+      doc1: "",
+      doc2: "",
       empresa: "",
     },
   ])
@@ -62,6 +63,7 @@ export default function NovaSolicitacaoAdmin({
 
   // Adicionar estado para controlar modal de upload
   const [mostrarUploadLista, setMostrarUploadLista] = useState(false)
+  const [mostrarUploadFoto, setMostrarUploadFoto] = useState(false)
 
   // 🎯 NOVOS ESTADOS PARA CORREÇÕES
   const [dadosVieramDoExcel, setDadosVieramDoExcel] = useState(false)
@@ -91,8 +93,8 @@ export default function NovaSolicitacaoAdmin({
       {
         id: novoId,
         nome: "",
-        documento: "",
-        documento2: "",
+        doc1: "",
+        doc2: "",
         empresa: "",
       },
     ])
@@ -107,7 +109,7 @@ export default function NovaSolicitacaoAdmin({
     }
   }
 
-  const atualizarPrestador = (id: string, campo: "nome" | "documento" | "documento2" | "empresa", valor: string) => {
+  const atualizarPrestador = (id: string, campo: "nome" | "doc1" | "doc2" | "empresa", valor: string) => {
     console.log(`🔄 ADM - Atualizando prestador ID ${id}, campo ${campo}: "${valor}"`)
 
     const novosPrestadores = prestadores.map((p) => (p.id === id ? { ...p, [campo]: valor } : p))
@@ -150,9 +152,9 @@ export default function NovaSolicitacaoAdmin({
   const validarAoSairDoCampo = async (prestadorId: string) => {
     const prestador = prestadores.find((p) => p.id === prestadorId)
 
-    if (prestador && prestador.documento.trim()) {
-      const documentoParaValidar = prestador.documento.trim()
-      console.log(`🔍 ADM - Buscando prestador com documento: "${documentoParaValidar}"`)
+    if (prestador && prestador.doc1.trim()) {
+      const documentoParaValidar = prestador.doc1.trim()
+      console.log(`🔍 ADM - Buscando prestador com doc1: "${documentoParaValidar}"`)
 
       try {
         const prestadorEncontrado = await PrestadoresService.consultarPrestadorPorDocumento(documentoParaValidar)
@@ -164,10 +166,10 @@ export default function NovaSolicitacaoAdmin({
           const novosPrestadores = prestadores.map((p) =>
             p.id === prestadorId
               ? {
-                  ...p,
-                  nome: prestadorEncontrado.nome,
-                  empresa: prestadorEncontrado.empresa || p.empresa, // Manter empresa atual se não houver no banco
-                }
+                ...p,
+                nome: prestadorEncontrado.nome,
+                empresa: prestadorEncontrado.empresa || p.empresa, // Manter empresa atual se não houver no banco
+              }
               : p,
           )
           setPrestadores(novosPrestadores)
@@ -225,7 +227,7 @@ export default function NovaSolicitacaoAdmin({
       if (!prestador.nome.trim()) {
         return "Todos os prestadores devem ter nome preenchido"
       }
-      if (!prestador.documento.trim() && !prestador.documento2?.trim()) {
+      if (!prestador.doc1.trim() && !prestador.doc2?.trim()) {
         return "Todos os prestadores devem ter pelo menos um documento preenchido (Doc1 ou Doc2)"
       }
     }
@@ -286,8 +288,8 @@ export default function NovaSolicitacaoAdmin({
         }
         return {
           nome: p.nome,
-          documento: p.documento,
-          documento2: p.documento2,
+          doc1: p.doc1,
+          doc2: p.doc2,
           empresa: empresaFinal,
         }
       })
@@ -322,7 +324,7 @@ export default function NovaSolicitacaoAdmin({
           setLocal("")
           setEmpresa("")
           setPrestadores([
-            { id: `prestador_inicial_${Date.now()}`, nome: "", documento: "", documento2: "", empresa: "" },
+            { id: `prestador_inicial_${Date.now()}`, nome: "", doc1: "", doc2: "", empresa: "" },
           ])
           setDataInicial("")
           setDataFinal("")
@@ -377,9 +379,9 @@ export default function NovaSolicitacaoAdmin({
   const validarAoSairDoCampoDoc2 = async (prestadorId: string) => {
     const prestador = prestadores.find((p) => p.id === prestadorId)
 
-    if (prestador && prestador.documento2?.trim()) {
-      const documentoParaValidar = prestador.documento2.trim()
-      console.log(`🔍 ADM - Buscando prestador com documento2: "${documentoParaValidar}"`)
+    if (prestador && prestador.doc2?.trim()) {
+      const documentoParaValidar = prestador.doc2.trim()
+      console.log(`🔍 ADM - Buscando prestador com doc2: "${documentoParaValidar}"`)
 
       try {
         const prestadorEncontrado = await PrestadoresService.consultarPrestadorPorDocumento(documentoParaValidar)
@@ -391,10 +393,10 @@ export default function NovaSolicitacaoAdmin({
           const novosPrestadores = prestadores.map((p) =>
             p.id === prestadorId
               ? {
-                  ...p,
-                  nome: prestadorEncontrado.nome,
-                  empresa: prestadorEncontrado.empresa || p.empresa, // Manter empresa atual se não houver no banco
-                }
+                ...p,
+                nome: prestadorEncontrado.nome,
+                empresa: prestadorEncontrado.empresa || p.empresa, // Manter empresa atual se não houver no banco
+              }
               : p,
           )
           setPrestadores(novosPrestadores)
@@ -421,8 +423,8 @@ export default function NovaSolicitacaoAdmin({
     const novosPrestadores = prestadoresExcel.map((p, index) => ({
       id: `excel_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 5)}`,
       nome: p.nome || "",
-      documento: p.documento || "",
-      documento2: p.documento2 || "",
+      doc1: p.doc1 || "",
+      doc2: p.doc2 || "",
       empresa: p.empresa || "",
     }))
 
@@ -462,27 +464,7 @@ export default function NovaSolicitacaoAdmin({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 space-y-6">
-      {/* ← ADM: Header específico do ADM */}
-      <Card className="shadow-lg border-0 bg-gradient-to-r from-blue-600 to-blue-700">
-        <CardContent className="p-6">
-          <div className="text-center text-white">
-            <h1 className="text-3xl font-bold mb-2">🔧 Painel do Administrador</h1>
-            <p className="text-blue-100 mb-4">
-              Nova Solicitação de Acesso - Modo Administrativo com Busca Dupla e Auto-preenchimento
-            </p>
-            <Button
-              onClick={() => setMostrarUploadHistorico(true)}
-              variant="outline"
-              className="border-white text-white hover:bg-white hover:text-blue-600"
-            >
-              <FileSpreadsheet className="h-4 w-4 mr-2" />
-              Upload Histórico Excel
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
+    <div className="min-h-screen bg-transparent p-4 space-y-6">
       {mostrarUploadHistorico && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -494,10 +476,9 @@ export default function NovaSolicitacaoAdmin({
             </div>
             <div className="p-4">
               <UploadHistoricoExcel
-                onUploadCompleto={(totalSalvos) => {
-                  console.log(`✅ ADM - ${totalSalvos} prestadores salvos no histórico`)
+                onUploadCompleto={() => {
+                  console.log(`✅ ADM - Upload histórico concluído`)
                   setMostrarUploadHistorico(false)
-                  // Opcional: mostrar notificação de sucesso
                 }}
               />
             </div>
@@ -598,6 +579,25 @@ export default function NovaSolicitacaoAdmin({
                   <div className="flex gap-2">
                     <Button
                       type="button"
+                      onClick={() => setMostrarUploadFoto(true)}
+                      className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-[0_0_15px_rgba(192,38,211,0.3)] transition-all"
+                      size="sm"
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      Tirar Foto da Lista
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => setMostrarUploadHistorico(true)}
+                      variant="outline"
+                      size="sm"
+                      className="border-slate-600 text-slate-600 hover:bg-slate-50"
+                    >
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      Upload Histórico
+                    </Button>
+                    <Button
+                      type="button"
                       onClick={() => setMostrarUploadLista(true)}
                       variant="outline"
                       size="sm"
@@ -620,45 +620,16 @@ export default function NovaSolicitacaoAdmin({
                 </div>
 
                 <div className="space-y-4">
-                  {/* 🎯 ALERTA EXPLICATIVO INTELIGENTE */}
-                  <Alert className="mb-4 border-blue-200 bg-blue-50">
-                    <User className="h-4 w-4 text-blue-600" />
-                    <AlertDescription className="text-blue-700">
-                      <div className="space-y-2">
-                        <p>
-                          <strong>🔍 Busca Dupla + Auto-preenchimento:</strong> Preencha Doc1 ou Doc2. O sistema buscará
-                          em ambas as colunas do banco e preencherá automaticamente o nome quando encontrar o prestador.
-                        </p>
-                        <p>
-                          <strong>🏢 Modo Empresa:</strong> Preencha a empresa geral OU as empresas específicas (não
-                          ambos)
-                        </p>
-                      </div>
-                    </AlertDescription>
-                  </Alert>
-
                   {prestadores.map((prestador, index) => (
                     <div key={prestador.id} className="space-y-3">
-                      {/* Grid com 5 colunas - IGUAL AO SOLICITANTE */}
+                      {/* Grid com 5 colunas - ORDEM: Doc1, Doc2, Nome, Empresa */}
                       <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
-                        {/* Nome */}
-                        <div>
-                          <Label className="text-sm font-medium text-slate-700">Nome</Label>
-                          <Input
-                            value={prestador.nome}
-                            onChange={(e) => atualizarPrestador(prestador.id, "nome", e.target.value)}
-                            onBlur={() => validarAoSairDoCampo(prestador.id)}
-                            placeholder="Nome completo (auto-preenchido)"
-                            className="border-slate-300 focus:border-blue-600 focus:ring-blue-600"
-                          />
-                        </div>
-
                         {/* Doc1 */}
                         <div>
                           <Label className="text-sm font-medium text-slate-700">Doc1 (RG, etc)</Label>
                           <Input
-                            value={prestador.documento}
-                            onChange={(e) => atualizarPrestador(prestador.id, "documento", e.target.value)}
+                            value={prestador.doc1}
+                            onChange={(e) => atualizarPrestador(prestador.id, "doc1", e.target.value)}
                             onBlur={() => validarAoSairDoCampo(prestador.id)}
                             placeholder="RG, etc"
                             className="border-slate-300 focus:border-blue-600 focus:ring-blue-600"
@@ -669,10 +640,22 @@ export default function NovaSolicitacaoAdmin({
                         <div>
                           <Label className="text-sm font-medium text-slate-700">Doc2 (CPF, CNH, etc)</Label>
                           <Input
-                            value={prestador.documento2 || ""}
-                            onChange={(e) => atualizarPrestador(prestador.id, "documento2", e.target.value)}
+                            value={prestador.doc2 || ""}
+                            onChange={(e) => atualizarPrestador(prestador.id, "doc2", e.target.value)}
                             onBlur={() => validarAoSairDoCampoDoc2(prestador.id)}
                             placeholder="CPF, CNH, etc"
+                            className="border-slate-300 focus:border-blue-600 focus:ring-blue-600"
+                          />
+                        </div>
+
+                        {/* Nome */}
+                        <div>
+                          <Label className="text-sm font-medium text-slate-700">Nome</Label>
+                          <Input
+                            value={prestador.nome}
+                            onChange={(e) => atualizarPrestador(prestador.id, "nome", e.target.value)}
+                            onBlur={() => validarAoSairDoCampo(prestador.id)}
+                            placeholder="Nome completo (auto-preenchido)"
                             className="border-slate-300 focus:border-blue-600 focus:ring-blue-600"
                           />
                         </div>
@@ -744,15 +727,15 @@ export default function NovaSolicitacaoAdmin({
               </div>
 
               {alertaDataUrgente && (
-                <Alert variant="warning">
-                  <AlertTriangle className="h-4 w-4" />
+                <Alert className="border-yellow-200 bg-yellow-50 text-yellow-800">
+                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
                   <AlertDescription>{alertaDataUrgente}</AlertDescription>
                 </Alert>
               )}
 
               {mostrarOpcoesPrazo && (
                 <div className="flex items-center space-x-2">
-                  <Checkbox id="prosseguirUrgente" onCheckedChange={setProsseguirUrgente} />
+                  <Checkbox id="prosseguirUrgente" onCheckedChange={(checked) => setProsseguirUrgente(checked === true)} />
                   <label
                     htmlFor="prosseguirUrgente"
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
@@ -764,8 +747,8 @@ export default function NovaSolicitacaoAdmin({
 
               {erro && <Alert variant="destructive">{erro}</Alert>}
               {sucesso && (
-                <Alert variant="success">
-                  <CheckCircle className="h-4 w-4" />
+                <Alert className="border-green-200 bg-green-50 text-green-800">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
                   <AlertDescription>{sucesso}</AlertDescription>
                 </Alert>
               )}
@@ -784,6 +767,59 @@ export default function NovaSolicitacaoAdmin({
         </Card>
       )}
 
+      {mostrarUploadHistorico && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Upload de Histórico (Administrador)</h3>
+              <Button variant="ghost" size="icon" onClick={() => setMostrarUploadHistorico(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-4">
+              <UploadHistoricoExcel />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mostrarUploadLista && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Upload de Lista Excel</h3>
+              <Button variant="ghost" size="icon" onClick={() => setMostrarUploadLista(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-4">
+              <UploadListaExcel onListaProcessada={processarListaExcel} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mostrarUploadFoto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Tirar Foto da Lista</h3>
+              <Button variant="ghost" size="icon" onClick={() => setMostrarUploadFoto(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-4">
+              <UploadFotoLista
+                onListaProcessada={(prestadoresRef) => {
+                  processarListaExcel(prestadoresRef)
+                  setMostrarUploadFoto(false)
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       <ModalPreviaSolicitacao
         isOpen={mostrarModalPrevia}
         onClose={() => setMostrarModalPrevia(false)}
@@ -796,7 +832,6 @@ export default function NovaSolicitacaoAdmin({
         dataInicial={dataInicial}
         dataFinal={dataFinal}
         onConfirmar={confirmarEnvioAposModal}
-        alertasPrestadores={{}}
       />
     </div>
   )

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import type { PrestadorExcelSolicitante } from "@/services/excel-service"
 import { extrairPrestadoresDeTexto } from "@/utils/text-parser"
-import Tesseract from "tesseract.js"
+// import Tesseract from "tesseract.js"
 import { Progress } from "@/components/ui/progress"
 
 interface UploadFotoListaProps {
@@ -53,13 +53,13 @@ export default function UploadFotoLista({ onListaProcessada }: UploadFotoListaPr
         setStatusOCR("Iniciando Leitura Ótica (OCR)...")
 
         try {
-            console.log("📸 Iniciando Tesseract.js para leitura da foto...")
-
+            console.log("📸 OCR desativado temporariamente...")
+            /*
             const { data: { text } } = await Tesseract.recognize(
                 imagem,
                 'por', // Português
                 {
-                    logger: m => {
+                    logger: (m: any) => {
                         if (m.status === "recognizing text") {
                             setProgresso(Math.floor(m.progress * 100))
                             setStatusOCR("Lendo caracteres da imagem...")
@@ -69,6 +69,8 @@ export default function UploadFotoLista({ onListaProcessada }: UploadFotoListaPr
                     }
                 }
             )
+            */
+            const text = "OCR desativado"
 
             console.log("📝 Texto extraído da imagem:", text)
             setStatusOCR("Analisando Nomes e Documentos...")

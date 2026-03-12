@@ -76,14 +76,14 @@ export default function GestaoRendicoes() {
                     cafe: {
                         status: dbCafe ? "Retornou" : "Aguardando",
                         pausa_id: dbCafe?.id,
-                        rendicionista_id: dbCafe?.rendicionista_id, // Usando o rendicionista salvo ou mapeado
+                        rendicionista_id: (dbCafe as any)?.rendicionista_id, // Usando o rendicionista salvo ou mapeado
                         saida: dbCafe?.horario_inicio,
                         retorno: dbCafe?.horario_fim
                     },
                     almoco: {
                         status: dbAlmoco ? "Retornou" : "Aguardando",
                         pausa_id: dbAlmoco?.id,
-                        rendicionista_id: dbAlmoco?.rendicionista_id,
+                        rendicionista_id: (dbAlmoco as any)?.rendicionista_id,
                         saida: dbAlmoco?.horario_inicio,
                         retorno: dbAlmoco?.horario_fim
                     },
@@ -293,7 +293,7 @@ export default function GestaoRendicoes() {
                                         <Badge variant="outline" className={`font-mono text-xs ${row.posto.nivel_criticidade === 1 ? 'border-red-400 text-red-700 bg-red-50' : 'border-indigo-200 text-indigo-700 bg-indigo-50'}`}>
                                             {row.posto.nome_posto.substring(0, 10)}
                                         </Badge>
-                                        {row.posto.exige_armamento && <ShieldAlert className="w-3 h-3 text-red-500" title="Exige Arma" />}
+                                        {row.posto.exige_armamento && <ShieldAlert className="w-3 h-3 text-red-500" />}
                                     </div>
 
                                     {/* TURNO */}

@@ -45,11 +45,11 @@ export default function TesteSupabase() {
       // 2. Testar busca direta no Supabase
       adicionarLog("🔍 Testando busca direta no Supabase...")
       const { data: prestadores, error: searchError } = await supabase.from("prestadores").select(`
-          documento,
-          documento2,
+          doc1,
+          doc2,
           nome,
           checagem_valida_ate,
-          status,
+          checagem,
           data_avaliacao
         `)
 
@@ -64,7 +64,7 @@ export default function TesteSupabase() {
         adicionarLog(`📊 Primeiros 3 registros:`)
         prestadores.slice(0, 3).forEach((p, i) => {
           adicionarLog(
-            `   ${i + 1}. Nome: ${p.nome} | Doc1: ${p.documento} | Doc2: ${p.documento2 || "N/A"} | Status: ${p.status}`,
+            `   ${i + 1}. Nome: ${p.nome} | Doc1: ${p.doc1} | Doc2: ${p.doc2 || "N/A"} | Status: ${p.checagem}`,
           )
         })
       }
@@ -74,17 +74,17 @@ export default function TesteSupabase() {
       const documentoLimpo = documento.replace(/\D/g, "")
 
       const prestadorEncontrado = prestadores?.find((p) => {
-        const doc1Limpo = p.documento ? p.documento.replace(/\D/g, "") : ""
-        const doc2Limpo = p.documento2 ? p.documento2.replace(/\D/g, "") : ""
+        const doc1Limpo = p.doc1 ? p.doc1.replace(/\D/g, "") : ""
+        const doc2Limpo = p.doc2 ? p.doc2.replace(/\D/g, "") : ""
         return doc1Limpo === documentoLimpo || doc2Limpo === documentoLimpo
       })
 
       if (prestadorEncontrado) {
         adicionarLog(`✅ PRESTADOR ENCONTRADO!`)
         adicionarLog(`   Nome: ${prestadorEncontrado.nome}`)
-        adicionarLog(`   Doc1: ${prestadorEncontrado.documento}`)
-        adicionarLog(`   Doc2: ${prestadorEncontrado.documento2 || "N/A"}`)
-        adicionarLog(`   Status: ${prestadorEncontrado.status}`)
+        adicionarLog(`   Doc1: ${prestadorEncontrado.doc1}`)
+        adicionarLog(`   Doc2: ${prestadorEncontrado.doc2 || "N/A"}`)
+        adicionarLog(`   Status: ${prestadorEncontrado.checagem}`)
         setResultado(prestadorEncontrado)
       } else {
         adicionarLog(`❌ Prestador com documento ${documento} NÃO ENCONTRADO`)
@@ -97,7 +97,7 @@ export default function TesteSupabase() {
       if (resultadoServico) {
         adicionarLog(`✅ SERVIÇO FUNCIONOU!`)
         adicionarLog(`   Nome: ${resultadoServico.nome}`)
-        adicionarLog(`   Status: ${resultadoServico.status}`)
+        adicionarLog(`   Status: ${resultadoServico.checagem}`)
       } else {
         adicionarLog(`❌ SERVIÇO RETORNOU NULL`)
       }
@@ -181,13 +181,13 @@ export default function TesteSupabase() {
                       <strong>Nome:</strong> {resultado.nome}
                     </p>
                     <p>
-                      <strong>Documento:</strong> {resultado.documento}
+                      <strong>Doc1:</strong> {resultado.doc1}
                     </p>
                     <p>
-                      <strong>Documento2:</strong> {resultado.documento2 || "N/A"}
+                      <strong>Doc2:</strong> {resultado.doc2 || "N/A"}
                     </p>
                     <p>
-                      <strong>Status:</strong> {resultado.status}
+                      <strong>Status:</strong> {resultado.checagem}
                     </p>
                     <p>
                       <strong>Validade:</strong> {resultado.checagem_valida_ate || "N/A"}

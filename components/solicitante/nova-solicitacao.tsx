@@ -675,7 +675,7 @@ export default function NovaSolicitacao({
   // 🎯 CORREÇÃO: VALIDAÇÃO AUTOMÁTICA APÓS UPLOAD EXCEL
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 space-y-6">
+    <div className="bg-transparent p-4 space-y-6">
       <AvisoPrazo aceitou={aceitouPrazo} onAceitar={setAceitouPrazo} />
 
       {aceitouPrazo && <FinalidadeSolicitacao onFinalidadeChange={setFinalidade} finalidadeSelecionada={finalidade} />}
@@ -714,12 +714,7 @@ export default function NovaSolicitacao({
 
       {finalidade && (
         <Card className="shadow-lg border-0">
-          <CardHeader className="pb-6">
-            <CardTitle className="text-2xl font-bold text-slate-800 text-center">Nova Solicitação de Acesso</CardTitle>
-            <div className="w-24 h-1 bg-slate-600 mx-auto rounded-full"></div>
-          </CardHeader>
-
-          <CardContent>
+          <CardContent className="pt-6">
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
@@ -828,19 +823,8 @@ export default function NovaSolicitacao({
 
                   {prestadores.map((prestador, index) => (
                     <div key={prestador.id} className="space-y-3">
-                      {/* Grid com 5 colunas */}
+                      {/* Grid com 5 colunas - ORDEM: Doc1, Doc2, Nome, Empresa */}
                       <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
-                        {/* Nome */}
-                        <div>
-                          <Label className="text-sm font-medium text-slate-700">Nome</Label>
-                          <Input
-                            value={prestador.nome}
-                            onChange={(e) => atualizarPrestador(prestador.id, "nome", e.target.value)}
-                            placeholder="Nome completo (auto-preenchido)"
-                            className="border-slate-300 focus:border-slate-600 focus:ring-slate-600"
-                          />
-                        </div>
-
                         {/* Doc1 */}
                         <div>
                           <Label className="text-sm font-medium text-slate-700">Doc1 (RG, etc)</Label>
@@ -861,6 +845,17 @@ export default function NovaSolicitacao({
                             onChange={(e) => atualizarPrestador(prestador.id, "doc2", e.target.value)}
                             onBlur={() => validarAoSairDoCampoDoc2(prestador.id)}
                             placeholder="CPF, CNH, etc"
+                            className="border-slate-300 focus:border-slate-600 focus:ring-slate-600"
+                          />
+                        </div>
+
+                        {/* Nome */}
+                        <div>
+                          <Label className="text-sm font-medium text-slate-700">Nome</Label>
+                          <Input
+                            value={prestador.nome}
+                            onChange={(e) => atualizarPrestador(prestador.id, "nome", e.target.value)}
+                            placeholder="Nome completo (auto-preenchido)"
                             className="border-slate-300 focus:border-slate-600 focus:ring-slate-600"
                           />
                         </div>

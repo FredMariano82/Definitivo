@@ -12,6 +12,7 @@ import { EconomiasService, type EconomiaMetricas } from "../../services/economia
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import GraficoProdutividadeUsuarios from "./grafico-produtividade-usuarios"
+import PageHeader from "@/components/page-header"
 
 export default function DashboardAdmin() {
   const [solicitacoes, setSolicitacoes] = useState<any[]>([])
@@ -119,7 +120,7 @@ export default function DashboardAdmin() {
     if (filtroTipo === "economia") {
       tipoMatch = s.economia === "economia1" || s.economia === "economia2"
     } else if (filtroTipo === "urgente") {
-      tipoMatch = s.prestadores && s.prestadores.some((p: any) => p.cadastro === "urgente")
+      tipoMatch = s.prestadores && s.prestadores.some((p: any) => p.liberacao === "urgente")
     }
 
     return solicitanteMatch && departamentoMatch && dataMatch && mesMatch && tipoMatch
@@ -131,7 +132,7 @@ export default function DashboardAdmin() {
     pendentes: dadosFiltrados.filter((s) => s.statusGeral === "pendente").length,
     aprovadas: dadosFiltrados.filter((s) => s.statusGeral === "aprovado").length,
     reprovadas: dadosFiltrados.filter((s) => s.statusGeral === "reprovado").length,
-    urgentes: dadosFiltrados.filter((s) => s.prestadores && s.prestadores.some((p: any) => p.cadastro === "urgente"))
+    urgentes: dadosFiltrados.filter((s) => s.prestadores && s.prestadores.some((p: any) => p.liberacao === "urgente"))
       .length,
     custoTotal: dadosFiltrados.reduce((acc, s) => {
       // Cada prestador que precisa de checagem custa R$ 20,00
@@ -173,9 +174,9 @@ export default function DashboardAdmin() {
   const dadosDepartamentos = Object.entries(contadorDepartamentos)
     .map(([dept, count]) => ({
       departamento: dept,
-      solicitacoes: count,
+      solicitacoes: count as number,
     }))
-    .sort((a, b) => b.solicitacoes - a.solicitacoes)
+    .sort((a, b) => (b.solicitacoes as number) - (a.solicitacoes as number))
 
   // Dados para gráfico de pizza CSS
   const dadosStatus = [
@@ -205,10 +206,10 @@ export default function DashboardAdmin() {
   const todosPrestadores = dadosFiltrados.flatMap((s) => s.prestadores || [])
   const metricasPrestadores = {
     total: todosPrestadores.length,
-    aprovados: todosPrestadores.filter((p) => p.status === "aprovado").length,
-    pendentes: todosPrestadores.filter((p) => p.status === "pendente").length,
-    reprovados: todosPrestadores.filter((p) => p.status === "reprovado").length,
-    excecao: todosPrestadores.filter((p) => p.status === "excecao").length,
+    aprovados: todosPrestadores.filter((p) => p.checagem === "aprovado" || p.checagem === "aprovada").length,
+    pendentes: todosPrestadores.filter((p) => p.checagem === "pendente").length,
+    reprovados: todosPrestadores.filter((p) => p.checagem === "reprovado" || p.checagem === "reprovada").length,
+    excecao: todosPrestadores.filter((p) => p.checagem === "excecao").length,
   }
 
   console.log("🔍 DEBUG - Métricas dos Prestadores:", metricasPrestadores)
@@ -243,7 +244,7 @@ export default function DashboardAdmin() {
     .map((solicitante) => {
       const solicitacoesSolicitante = dadosFiltrados.filter((s) => s.solicitante === solicitante)
       const urgentesCount = solicitacoesSolicitante.filter(
-        (s) => s.prestadores && s.prestadores.some((p: any) => p.cadastro === "urgente"),
+        (s) => s.prestadores && s.prestadores.some((p: any) => p.liberacao === "urgente"),
       ).length
       const totalSolicitacoes = solicitacoesSolicitante.length
 
@@ -276,13 +277,7 @@ export default function DashboardAdmin() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="text-center flex-1">
-          <h1 className="text-3xl font-bold text-slate-800 mb-2">Dashboard Administrativo</h1>
-          <div className="w-32 h-1 bg-slate-600 mx-auto rounded-full"></div>
-        </div>
-      </div>
+    <div className="space-y-6 pt-2">
 
       {/* Filtros */}
       <Card className="border-slate-200 bg-slate-50">
@@ -490,7 +485,7 @@ export default function DashboardAdmin() {
                         ></div>
                       </div>
                       <div className="text-lg font-bold text-slate-600 min-w-[2rem] text-right">
-                        {item.solicitacoes}
+                        {item.solicitacoes as number}
                       </div>
                     </div>
                   </div>

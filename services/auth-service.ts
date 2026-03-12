@@ -3,7 +3,7 @@ import type { Usuario } from "@/types"
 
 export class AuthService {
   // Login com email e senha
-  static async login(email: string, senha: string): Promise<{ usuario: Usuario | null; erro: string }> {
+  static async login(email: string, senha: string): Promise<{ usuario: Usuario | null; sucesso: boolean; erro: string }> {
     try {
       console.log("🔐 Tentando login para:", email)
 
@@ -16,14 +16,14 @@ export class AuthService {
 
       if (userError || !usuario) {
         console.log("❌ Usuário não encontrado:", userError)
-        return { usuario: null, erro: "Email não encontrado" }
+        return { usuario: null, sucesso: false, erro: "Email não encontrado" }
       }
 
       // Verificar senha com o banco de dados
       // Nota: Em produção, usaríamos hash (bcrypt/argon2). Por enquanto é texto simples.
       if (senha !== usuario.senha) {
         console.log("❌ Senha incorreta")
-        return { usuario: null, erro: "Senha incorreta" }
+        return { usuario: null, sucesso: false, erro: "Senha incorreta" }
       }
 
       console.log("✅ Login realizado com sucesso:", usuario.nome)
@@ -37,11 +37,12 @@ export class AuthService {
           departamento_id: usuario.departamento_id,
           perfil: usuario.perfil as "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte",
         },
+        sucesso: true,
         erro: "",
       }
     } catch (error) {
       console.error("💥 Erro no login:", error)
-      return { usuario: null, erro: "Erro interno do servidor" }
+      return { usuario: null, sucesso: false, erro: "Erro interno do servidor" }
     }
   }
 
@@ -67,7 +68,6 @@ export class AuthService {
       }
 
       // Atualizar senha no banco (por enquanto salvando como texto)
-      // Em produção real, você faria hash da senha
       const { error: updateError } = await supabase.from("usuarios").update({ senha: novaSenha }).eq("id", userId)
 
       if (updateError) {
@@ -111,7 +111,7 @@ export class AuthService {
     nome: string
     email: string
     departamento: string
-    departamento_id?: number // Adicionado
+    departamento_id?: number
     perfil: "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte"
   }): Promise<{ sucesso: boolean; erro: string; usuario?: Usuario }> {
     try {

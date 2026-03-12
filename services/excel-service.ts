@@ -114,13 +114,13 @@ export class ExcelService {
 
               // Se não achou coluna de documento, tentar usar a segunda coluna genericamente se disponível
               // ou simplesmente deixar vazio para preencher manualmente
-              const documentoFinal = this.limparDocumento(docRaw)
+              const documentoFinal = this.limparDoc1(docRaw)
 
               const prestador: PrestadorExcelADM = {
                 id: getVal(colunas.id) || undefined,
                 nome: nomeRaw,
                 doc1: documentoFinal,
-                doc2: this.limparDocumento(getVal(colunas.doc2)) || undefined,
+                doc2: this.limparDoc1(getVal(colunas.doc2)) || undefined,
                 empresa: empresaRaw,
                 cargo: getVal(colunas.cargo) || undefined,
                 observacoes: getVal(colunas.observacoes) || undefined,
@@ -242,8 +242,8 @@ export class ExcelService {
           const prestador: PrestadorExcelADM = {
             id: this.extrairValor(linha, colunas.id) || undefined,
             nome: this.extrairValor(linha, colunas.nome) || "Sem Nome",
-            doc1: this.limparDocumento(this.extrairValor(linha, colunas.doc1)),
-            doc2: this.limparDocumento(this.extrairValor(linha, colunas.doc2)) || undefined,
+            doc1: this.limparDoc1(this.extrairValor(linha, colunas.doc1)),
+            doc2: this.limparDoc1(this.extrairValor(linha, colunas.doc2)) || undefined,
             empresa: this.extrairValor(linha, colunas.empresa) || "Não Informada",
             cargo: this.extrairValor(linha, colunas.cargo) || undefined,
             observacoes: this.extrairValor(linha, colunas.observacoes) || undefined,
@@ -357,8 +357,8 @@ export class ExcelService {
         try {
           const prestador: PrestadorExcelSolicitante = {
             nome: this.extrairValor(linha, colunas.nome),
-            doc1: this.limparDocumento(this.extrairValor(linha, colunas.doc1)),
-            doc2: this.limparDocumento(this.extrairValor(linha, colunas.doc2)) || undefined,
+            doc1: this.limparDoc1(this.extrairValor(linha, colunas.doc1)),
+            doc2: this.limparDoc1(this.extrairValor(linha, colunas.doc2)) || undefined,
             empresa: this.extrairValor(linha, colunas.empresa) || "",
           }
 
@@ -483,7 +483,7 @@ export class ExcelService {
     return String(linha[indice]).trim()
   }
 
-  private static limparDocumento(doc: string): string {
+  private static limparDoc1(doc: string): string {
     if (!doc) return ""
     // Remove tudo que não for alfanumérico, mantendo apenas letras e números
     // Isso ajuda a unificar formatos de RG/CPF

@@ -39,7 +39,7 @@ export default function AuthenticatedLayout({
             <div className="flex flex-1">
                 <Navigation />
                 <main className="flex-1 p-6 md:ml-72 transition-all duration-300">
-                    <div className="max-w-7xl mx-auto">
+                    <div className="max-w-none mx-auto">
                         {children}
                     </div>
                 </main>

@@ -218,203 +218,201 @@ export default function Liberacoes() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4">
-      <div className="max-w-7xl mx-auto">
-        <Card className="glass shadow-2xl border-white/20 overflow-hidden rounded-3xl">
-          <CardHeader className="pb-8 pt-10 premium-gradient relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-400/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-cyan-400/10 rounded-full blur-3xl -ml-24 -mb-24"></div>
+    <div className="min-h-screen bg-transparent p-6">
+      <Card className="glass shadow-2xl border-white/20 overflow-hidden rounded-3xl">
+        <CardHeader className="pb-8 pt-10 premium-gradient relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-blue-400/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-cyan-400/10 rounded-full blur-3xl -ml-24 -mb-24"></div>
 
-            <CardTitle className="text-3xl font-black text-white text-center tracking-tight relative z-10 flex items-center justify-center gap-3">
-              <CheckCircle className="h-8 w-8 text-emerald-400" />
-              Status das Liberações - {usuario?.departamento}
-            </CardTitle>
-            <div className="w-20 h-1.5 bg-gradient-to-r from-emerald-400 to-blue-400 mx-auto rounded-full mt-4 relative z-10 shadow-lg shadow-emerald-500/20"></div>
-          </CardHeader>
+          <CardTitle className="text-3xl font-black text-white text-center tracking-tight relative z-10 flex items-center justify-center gap-3">
+            <CheckCircle className="h-8 w-8 text-emerald-400" />
+            Status das Liberações - {usuario?.departamento}
+          </CardTitle>
+          <div className="w-20 h-1.5 bg-gradient-to-r from-emerald-400 to-blue-400 mx-auto rounded-full mt-4 relative z-10 shadow-lg shadow-emerald-500/20"></div>
+        </CardHeader>
 
-          <CardContent className="pt-8">
-            {/* Resumo por Status */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-              {[
-                { label: "Pendentes", count: statusCounts.pendente, icon: Clock, color: "yellow" },
-                { label: "Liberados", count: statusCounts.ok, icon: CheckCircle, color: "emerald" },
-                { label: "Urgentes", count: statusCounts.urgente, icon: AlertTriangle, color: "orange" },
-                { label: "Vencidas", count: statusCounts.vencida, icon: XCircle, color: "red" },
-                { label: "Negadas", count: statusCounts.negada, icon: Ban, color: "slate" }
-              ].map((stat) => (
-                <div key={stat.label} className="group transition-soft hover:translate-y-[-4px]">
-                  <Card className={`border-0 bg-${stat.color === 'emerald' ? 'emerald' : stat.color}-500/5 hover:bg-${stat.color === 'emerald' ? 'emerald' : stat.color}-500/10 rounded-2xl transition-soft`}>
-                    <CardContent className="p-4 text-center">
-                      <stat.icon className={`h-7 w-7 text-${stat.color === 'emerald' ? 'emerald' : stat.color}-600 mx-auto mb-2`} />
-                      <div className={`text-2xl font-black text-${stat.color === 'emerald' ? 'emerald' : stat.color}-700`}>{stat.count}</div>
-                      <div className={`text-[10px] font-bold uppercase tracking-wider text-${stat.color === 'emerald' ? 'emerald' : stat.color}-600/70`}>{stat.label}</div>
-                    </CardContent>
-                  </Card>
-                </div>
-              ))}
-            </div>
-
-            <div className="bg-slate-500/5 border border-slate-200 rounded-2xl p-4 mb-8 flex items-center gap-4">
-              <div className="bg-emerald-500/20 p-2 rounded-lg">
-                <CheckCircle className="h-5 w-5 text-emerald-600" />
+        <CardContent className="pt-8">
+          {/* Resumo por Status */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+            {[
+              { label: "Pendentes", count: statusCounts.pendente, icon: Clock, color: "yellow" },
+              { label: "Liberados", count: statusCounts.ok, icon: CheckCircle, color: "emerald" },
+              { label: "Urgentes", count: statusCounts.urgente, icon: AlertTriangle, color: "orange" },
+              { label: "Vencidas", count: statusCounts.vencida, icon: XCircle, color: "red" },
+              { label: "Negadas", count: statusCounts.negada, icon: Ban, color: "slate" }
+            ].map((stat) => (
+              <div key={stat.label} className="group transition-soft hover:translate-y-[-4px]">
+                <Card className={`border-0 bg-${stat.color === 'emerald' ? 'emerald' : stat.color}-500/5 hover:bg-${stat.color === 'emerald' ? 'emerald' : stat.color}-500/10 rounded-2xl transition-soft`}>
+                  <CardContent className="p-4 text-center">
+                    <stat.icon className={`h-7 w-7 text-${stat.color === 'emerald' ? 'emerald' : stat.color}-600 mx-auto mb-2`} />
+                    <div className={`text-2xl font-black text-${stat.color === 'emerald' ? 'emerald' : stat.color}-700`}>{stat.count}</div>
+                    <div className={`text-[10px] font-bold uppercase tracking-wider text-${stat.color === 'emerald' ? 'emerald' : stat.color}-600/70`}>{stat.label}</div>
+                  </CardContent>
+                </Card>
               </div>
-              <p className="text-slate-600 font-medium">
-                Acompanhe o status das liberações realizadas pelos administradores. Total de prestadores:{" "}
-                <span className="text-emerald-600 font-bold">{dadosPorStatus.length}</span>
-              </p>
-            </div>
+            ))}
+          </div>
 
-            {/* Busca */}
-            <div className="mb-8 p-6 bg-white rounded-2xl border border-slate-200 shadow-sm transition-soft hover:shadow-md">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="bg-slate-100 p-2 rounded-lg">
-                  <Search className="h-5 w-5 text-slate-600" />
-                </div>
-                <Label className="text-lg font-bold text-slate-800">Buscar Prestador</Label>
+          <div className="bg-slate-500/5 border border-slate-200 rounded-2xl p-4 mb-8 flex items-center gap-4">
+            <div className="bg-emerald-500/20 p-2 rounded-lg">
+              <CheckCircle className="h-5 w-5 text-emerald-600" />
+            </div>
+            <p className="text-slate-600 font-medium">
+              Acompanhe o status das liberações realizadas pelos administradores. Total de prestadores:{" "}
+              <span className="text-emerald-600 font-bold">{dadosPorStatus.length}</span>
+            </p>
+          </div>
+
+          {/* Busca */}
+          <div className="mb-8 p-6 bg-white rounded-2xl border border-slate-200 shadow-sm transition-soft hover:shadow-md">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-slate-100 p-2 rounded-lg">
+                <Search className="h-5 w-5 text-slate-600" />
               </div>
-              <div className="relative">
-                <Input
-                  type="text"
-                  placeholder="Nome, documento ou número da solicitação..."
-                  value={buscaGeral}
-                  onChange={(e) => setBuscaGeral(e.target.value)}
-                  className="h-12 border-slate-200 focus:border-emerald-500 focus:ring-emerald-500 rounded-xl pr-12 text-slate-700 bg-slate-50/50"
-                />
-                <div className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-emerald-600 p-1.5 rounded-lg text-white shadow-lg">
-                  <Search className="h-4 w-4" />
-                </div>
+              <Label className="text-lg font-bold text-slate-800">Buscar Prestador</Label>
+            </div>
+            <div className="relative">
+              <Input
+                type="text"
+                placeholder="Nome, documento ou número da solicitação..."
+                value={buscaGeral}
+                onChange={(e) => setBuscaGeral(e.target.value)}
+                className="h-12 border-slate-200 focus:border-emerald-500 focus:ring-emerald-500 rounded-xl pr-12 text-slate-700 bg-slate-50/50"
+              />
+              <div className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-emerald-600 p-1.5 rounded-lg text-white shadow-lg">
+                <Search className="h-4 w-4" />
               </div>
             </div>
+          </div>
 
-            {/* Informações de Paginação */}
-            <div className="mb-4 flex items-center justify-between text-xs font-bold uppercase tracking-widest text-slate-400">
-              <div>
-                Mostrando <span className="text-slate-700">{indiceInicio + 1}</span> - <span className="text-slate-700">{Math.min(indiceFim, totalPrestadores)}</span> de <span className="text-slate-700">{totalPrestadores}</span>
-              </div>
-              <div>
-                Página <span className="text-slate-700">{paginaAtual}</span> de <span className="text-slate-700">{totalPaginas}</span>
-              </div>
+          {/* Informações de Paginação */}
+          <div className="mb-4 flex items-center justify-between text-xs font-bold uppercase tracking-widest text-slate-400">
+            <div>
+              Mostrando <span className="text-slate-700">{indiceInicio + 1}</span> - <span className="text-slate-700">{Math.min(indiceFim, totalPrestadores)}</span> de <span className="text-slate-700">{totalPrestadores}</span>
             </div>
+            <div>
+              Página <span className="text-slate-700">{paginaAtual}</span> de <span className="text-slate-700">{totalPaginas}</span>
+            </div>
+          </div>
 
-            {/* Tabela */}
-            <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm bg-white">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50 hover:bg-slate-50 border-b border-slate-200">
-                    <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Solicitação</TableHead>
-                    <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Prestador</TableHead>
-                    <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Doc1</TableHead>
-                    <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Status Liberação</TableHead>
-                    <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Data Final</TableHead>
-                    <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Observações</TableHead>
-                    <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Ações</TableHead>
+          {/* Tabela */}
+          <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm bg-white">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-slate-50 hover:bg-slate-50 border-b border-slate-200">
+                  <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Solicitação</TableHead>
+                  <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Prestador</TableHead>
+                  <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Doc1</TableHead>
+                  <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Status Liberação</TableHead>
+                  <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Data Final</TableHead>
+                  <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Observações</TableHead>
+                  <TableHead className="py-5 font-bold text-slate-800 text-center uppercase tracking-tighter text-xs">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {dadosPaginados.map(({ solicitacao, prestador, statusLiberacao }, index) => (
+                  <TableRow key={`${solicitacao.id}-${prestador.id}`} className="hover:bg-emerald-50/30 transition-soft border-b border-slate-100 last:border-0">
+                    <TableCell className="font-medium text-sm text-center">{solicitacao.numero}</TableCell>
+                    <TableCell className="text-sm text-center">{prestador.nome}</TableCell>
+                    <TableCell className="text-sm text-center">
+                      <div className="text-xs font-mono">{prestador.doc1}</div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <StatusLiberacaoIcon status={statusLiberacao} />
+                        <StatusLiberacaoBadge status={statusLiberacao} />
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        {getDataAlert(solicitacao.dataFinal)?.icon}
+                        <span className={getDataAlert(solicitacao.dataFinal)?.color || "text-gray-900"}>
+                          {solicitacao.dataFinal}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-center max-w-[200px]">
+                      {prestador.observacoes ? (
+                        <div className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200 whitespace-pre-wrap break-words">
+                          {prestador.observacoes}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={!isAcoesHabilitadas(solicitacao.dataFinal)}
+                          onClick={() => handleRenovar(prestador, solicitacao)}
+                          className={`${!isAcoesHabilitadas(solicitacao.dataFinal) ? "text-gray-400 border-gray-300" : "text-blue-600 border-blue-300 hover:bg-blue-50"}`}
+                        >
+                          <RotateCcw className="h-3 w-3 mr-1" />
+                          Renovar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={!isAcoesHabilitadas(solicitacao.dataFinal)}
+                          onClick={() => handleExcluir(prestador, solicitacao)}
+                          className={`${!isAcoesHabilitadas(solicitacao.dataFinal) ? "text-gray-400 border-gray-300" : "text-red-600 border-red-300 hover:bg-red-50"}`}
+                        >
+                          <Trash2 className="h-3 w-3 mr-1" />
+                          Excluir
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {dadosPaginados.map(({ solicitacao, prestador, statusLiberacao }, index) => (
-                    <TableRow key={`${solicitacao.id}-${prestador.id}`} className="hover:bg-emerald-50/30 transition-soft border-b border-slate-100 last:border-0">
-                      <TableCell className="font-medium text-sm text-center">{solicitacao.numero}</TableCell>
-                      <TableCell className="text-sm text-center">{prestador.nome}</TableCell>
-                      <TableCell className="text-sm text-center">
-                        <div className="text-xs font-mono">{prestador.doc1}</div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <StatusLiberacaoIcon status={statusLiberacao} />
-                          <StatusLiberacaoBadge status={statusLiberacao} />
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          {getDataAlert(solicitacao.dataFinal)?.icon}
-                          <span className={getDataAlert(solicitacao.dataFinal)?.color || "text-gray-900"}>
-                            {solicitacao.dataFinal}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-center max-w-[200px]">
-                        {prestador.observacoes ? (
-                          <div className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200 whitespace-pre-wrap break-words">
-                            {prestador.observacoes}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={!isAcoesHabilitadas(solicitacao.dataFinal)}
-                            onClick={() => handleRenovar(prestador, solicitacao)}
-                            className={`${!isAcoesHabilitadas(solicitacao.dataFinal) ? "text-gray-400 border-gray-300" : "text-blue-600 border-blue-300 hover:bg-blue-50"}`}
-                          >
-                            <RotateCcw className="h-3 w-3 mr-1" />
-                            Renovar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={!isAcoesHabilitadas(solicitacao.dataFinal)}
-                            onClick={() => handleExcluir(prestador, solicitacao)}
-                            className={`${!isAcoesHabilitadas(solicitacao.dataFinal) ? "text-gray-400 border-gray-300" : "text-red-600 border-red-300 hover:bg-red-50"}`}
-                          >
-                            <Trash2 className="h-3 w-3 mr-1" />
-                            Excluir
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {dadosPaginados.length === 0 && (
+            <div className="text-center py-20 text-slate-400">
+              <Search className="h-16 w-16 mx-auto mb-4 opacity-20" />
+              <p className="text-lg font-medium">Nenhuma liberação encontrada.</p>
+              <p className="text-sm">Tente ajustar seus termos de busca.</p>
+            </div>
+          )}
+
+          <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="text-sm font-bold text-slate-400 uppercase tracking-widest">
+              Total: <span className="text-emerald-600">{totalPrestadores}</span> prestadores
             </div>
 
-            {dadosPaginados.length === 0 && (
-              <div className="text-center py-20 text-slate-400">
-                <Search className="h-16 w-16 mx-auto mb-4 opacity-20" />
-                <p className="text-lg font-medium">Nenhuma liberação encontrada.</p>
-                <p className="text-sm">Tente ajustar seus termos de busca.</p>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={handlePaginaAnterior}
+                disabled={paginaAtual === 1}
+                variant="outline"
+                size="sm"
+                className="h-10 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-soft"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Anterior
+              </Button>
+
+              <div className="bg-slate-100 px-4 py-2 rounded-xl text-sm font-bold text-slate-600 min-w-[80px] text-center">
+                {paginaAtual} / {totalPaginas}
               </div>
-            )}
 
-            <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="text-sm font-bold text-slate-400 uppercase tracking-widest">
-                Total: <span className="text-emerald-600">{totalPrestadores}</span> prestadores
-              </div>
-
-              <div className="flex items-center gap-3">
-                <Button
-                  onClick={handlePaginaAnterior}
-                  disabled={paginaAtual === 1}
-                  variant="outline"
-                  size="sm"
-                  className="h-10 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-soft"
-                >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Anterior
-                </Button>
-
-                <div className="bg-slate-100 px-4 py-2 rounded-xl text-sm font-bold text-slate-600 min-w-[80px] text-center">
-                  {paginaAtual} / {totalPaginas}
-                </div>
-
-                <Button
-                  onClick={handleProximaPagina}
-                  disabled={paginaAtual === totalPaginas}
-                  variant="outline"
-                  size="sm"
-                  className="h-10 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-soft"
-                >
-                  Próxima
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
+              <Button
+                onClick={handleProximaPagina}
+                disabled={paginaAtual === totalPaginas}
+                variant="outline"
+                size="sm"
+                className="h-10 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-soft"
+              >
+                Próxima
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
       {/* Modal de Renovação */}
       <Dialog open={modalRenovacao} onOpenChange={setModalRenovacao}>
         <DialogContent className="max-w-md">
@@ -467,6 +465,6 @@ export default function Liberacoes() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   )
 }

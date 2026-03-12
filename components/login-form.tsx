@@ -84,7 +84,7 @@ export default function LoginForm() {
       } else {
         setErroTroca("Email ou senha atual incorretos")
       }
-    } catch (error) {
+    } catch (error: any) {
       setErroTroca("Erro interno do servidor")
     } finally {
       setIsLoadingTroca(false)
