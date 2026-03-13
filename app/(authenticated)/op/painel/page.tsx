@@ -1,82 +1,68 @@
 "use client"
 
-import { useState } from "react"
-import { useAuth } from "@/contexts/auth-context"
-import { Users, MapPin, CalendarClock, Clock } from "lucide-react"
-import GestaoPostos from "@/components/op/gestao-postos"
-import GestaoEscalas from "@/components/op/gestao-escalas"
-import GestaoEquipe from "@/components/op/gestao-equipe"
-import GestaoRendicoes from "@/components/op/gestao-rendicoes"
-import { Button } from "@/components/ui/button"
-import PageHeader from "@/components/page-header"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Users, LayoutDashboard, Settings, MapPin } from "lucide-react"
+import GestaoEquipeV2 from "@/components/op/GestaoEquipeV2"
 
 export default function PainelOperacional() {
-    const [activeTab, setActiveTab] = useState("escala")
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-3xl font-black tracking-tight text-slate-900">Gestão Operacional</h1>
+        <p className="text-slate-500 font-medium">Controle de efetivo, escalas e postos de serviço em tempo real.</p>
+      </div>
 
-    return (
-        <div className="min-h-screen bg-white">
-            <PageHeader
-                title="Operação em Tempo Real"
-                subtitle="Painel Tático: Alocação e Giros de Base."
-                backHref="/admin/dashboard"
-            />
+      <Tabs defaultValue="equipe" className="w-full space-y-6">
+        <TabsList className="bg-slate-200/50 p-1 gap-1 rounded-xl border border-slate-200 shadow-sm">
+          <TabsTrigger value="dashboard" className="rounded-lg gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold text-xs uppercase tracking-wider py-2.5 px-6">
+            <LayoutDashboard className="h-4 w-4" />
+            Dashboard
+          </TabsTrigger>
+          <TabsTrigger value="equipe" className="rounded-lg gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold text-xs uppercase tracking-wider py-2.5 px-6">
+            <Users className="h-4 w-4" />
+            Escala de Equipe
+          </TabsTrigger>
+          <TabsTrigger value="postos" className="rounded-lg gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold text-xs uppercase tracking-wider py-2.5 px-6">
+            <MapPin className="h-4 w-4" />
+            Postos e Alocação
+          </TabsTrigger>
+          <TabsTrigger value="config" className="rounded-lg gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold text-xs uppercase tracking-wider py-2.5 px-6">
+            <Settings className="h-4 w-4" />
+            Configurações
+          </TabsTrigger>
+        </TabsList>
 
-            {/* Tabs de Navegação Interna */}
-            <div className="flex gap-2 p-1 bg-white border rounded-xl w-fit shadow-sm mb-4">
-                <Button
-                    variant={activeTab === "escala" ? "default" : "ghost"}
-                    onClick={() => setActiveTab("escala")}
-                    className={`gap-2 ${activeTab === "escala" ? "bg-blue-600 text-white shadow-md hover:bg-blue-700" : "text-slate-600"}`}
-                >
-                    <CalendarClock className="w-4 h-4" />
-                    Painel Tático (Escala)
-                </Button>
-                <Button
-                    variant={activeTab === "rendicoes" ? "default" : "ghost"}
-                    onClick={() => setActiveTab("rendicoes")}
-                    className={`gap-2 ${activeTab === "rendicoes" ? "bg-indigo-600 text-white shadow-md hover:bg-indigo-700" : "text-slate-600"}`}
-                >
-                    <Clock className="w-4 h-4" />
-                    Roteiro de Pausas
-                </Button>
-                <Button
-                    variant={activeTab === "equipe" ? "default" : "ghost"}
-                    onClick={() => setActiveTab("equipe")}
-                    className={`gap-2 ${activeTab === "equipe" ? "bg-blue-600 text-white shadow-md hover:bg-blue-700" : "text-slate-600"}`}
-                >
-                    <Users className="w-4 h-4" />
-                    Gerir Equipe
-                </Button>
-                <Button
-                    variant={activeTab === "postos" ? "default" : "ghost"}
-                    onClick={() => setActiveTab("postos")}
-                    className={`gap-2 ${activeTab === "postos" ? "bg-blue-600 text-white shadow-md hover:bg-blue-700" : "text-slate-600"}`}
-                >
-                    <MapPin className="w-4 h-4" />
-                    Editar Postos
-                </Button>
+        <TabsContent value="dashboard" className="border-none p-0 outline-none">
+          <div className="h-[400px] flex items-center justify-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+            <div className="text-center space-y-2">
+              <LayoutDashboard className="h-8 w-8 text-slate-300 mx-auto" />
+              <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Em desenvolvimento</p>
             </div>
+          </div>
+        </TabsContent>
 
-            {/* Área de Conteúdo */}
-            <div className="min-h-[500px]">
-                {activeTab === "escala" && (
-                    <GestaoEscalas />
-                )}
+        <TabsContent value="equipe" className="border-none p-0 outline-none animate-in fade-in duration-500">
+          <GestaoEquipeV2 />
+        </TabsContent>
 
-                {activeTab === "rendicoes" && (
-                    <GestaoRendicoes />
-                )}
-
-                {activeTab === "equipe" && (
-                    <GestaoEquipe />
-                )}
-
-                {activeTab === "postos" && (
-                    <div className="bg-white border rounded-xl shadow-sm p-6">
-                        <GestaoPostos />
-                    </div>
-                )}
+        <TabsContent value="postos" className="border-none p-0 outline-none">
+          <div className="h-[400px] flex items-center justify-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+            <div className="text-center space-y-2">
+              <MapPin className="h-8 w-8 text-slate-300 mx-auto" />
+              <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Em desenvolvimento</p>
             </div>
-        </div>
-    )
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="config" className="border-none p-0 outline-none">
+          <div className="h-[400px] flex items-center justify-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+            <div className="text-center space-y-2">
+              <Settings className="h-8 w-8 text-slate-300 mx-auto" />
+              <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Em desenvolvimento</p>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
 }
