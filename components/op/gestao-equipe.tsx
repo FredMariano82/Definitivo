@@ -15,7 +15,7 @@ import {
     ArrowRight,
     UserCircle2
 } from "lucide-react"
-import { OpService, OpEquipe } from "@/services/op-service"
+import { OpService, OpEquipe, OpEscalaDiaria } from "@/services/op-service"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
@@ -39,8 +39,13 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
-import { format, isAfter, isBefore, addDays, differenceInDays, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns"
+import { format, isAfter, isBefore, addDays, differenceInDays, startOfMonth, endOfMonth, eachDayOfInterval, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover"
 
 export default function GestaoEquipe() {
     const [equipe, setEquipe] = useState<OpEquipe[]>([])
@@ -48,6 +53,8 @@ export default function GestaoEquipe() {
     const [searchTerm, setSearchTerm] = useState("")
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [editingMemberId, setEditingMemberId] = useState<string | null>(null)
+    const [excecoesMes, setExcecoesMes] = useState<OpEscalaDiaria[]>([])
+    const [viewDate, setViewDate] = useState(new Date())
 
     const [formData, setFormData] = useState<Partial<OpEquipe>>({
         nome_completo: "",
@@ -65,13 +72,35 @@ export default function GestaoEquipe() {
 
     useEffect(() => {
         carregarEquipe()
-    }, [])
+    }, [viewDate])
 
     const carregarEquipe = async () => {
         setLoading(true)
-        const dados = await OpService.getEquipe()
+        const ini = format(startOfMonth(viewDate), 'yyyy-MM-dd')
+        const fim = format(endOfMonth(viewDate), 'yyyy-MM-dd')
+        const [dados, excecoes] = await Promise.all([
+            OpService.getEquipe(),
+            OpService.getEscalasRegiao(ini, fim)
+        ])
         setEquipe(dados)
+        setExcecoesMes(excecoes)
         setLoading(false)
+    }
+
+    const handleTrocarStatusDia = async (membroId: string, data: Date, novoStatus: string) => {
+        try {
+            const dataString = format(data, 'yyyy-MM-dd')
+            await OpService.upsertEscalaDiaria({
+                colaborador_id: membroId,
+                data_plantao: dataString,
+                status_dia: novoStatus,
+                horario_inicio: "08:00", // Default
+                horario_fim: "20:00"     // Default
+            })
+            await carregarEquipe()
+        } catch (e) {
+            alert("Erro ao salvar alteração na escala.")
+        }
     }
 
     const handleSave = async () => {
@@ -86,6 +115,9 @@ export default function GestaoEquipe() {
             } else {
                 await OpService.adicionarMembroEquipe(formData as Omit<OpEquipe, "id">)
             }
+            
+            await carregarEquipe()
+            alert(editingMemberId ? "Colaborador atualizado com sucesso!" : "Colaborador cadastrado com sucesso!")
             
             setIsDialogOpen(false)
             setEditingMemberId(null)
@@ -102,11 +134,9 @@ export default function GestaoEquipe() {
                 data_fim_ferias: "",
                 referencia_escala: format(new Date(), 'yyyy-MM-dd'),
             })
-            await carregarEquipe()
-            alert(editingMemberId ? "Colaborador atualizado com sucesso!" : "Colaborador cadastrado com sucesso!")
-        } catch (e) {
+        } catch (e: any) {
             console.error("Erro ao salvar:", e)
-            alert("Erro ao salvar membro da equipe. Verifique o console para mais detalhes.")
+            alert("Erro ao salvar: " + (e.message || "Erro desconhecido") + ". Verifique o console para detalhes técnicos.")
         }
     }
 
@@ -397,11 +427,17 @@ export default function GestaoEquipe() {
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
-                                <Button variant="outline" size="sm" className="rounded-xl h-9 px-4 text-xs font-bold border-slate-200">Mês Anterior</Button>
+                                <Button variant="outline" size="sm" className="rounded-xl h-9 px-4 text-xs font-bold border-slate-200" onClick={() => {
+                                    const next = addDays(startOfMonth(viewDate), -1);
+                                    setViewDate(next);
+                                }}>Mês Anterior</Button>
                                 <div className="px-4 py-2 bg-slate-50 rounded-xl border border-slate-100 text-xs font-black text-slate-700 uppercase tracking-tight">
-                                    Março 2024
+                                    {format(viewDate, 'MMMM yyyy', { locale: ptBR })}
                                 </div>
-                                <Button variant="outline" size="sm" className="rounded-xl h-9 px-4 text-xs font-bold border-slate-200">Próximo Mês</Button>
+                                <Button variant="outline" size="sm" className="rounded-xl h-9 px-4 text-xs font-bold border-slate-200" onClick={() => {
+                                    const next = addDays(endOfMonth(viewDate), 1);
+                                    setViewDate(next);
+                                }}>Próximo Mês</Button>
                             </div>
                         </div>
 
@@ -415,8 +451,8 @@ export default function GestaoEquipe() {
                                                 Colaborador
                                             </th>
                                             {eachDayOfInterval({ 
-                                                start: startOfMonth(new Date()), 
-                                                end: endOfMonth(new Date()) 
+                                                start: startOfMonth(viewDate), 
+                                                end: endOfMonth(viewDate) 
                                             }).map((day, i) => (
                                                 <th key={i} className={`text-center w-10 min-w-[40px] py-4 text-[9px] font-black border-l border-slate-100/30
                                                     ${format(day, 'E', { locale: ptBR }).startsWith('s') ? 'bg-amber-50/30 text-amber-600' : 'text-slate-400'}
@@ -464,36 +500,53 @@ export default function GestaoEquipe() {
                                                                     </div>
                                                                 </td>
                                                                 {eachDayOfInterval({ 
-                                                                    start: startOfMonth(new Date()), 
-                                                                    end: endOfMonth(new Date()) 
+                                                                    start: startOfMonth(viewDate), 
+                                                                    end: endOfMonth(viewDate) 
                                                                 }).map((day, i) => {
-                                                                    const refDate = m.referencia_escala ? new Date(m.referencia_escala) : new Date();
-                                                                    const diffDays = differenceInDays(day, refDate);
+                                                                    const diaExcecao = excecoesMes.find(ex => 
+                                                                        ex.colaborador_id === m.id && 
+                                                                        ex.data_plantao === format(day, 'yyyy-MM-dd')
+                                                                    );
                                                                     
-                                                                    let isWorkDay = false;
-                                                                    if (m.tipo_escala === '12x36') {
-                                                                        isWorkDay = diffDays % 2 === 0;
-                                                                    } else if (m.tipo_escala === '5x1') {
-                                                                        isWorkDay = diffDays % 6 < 5;
-                                                                    } else if (m.tipo_escala === '5x2') {
-                                                                        const dweek = day.getDay();
-                                                                        isWorkDay = dweek !== 0 && dweek !== 6;
-                                                                    }
+                                                                    const isWorkDay = OpService.getTrabalhaNoDia(m, day, diaExcecao ? [diaExcecao] : []);
 
                                                                     // Check if on vacation
                                                                     const isOnVacation = m.data_inicio_ferias && m.data_fim_ferias && 
-                                                                        !isBefore(day, new Date(m.data_inicio_ferias)) && 
-                                                                        !isAfter(day, new Date(m.data_fim_ferias));
+                                                                        !isBefore(day, parseISO(m.data_inicio_ferias)) && 
+                                                                        !isAfter(day, parseISO(m.data_fim_ferias));
+
+                                                                    const statusText = diaExcecao?.status_dia || (isWorkDay ? 'Trabalhando' : 'Folga');
+                                                                    const bgClass = isOnVacation ? 'bg-amber-500 text-white shadow-amber-200' : 
+                                                                                   statusText === 'Falta' ? 'bg-red-600 text-white shadow-red-200' :
+                                                                                   statusText === 'Atestado' ? 'bg-red-400 text-white shadow-red-100' :
+                                                                                   statusText === 'Folga' ? 'bg-slate-100 text-slate-400 border border-slate-200 opacity-40' :
+                                                                                   'bg-blue-600 text-white shadow-blue-200/50';
 
                                                                     return (
                                                                         <td key={i} className="p-0.5 border-l border-slate-50/50">
-                                                                            <div className={`h-9 w-full rounded-lg transition-all duration-300 flex items-center justify-center text-[10px] font-black
-                                                                                ${isOnVacation ? 'bg-amber-500 text-white shadow-lg shadow-amber-200 scale-90' : 
-                                                                                  isWorkDay ? 'bg-blue-600 text-white shadow-lg shadow-blue-200/50 scale-[0.85]' : 
-                                                                                  'text-slate-100'}
-                                                                            `}>
-                                                                                {isOnVacation ? 'F' : isWorkDay ? 'T' : ''}
-                                                                            </div>
+                                                                            <Popover>
+                                                                                <PopoverTrigger asChild>
+                                                                                    <div className={`h-9 w-full rounded-lg cursor-pointer transition-all duration-300 flex items-center justify-center text-[10px] font-black ${bgClass} scale-[0.85] hover:scale-100`}>
+                                                                                        {isOnVacation ? 'F' : statusText.charAt(0).toUpperCase()}
+                                                                                    </div>
+                                                                                </PopoverTrigger>
+                                                                                <PopoverContent className="w-40 p-1">
+                                                                                    <div className="flex flex-col gap-1">
+                                                                                        <Button variant="ghost" size="sm" className="justify-start text-xs font-bold" onClick={() => handleTrocarStatusDia(m.id, day, 'Trabalhando')}>
+                                                                                            Trabalhando
+                                                                                        </Button>
+                                                                                        <Button variant="ghost" size="sm" className="justify-start text-xs font-bold text-red-600" onClick={() => handleTrocarStatusDia(m.id, day, 'Falta')}>
+                                                                                            Falta
+                                                                                        </Button>
+                                                                                        <Button variant="ghost" size="sm" className="justify-start text-xs font-bold text-amber-600" onClick={() => handleTrocarStatusDia(m.id, day, 'Atestado')}>
+                                                                                            Atestado
+                                                                                        </Button>
+                                                                                        <Button variant="ghost" size="sm" className="justify-start text-xs font-bold text-slate-500" onClick={() => handleTrocarStatusDia(m.id, day, 'Folga')}>
+                                                                                            Folga
+                                                                                        </Button>
+                                                                                    </div>
+                                                                                </PopoverContent>
+                                                                            </Popover>
                                                                         </td>
                                                                     )
                                                                 })}
@@ -521,8 +574,9 @@ export default function GestaoEquipe() {
                             <div>
                                 <h4 className="text-sm font-bold text-blue-900">Inteligência de Escala</h4>
                                 <p className="text-[11px] text-blue-800 opacity-70 leading-relaxed max-w-2xl">
-                                    O sistema calcula automaticamente os dias de trabalho baseados na data de referência. 
-                                    Para ajustar exceções (Faltas, Afastamentos ou Férias), clique no ícone de edição ao lado do nome do colaborador.
+                                    O sistema calcula automaticamente os dias de trabalho. 
+                                    **Para ajustar exceções (Faltas, Afastamentos ou Folgas), CLIQUE DIRETAMENTE no dia desejado no calendário.** 
+                                    Use o ícone de edição ao lado do nome para dados cadastrais ou férias longas.
                                 </p>
                             </div>
                         </div>

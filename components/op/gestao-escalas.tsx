@@ -33,6 +33,7 @@ const TIPOS_PLANTAO = ["Normal", "FT (Folga Trabalhada)", "RT (Recup. de Tempo)"
 export default function GestaoEscalas() {
     const [dataAtual, setDataAtual] = useState("")
     const [equipePool, setEquipePool] = useState<OpEquipe[]>([])
+    const [equipeCompleta, setEquipeCompleta] = useState<OpEquipe[]>([]) // Para o Check-in
     const [postos, setPostos] = useState<OpPosto[]>([])
     const [escalas, setEscalas] = useState<OpEscalaComEstado[]>([])
     const [loading, setLoading] = useState(true)
@@ -72,14 +73,35 @@ export default function GestaoEscalas() {
 
     const carregarLoteDados = async (dataBusca: string) => {
         setLoading(true)
-        const [dadosEquipe, dadosPostos, dadosEscalas] = await Promise.all([
+        const [dadosEquipe, dadosPostos, dadosEscalas, dadosCheckin] = await Promise.all([
             OpService.getEquipe(),
             OpService.getPostos(),
-            OpService.getEscalaPorData(dataBusca)
+            OpService.getEscalaPorData(dataBusca),
+            OpService.getCheckin(dataBusca)
         ])
 
         const escaladosIds = dadosEscalas.map(e => e.colaborador_id)
-        const equipeDisponivel = dadosEquipe.filter(e => e.status_ativo && !escaladosIds.includes(e.id))
+        setEquipeCompleta(dadosEquipe.filter(e => e.status_ativo))
+
+        // --- INTELIGÊNCIA DE CALENDÁRIO ---
+        // Se houver check-in no banco, usamos ele. Se não, usamos a sugestão da escala.
+        let idsPresentesFinal: string[] = []
+        
+        if (dadosCheckin && dadosCheckin.length > 0) {
+            idsPresentesFinal = dadosCheckin
+        } else {
+            // Sugestão baseada na escala do calendário + Exceções (Faltas/FTs)
+            idsPresentesFinal = dadosEquipe
+                .filter(e => e.status_ativo && OpService.getTrabalhaNoDia(e, dataBusca, dadosEscalas))
+                .map(e => e.id)
+        }
+
+        setPresentesIds(new Set(idsPresentesFinal))
+
+        // O Pool de disponíveis é: (Presentes no Check-in) MINUS (Já escalados em algum posto)
+        const equipeDisponivel = dadosEquipe.filter(e => 
+            idsPresentesFinal.includes(e.id) && !escaladosIds.includes(e.id)
+        )
 
         setEquipePool(equipeDisponivel)
         setPostos(dadosPostos.filter(p => p.nome_posto !== "Chapeira" && p.nome_posto !== "Hungria"))
@@ -579,7 +601,12 @@ export default function GestaoEscalas() {
                         />
 
                         <div className="flex-1 overflow-y-auto border rounded-xl divide-y">
-                            {equipePool
+                            {/* No modal de check-in, mostramos TODA a equipe ativa para permitir FTs */}
+                            <div className="p-2 bg-blue-50 text-[10px] font-bold text-blue-700 uppercase tracking-wider text-center border-b">
+                                Selecione quem veio trabalhar (Escala Normal ou FT)
+                            </div>
+                            
+                            {equipeCompleta
                                 .filter(m => m.nome_completo.toLowerCase().includes(buscaChamada.toLowerCase()) || m.re.includes(buscaChamada))
                                 .map(membro => {
                                     const isPresente = presentesIds.has(membro.id);
@@ -598,7 +625,12 @@ export default function GestaoEscalas() {
                                                 <input
                                                     type="checkbox"
                                                     checked={isPresente}
-                                                    readOnly
+                                                    onChange={(e) => {
+                                                        const next = new Set(presentesIds);
+                                                        if (isPresente) next.delete(membro.id);
+                                                        else next.add(membro.id);
+                                                        setPresentesIds(next);
+                                                    }}
                                                     className="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                                                 />
                                                 <div>
@@ -618,8 +650,17 @@ export default function GestaoEscalas() {
                         <div className="flex-1 text-sm text-slate-500">
                             <strong>{presentesIds.size}</strong> confirmados na base ativa.
                         </div>
-                        <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setIsChamadaModalOpen(false)}>
-                            Concluir Check-in ({presentesIds.size})
+                        <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={async () => {
+                            try {
+                                const ids = Array.from(presentesIds);
+                                await OpService.salvarCheckin(dataAtual, ids);
+                                await carregarLoteDados(dataAtual);
+                                setIsChamadaModalOpen(false);
+                            } catch (e) {
+                                alert("Erro ao salvar lista de presença.");
+                            }
+                        }}>
+                            Salvar Lista de Presença ({presentesIds.size})
                         </Button>
                     </DialogFooter>
                 </DialogContent>

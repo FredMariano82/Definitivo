@@ -66,6 +66,11 @@ CREATE POLICY "Permitir leitura de escala" ON op_escala_diaria FOR SELECT USING 
 CREATE POLICY "Permitir inserção de escala" ON op_escala_diaria FOR INSERT WITH CHECK (true);
 CREATE POLICY "Permitir deleção de escala" ON op_escala_diaria FOR DELETE USING (true);
 
+CREATE POLICY "Permitir update de escala" ON op_escala_diaria FOR UPDATE USING (true);
 CREATE POLICY "Permitir leitura de rodizio" ON op_rodizio_pausas FOR SELECT USING (true);
 CREATE POLICY "Permitir inserção de rodizio" ON op_rodizio_pausas FOR INSERT WITH CHECK (true);
 CREATE POLICY "Permitir deleção de rodizio" ON op_rodizio_pausas FOR DELETE USING (true);
+
+-- Restrição de Unicidade
+ALTER TABLE op_escala_diaria DROP CONSTRAINT IF EXISTS unique_colab_date;
+ALTER TABLE op_escala_diaria ADD CONSTRAINT unique_colab_date UNIQUE (colaborador_id, data_plantao);

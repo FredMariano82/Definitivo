@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { format } from "date-fns"
 import { getCurrentDate } from "@/utils/date-helpers"
 import {
     Select,
@@ -74,16 +75,16 @@ export default function GestaoRendicoes() {
                     horario_posto: `${escala.horario_inicio.slice(0, 5)} - ${escala.horario_fim.slice(0, 5)}`,
 
                     cafe: {
-                        status: dbCafe ? "Retornou" : "Aguardando",
+                        status: dbCafe ? (dbCafe.horario_fim < format(new Date(), 'HH:mm') ? "Retornou" : "Em Pausa") : "Aguardando",
                         pausa_id: dbCafe?.id,
-                        rendicionista_id: (dbCafe as any)?.rendicionista_id, // Usando o rendicionista salvo ou mapeado
+                        rendicionista_id: dbCafe?.rendicionista_id, 
                         saida: dbCafe?.horario_inicio,
                         retorno: dbCafe?.horario_fim
                     },
                     almoco: {
-                        status: dbAlmoco ? "Retornou" : "Aguardando",
+                        status: dbAlmoco ? (dbAlmoco.horario_fim < format(new Date(), 'HH:mm') ? "Retornou" : "Em Pausa") : "Aguardando",
                         pausa_id: dbAlmoco?.id,
-                        rendicionista_id: (dbAlmoco as any)?.rendicionista_id,
+                        rendicionista_id: dbAlmoco?.rendicionista_id,
                         saida: dbAlmoco?.horario_inicio,
                         retorno: dbAlmoco?.horario_fim
                     },
@@ -168,9 +169,56 @@ export default function GestaoRendicoes() {
 
     const setDropRendicionista = (escala_id: string, tipo: 'cafe' | 'almoco', r_id: string) => {
         setRows(current => current.map(row => {
-            if (row.escala_id === escala_id) row[tipo].rendicionista_id = r_id
+            if (row.escala_id === escala_id) {
+                return {
+                    ...row,
+                    [tipo]: { ...row[tipo], rendicionista_id: r_id }
+                }
+            }
             return row
         }))
+    }
+
+    const handleSalvarNoBanco = async () => {
+        setLoading(true);
+        try {
+            const promises: Promise<any>[] = [];
+
+            for (const row of rows) {
+                // Salvar Café se houver rendicionista ou status alterado
+                if (row.cafe.rendicionista_id || row.cafe.status !== "Aguardando") {
+                    promises.push(OpService.salvarPausa({
+                        escala_diaria_id: row.escala_id,
+                        posto_rendido_id: row.posto.id,
+                        tipo_pausa: "Café",
+                        horario_inicio: row.cafe.saida || "09:00",
+                        horario_fim: row.cafe.retorno || "09:15",
+                        rendicionista_id: row.cafe.rendicionista_id
+                    }));
+                }
+
+                // Salvar Almoço/Janta
+                if (row.almoco.rendicionista_id || row.almoco.status !== "Aguardando") {
+                    promises.push(OpService.salvarPausa({
+                        escala_diaria_id: row.escala_id,
+                        posto_rendido_id: row.posto.id,
+                        tipo_pausa: "Almoço",
+                        horario_inicio: row.almoco.saida || "11:00",
+                        horario_fim: row.almoco.retorno || "12:00",
+                        rendicionista_id: row.almoco.rendicionista_id
+                    }));
+                }
+            }
+
+            await Promise.all(promises);
+            alert("Roteiro de Giro salvo com sucesso!");
+            await carregarPainel(dataAtual);
+        } catch (e) {
+            console.error("Erro ao salvar roteiro:", e);
+            alert("Erro ao salvar dados no banco.");
+        } finally {
+            setLoading(false);
+        }
     }
 
     // --- RENDER HELPERS ---
@@ -368,7 +416,7 @@ export default function GestaoRendicoes() {
                     </div>
 
                     <div className="flex justify-end gap-3 mt-4">
-                        <Button className="bg-slate-800">
+                        <Button className="bg-slate-800" onClick={handleSalvarNoBanco}>
                             <Save className="w-4 h-4 mr-2" />
                             Salvar Rotina no Banco
                         </Button>
