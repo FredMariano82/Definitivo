@@ -2,6 +2,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { Coffee, Utensils, AlertCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { OpEscalaDiaria, OpEquipe } from "@/services/op-service";
+import { DraggableMembro } from "./DraggableMembro";
 
 interface Props {
     id: string;
@@ -83,16 +84,15 @@ export function DroppablePausa({ id, tipo, tempoMinutos, pausasAtivas, onEncerra
                 {pausasAtivas.map(pausa => {
                     const atrasado = isLate(pausa.timer_fim_estimado);
                     return (
-                        <div
-                            key={pausa.id}
-                            className={`p-2 rounded border shadow-sm relative group flex justify-between items-center ${atrasado ? 'bg-red-50 border-red-300 animate-pulse' : 'bg-white border-slate-200'
-                                }`}
-                        >
-                            <div>
-                                <span className="font-bold text-slate-700 text-sm block truncate pr-8" title={pausa.op_equipe?.nome_completo}>
-                                    {pausa.op_equipe?.nome_completo}
-                                </span>
-                                <div className={`font-mono font-bold text-lg mt-1 ${atrasado ? 'text-red-600' : 'text-slate-600'}`}>
+                        <div key={pausa.id} className="relative group">
+                            <DraggableMembro 
+                                membro={pausa.op_equipe} 
+                                escala={pausa}
+                                className={atrasado ? 'bg-red-50 border-red-300 animate-pulse' : ''}
+                            />
+                            
+                            <div className="absolute right-3 bottom-3 flex items-center gap-2 pointer-events-none">
+                                <div className={`font-mono font-bold text-sm ${atrasado ? 'text-red-600' : 'text-slate-500'}`}>
                                     {formatTimeLimit(pausa.timer_fim_estimado)}
                                 </div>
                             </div>
@@ -106,12 +106,12 @@ export function DroppablePausa({ id, tipo, tempoMinutos, pausasAtivas, onEncerra
                                         onEncerrarPausa(pausa.id);
                                     }
                                 }}
-                                className={`absolute right-2 top-2 bottom-2 px-2 rounded font-bold text-xs transition-opacity ${atrasado ? 'bg-red-600 text-white hover:bg-red-700' : 'opacity-0 group-hover:opacity-100 bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                className={`absolute right-2 top-2 px-2 py-1 rounded font-bold text-[10px] z-10 transition-opacity ${atrasado ? 'bg-red-600 text-white hover:bg-red-700' : 'opacity-0 group-hover:opacity-100 bg-slate-100 text-slate-600 hover:bg-slate-200'
                                     }`}
                             >
                                 {atrasado ? 'JUSTIFICAR' : 'VOLTAR'}
                             </button>
-                            {atrasado && <AlertCircle className="absolute -top-2 -right-2 text-red-600 bg-white rounded-full w-5 h-5 animate-bounce" />}
+                            {atrasado && <AlertCircle className="absolute -top-1 -right-1 text-red-600 bg-white rounded-full w-4 h-4 z-20" />}
                         </div>
                     )
                 })}

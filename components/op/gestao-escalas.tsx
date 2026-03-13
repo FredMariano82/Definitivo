@@ -102,45 +102,36 @@ export default function GestaoEscalas() {
         }
     };
 
-    const handleDragEnd = async (event: DragEndEvent) => {
+    const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
         setActiveId(null);
         setActiveMembro(null);
 
         if (!over) return;
 
+        console.log("DnD Evento:", { de: active.data.current, para: over.data.current });
+
         const isMembroDrop = active.data.current?.type === 'MEMBRO';
         const isPostoDrop = over.data.current?.type === 'POSTO';
         const isPausaDrop = over.data.current?.type === 'PAUSA';
 
-        // CUIDADO: Estamos tentando dropar um membro novo da base em um posto?
         if (isMembroDrop && isPostoDrop) {
             const membro = active.data.current?.membro as OpEquipe;
             const posto = over.data.current?.posto as OpPosto | null;
+            const existingEscala = active.data.current?.escala; 
 
-            // VERIFICA SE JÁ TEM ALGUÉM NESSE POSTO (E NÃO É RENDIÇÃO MULTIPLA/BASE)
             if (posto && posto.id !== 'base') {
                 const ocupanteTitular = escalas.find(e => e.status_dia === "Trabalhando" && e.posto_id === posto.id);
 
-                // SE JÁ TEM UM TITULAR: ISTO É UM SWAP (RENDIÇÃO)!
-                if (ocupanteTitular) {
+                if (ocupanteTitular && ocupanteTitular.colaborador_id !== membro.id) {
+                    console.log("Substituição detectada em:", posto.nome_posto);
                     setSwapData({
                         titularReplaced: ocupanteTitular,
                         volanteNew: membro,
                         posto: posto
                     });
                     setSwapModalOpen(true);
-                    return; // Interrompe fluxo normal de inserção. A mágica acontece no modal.
-                }
-            }
-
-            // ALOCAÇÃO NORMAL EM VAGA VAZIA
-            if (posto && posto.id !== 'base') {
-                if (posto.exige_armamento && !membro.possui_porte_arma) {
-                    if (!confirm(`⚠️ ATENÇÃO: ${membro.nome_completo} não possui porte de arma (VSPP) exigido pelo posto. Deseja forçar alocação?`)) return;
-                }
-                if (posto.exige_cnh && !membro.possui_cnh) {
-                    if (!confirm(`⚠️ ATENÇÃO: ${membro.nome_completo} não possui CNH exigida pelo posto. Deseja forçar alocação?`)) return;
+                    return;
                 }
             }
 
@@ -148,67 +139,109 @@ export default function GestaoEscalas() {
             const finalPostoId = isBaseDrop || !posto ? null : posto.id;
             const finalOpPostos = isBaseDrop || !posto ? null : posto;
 
-            const newEscalaPayload = {
-                id: `temp-${Date.now()}`,
-                colaborador_id: membro.id,
-                data_plantao: dataAtual,
-                horario_inicio: posto && posto.nome_posto.includes("43") ? "05:00" : "18:00",
-                horario_fim: posto && posto.nome_posto.includes("43") ? "00:00" : "06:00",
-                status_dia: "Trabalhando",
-                posto_id: finalPostoId,
-                tipo_plantao: "Normal",
-                op_equipe: membro,
-                op_postos: finalOpPostos
-            } as any;
+            if (existingEscala) {
+                console.log("Remanejando:", membro.nome_completo, "para", finalOpPostos?.nome_posto || "Base");
+                setEscalas(prev => prev.map(e => e.id === existingEscala.id ? {
+                    ...e,
+                    posto_id: finalPostoId,
+                    op_postos: finalOpPostos,
+                    status_dia: "Trabalhando"
+                } : e));
 
-            setEscalas(prev => [...prev, newEscalaPayload]);
-            setEquipePool(prev => prev.filter(m => m.id !== membro.id));
-
-            import("@/lib/supabase").then(async ({ supabase }) => {
-                const { error } = await supabase.from('op_escala_diaria').insert([{
+                import("@/lib/supabase").then(async ({ supabase }) => {
+                    const { data, error } = await supabase.from('op_escala_diaria')
+                        .upsert({
+                            id: existingEscala.id,
+                            colaborador_id: membro.id,
+                            data_plantao: dataAtual,
+                            posto_id: finalPostoId,
+                            status_dia: "Trabalhando"
+                        })
+                        .select()
+                        .single();
+                    
+                    if (error) {
+                        console.error("Erro no Upsert (Remanejar):", error);
+                    } else if (data) {
+                        setEscalas(prev => prev.map(e => e.id === data.id ? { ...e, ...data } : e));
+                        console.log("Remanejamento estável BD:", membro.nome_completo);
+                    }
+                });
+            } else {
+                console.log("Nova alocação:", membro.nome_completo, "para", finalOpPostos?.nome_posto || "Base");
+                const newId = `temp-${Date.now()}`;
+                setEscalas(prev => [...prev, {
+                    id: newId,
                     colaborador_id: membro.id,
                     data_plantao: dataAtual,
-                    horario_inicio: newEscalaPayload.horario_inicio,
-                    horario_fim: newEscalaPayload.horario_fim,
+                    horario_inicio: "18:00",
+                    horario_fim: "06:00",
                     status_dia: "Trabalhando",
-                    posto_id: newEscalaPayload.posto_id,
-                    tipo_plantao: "Normal"
-                }]);
-                if (error) alert("Erro ao salvar no banco: " + error.message);
-                carregarLoteDados(dataAtual);
-            });
+                    posto_id: finalPostoId,
+                    tipo_plantao: "Normal",
+                    op_equipe: membro,
+                    op_postos: finalOpPostos
+                } as any]);
+                setEquipePool(prev => prev.filter(m => m.id !== membro.id));
+
+                import("@/lib/supabase").then(async ({ supabase }) => {
+                    const { data, error } = await supabase.from('op_escala_diaria')
+                        .upsert({
+                            colaborador_id: membro.id,
+                            data_plantao: dataAtual,
+                            horario_inicio: "18:00",
+                            horario_fim: "06:00",
+                            status_dia: "Trabalhando",
+                            posto_id: finalPostoId,
+                            tipo_plantao: "Normal"
+                        }, { onConflict: 'colaborador_id,data_plantao' })
+                        .select()
+                        .single();
+
+                    if (error) {
+                        console.error("Erro no Upsert (Novo):", error);
+                    } else if (data) {
+                        setEscalas(prev => {
+                            const filtered = prev.filter(e => e.id !== newId);
+                            // Evita duplicidade se o record já existia no banco
+                            const existing = filtered.find(e => e.id === data.id);
+                            if (existing) return filtered.map(e => e.id === data.id ? { ...e, ...data } : e);
+                            return [...filtered, { ...data, op_equipe: membro, op_postos: finalOpPostos }];
+                        });
+                        console.log("Alocação estável BD ID:", data.id);
+                    }
+                });
+            }
         }
 
-        // --- LÓGICA DE PAUSA (CAFÉ / REFEIÇÃO) ---
         if (isPausaDrop) {
             const membroToPause = active.data.current?.membro || active.data.current?.escala?.op_equipe;
-            const escalaId = active.data.current?.escala?.id; // Se já estava alocado referenciamos ele
-
+            const existingEscala = active.data.current?.escala;
             if (!membroToPause) return;
 
             const { tipo, tempoMinutos } = over.data.current as any;
             const nowMs = Date.now();
-            const futureMs = nowMs + (tempoMinutos * 60000); // tempoMinutos * 60 * 1000
+            const futureMs = nowMs + (tempoMinutos * 60000);
+            
+            console.log("Intervalo:", membroToPause.nome_completo, "indo para", tipo);
 
-            // Vamos atualizar localmente a Escala existente ou inserir uma nova status de pausa?
-            // Para simplicidade na primeira versão vamos alterar o status dessa pessoa para mostrar na pausa.
             setEscalas(prev => {
-                // Se já estava na escala, atualiza o status
-                const existing = prev.find(e => e.colaborador_id === membroToPause.id);
-                if (existing) {
-                    return prev.map(e => e.id === existing.id ? {
+                const alreadyOnDaily = prev.find(e => e.colaborador_id === membroToPause.id);
+                if (alreadyOnDaily) {
+                    return prev.map(e => e.id === alreadyOnDaily.id ? {
                         ...e,
                         status_dia: `Pausa: ${tipo}`,
-                        timer_fim_estimado: futureMs
+                        timer_fim_estimado: futureMs,
+                        posto_id: null,
+                        op_postos: null
                     } : e);
                 } else {
-                    // Cobre o caso dele estar no quadro de base
                     return [...prev, {
-                        id: `temp-pausa-${Date.now()}`,
+                        id: `temp-p-${Date.now()}`,
                         colaborador_id: membroToPause.id,
                         data_plantao: dataAtual,
-                        horario_inicio: "00:00",
-                        horario_fim: "00:00",
+                        horario_inicio: "18:00",
+                        horario_fim: "06:00",
                         status_dia: `Pausa: ${tipo}`,
                         posto_id: null,
                         tipo_plantao: "Normal",
@@ -219,53 +252,66 @@ export default function GestaoEscalas() {
                 }
             });
             setEquipePool(prev => prev.filter(m => m.id !== membroToPause.id));
+
+            import("@/lib/supabase").then(async ({ supabase }) => {
+                const { data, error } = await supabase.from('op_escala_diaria')
+                    .upsert({
+                        colaborador_id: membroToPause.id,
+                        data_plantao: dataAtual,
+                        horario_inicio: "18:00",
+                        horario_fim: "06:00",
+                        status_dia: `Pausa: ${tipo}`,
+                        posto_id: null,
+                        tipo_plantao: "Normal"
+                    }, { onConflict: 'colaborador_id,data_plantao' })
+                    .select()
+                    .single();
+
+                if (error) {
+                    console.error("Erro no Upsert (Pausa):", error);
+                } else if (data) {
+                    setEscalas(prev => {
+                        const existing = prev.find(e => e.colaborador_id === membroToPause.id);
+                        if (existing) {
+                            return prev.map(e => e.colaborador_id === membroToPause.id ? { ...e, ...data } : e);
+                        }
+                        return [...prev, { ...data, op_equipe: membroToPause }];
+                    });
+                }
+            });
         }
     };
 
-    // --- LÓGICA DO SWAP (Matchmaker -> Posto) ---
-    const handleConfirmSwap = (tipoPausaEscolhido: "Café" | "Refeição" | "Janta" | "Ceia") => {
+    const handleConfirmSwap = (tipo: "Café" | "Refeição" | "Janta" | "Ceia") => {
         if (!swapData) return;
-
         const { titularReplaced, volanteNew, posto } = swapData;
+        console.log("Confirmando Swap:", { titular: titularReplaced.op_equipe.nome_completo, volante: volanteNew.nome_completo, pausa: tipo });
+
         const nowMs = Date.now();
-        let min = 15;
-        if (tipoPausaEscolhido === "Refeição") min = 60;
-        if (tipoPausaEscolhido === "Janta") min = 30;
-        if (tipoPausaEscolhido === "Ceia") min = 60;
+        const duration = tipo === "Café" ? 15 : tipo === "Janta" ? 30 : 60;
+        const futureMs = nowMs + (duration * 60000);
+        
+        const existingVolanteEscala = escalas.find(e => e.colaborador_id === volanteNew.id);
 
-        const futureMs = nowMs + (min * 60000);
-
-        // 1. O volanteNew assume o Posto (Update local)
         setEscalas(prev => {
-            let nextState = [...prev];
-
-            // O Titular vai para a Pausa selecionada
-            const titularIndex = nextState.findIndex(e => e.id === titularReplaced.id);
-            if (titularIndex >= 0) {
-                nextState[titularIndex] = {
-                    ...nextState[titularIndex],
-                    status_dia: `Pausa: ${tipoPausaEscolhido}`,
-                    timer_fim_estimado: futureMs
-                };
+            let next = [...prev];
+            const tIdx = next.findIndex(e => e.id === titularReplaced.id);
+            if (tIdx >= 0) {
+                next[tIdx] = { ...next[tIdx], status_dia: `Pausa: ${tipo}`, timer_fim_estimado: futureMs, posto_id: null, op_postos: null };
             }
 
-            // O VolanteNew sai de "Em Espera/Base" e entra no posto
-            // Primeiro checamos se ele já estava nas escalas (como Rendicionista Base)
-            const volanteEscalaIndex = nextState.findIndex(e => e.colaborador_id === volanteNew.id);
-            if (volanteEscalaIndex >= 0) {
-                nextState[volanteEscalaIndex] = {
-                    ...nextState[volanteEscalaIndex],
-                    posto_id: posto.id,
-                    op_postos: posto
-                };
+            if (existingVolanteEscala) {
+                const vIdx = next.findIndex(e => e.id === existingVolanteEscala.id);
+                if (vIdx >= 0) {
+                    next[vIdx] = { ...next[vIdx], status_dia: "Trabalhando", posto_id: posto.id, op_postos: posto };
+                }
             } else {
-                // Estava no quadro vazio, cria nova entrada pro Volante no posto
-                nextState.push({
-                    id: `temp-volante-${Date.now()}`,
+                next.push({
+                    id: `temp-v-${Date.now()}`,
                     colaborador_id: volanteNew.id,
                     data_plantao: dataAtual,
-                    horario_inicio: titularReplaced.horario_inicio, // assumes same shift boundaries
-                    horario_fim: titularReplaced.horario_fim,
+                    horario_inicio: "18:00",
+                    horario_fim: "06:00",
                     status_dia: "Trabalhando",
                     posto_id: posto.id,
                     tipo_plantao: "Normal",
@@ -273,27 +319,51 @@ export default function GestaoEscalas() {
                     op_postos: posto
                 } as any);
             }
-
-            return nextState;
+            return next;
         });
 
-        // 2. Remove o volanteNew do Pool (se ele estivesse lá)
-        setEquipePool(prev => prev.filter(m => m.id !== volanteNew.id));
+        if (!existingVolanteEscala) setEquipePool(prev => prev.filter(m => m.id !== volanteNew.id));
 
-        // 3. Persistência de BD (Em background)
         import("@/lib/supabase").then(async ({ supabase }) => {
-            // Atualiza o Status do Titular pra Pausa (Na vida real, criaria log de evento. Aqui simplificado para MVP)
-            await supabase.from('op_escala_diaria')
-                .update({ status_dia: `Pausa: ${tipoPausaEscolhido}` })
-                .eq('id', titularReplaced.id);
+            const { data: d1, error: e1 } = await supabase.from('op_escala_diaria')
+                .upsert({
+                    id: titularReplaced.id,
+                    colaborador_id: titularReplaced.colaborador_id,
+                    data_plantao: dataAtual,
+                    status_dia: `Pausa: ${tipo}`,
+                    posto_id: null
+                })
+                .select()
+                .single();
+            
+            const { data: d2, error: e2 } = await supabase.from('op_escala_diaria')
+                .upsert({
+                    id: existingVolanteEscala?.id,
+                    colaborador_id: volanteNew.id,
+                    data_plantao: dataAtual,
+                    horario_inicio: "18:00",
+                    horario_fim: "06:00",
+                    status_dia: "Trabalhando",
+                    posto_id: posto.id,
+                    tipo_plantao: "Normal"
+                }, { onConflict: 'colaborador_id,data_plantao' })
+                .select()
+                .single();
 
-            // Cria/Atualiza o registro do Volante. Retirado por brevidade e focar na UI do MVP.
-            carregarLoteDados(dataAtual); // recarrega a verdade 
+            if (e1 || e2) {
+                console.error("Erro no Upsert (Swap):", e1 || e2);
+            } else if (d1 && d2) {
+                setEscalas(prev => prev.map(e => {
+                    if (e.id === d1.id) return { ...e, ...d1 };
+                    if (e.colaborador_id === volanteNew.id) return { ...e, ...d2, id: d2.id };
+                    return e;
+                }));
+            }
         });
 
         setSwapModalOpen(false);
         setSwapData(null);
-    }
+    };
     // --------------------
 
     const handleDeleteEscala = async (id: string) => {
@@ -480,8 +550,9 @@ export default function GestaoEscalas() {
                 {/* OVERLAY PARA ARRASTAR (Efeito visual enquanto clica e segura) */}
                 <DragOverlay dropAnimation={{ duration: 250, easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)' }}>
                     {activeMembro ? (
-                        <div className="opacity-90 scale-105 rotate-2">
-                            <DraggableMembro membro={activeMembro} />
+                        <div className="opacity-90 scale-105 rotate-2 p-3 rounded-xl border border-blue-500 bg-white shadow-xl">
+                            <h4 className="font-bold text-slate-800 text-sm">{activeMembro.nome_completo}</h4>
+                            <p className="text-xs text-slate-500 font-mono">RE: {activeMembro.re}</p>
                         </div>
                     ) : null}
                 </DragOverlay>

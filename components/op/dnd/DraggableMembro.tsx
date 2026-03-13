@@ -2,12 +2,13 @@ import { useDraggable } from "@dnd-kit/core";
 import { OpEquipe } from "@/services/op-service";
 import { CheckCircle2 } from "lucide-react";
 
-export function DraggableMembro({ membro, selectedId, onClick }: { membro: OpEquipe, selectedId?: string, onClick?: () => void }) {
+export function DraggableMembro({ membro, escala, selectedId, onClick }: { membro: OpEquipe, escala?: any, selectedId?: string, onClick?: () => void }) {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-        id: `membro-${membro.id}`,
+        id: escala ? `escala-${escala.id}` : `membro-${membro.id}`,
         data: {
             type: "MEMBRO",
-            membro
+            membro,
+            escala
         }
     });
 

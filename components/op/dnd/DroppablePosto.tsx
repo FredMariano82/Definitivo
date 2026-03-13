@@ -3,6 +3,7 @@ import { OpPosto, OpEscalaDiaria, OpEquipe } from "@/services/op-service";
 import { ShieldAlert, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { DraggableMembro } from "./DraggableMembro";
 
 interface Props {
     posto: OpPosto;
@@ -39,16 +40,12 @@ export function DroppablePosto({ posto, ocupantes, onRemove, onClickSlot }: Prop
                     }`}
             >
                 {ocupantes.map(esc => (
-                    <div key={esc.id} className="text-sm bg-white p-2 rounded border border-slate-200 shadow-sm relative group flex justify-between items-center z-10">
-                        <div>
-                            <span className="font-bold text-slate-700 block truncate" title={esc.op_equipe?.nome_completo}>{esc.op_equipe?.nome_completo}</span>
-                            <span className="text-xs text-slate-500">{esc.horario_inicio.slice(0, 5)} - {esc.horario_fim.slice(0, 5)}</span>
-                            {esc.tipo_plantao !== "Normal" && <Badge variant="outline" className="ml-1 text-[9px] h-4 leading-3 font-semibold bg-blue-50">{esc.tipo_plantao}</Badge>}
-                        </div>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:bg-red-50 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); onRemove(esc.id); }}>
-                            <AlertCircle className="w-3 h-3" />
-                        </Button>
-                    </div>
+                    <DraggableMembro 
+                        key={esc.id} 
+                        membro={esc.op_equipe} 
+                        escala={esc} 
+                        onClick={() => {}} // Previne comportamento de clique indesejado se houver
+                    />
                 ))}
 
                 {/* Slot visual para soltar */}
