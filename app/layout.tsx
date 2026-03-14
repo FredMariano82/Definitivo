@@ -9,6 +9,8 @@ export const metadata: Metadata = {
 
 import { AuthProvider } from "@/contexts/auth-context"
 
+import { Toaster } from "sonner"
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -18,6 +20,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <AuthProvider>{children}</AuthProvider>
+        <Toaster position="top-right" richColors />
       </body>
     </html>
   )

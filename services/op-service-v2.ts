@@ -38,6 +38,43 @@ export interface OpEscalaDiaria {
     observacoes?: string
 }
 
+export interface OpEvento {
+    id?: string
+    nome: string
+    tipo: string
+    data_inicio: string
+    data_fim: string
+    horario_inicio?: string
+    horario_fim?: string
+    cor?: string
+    local?: string
+    observacoes?: string
+    // Novos campos para Integração e Detalhamento
+    local_detalhado?: string
+    publico_estimado?: string
+    foto_evento?: string
+    
+    // Período de Montagem
+    montagem_inicio_data?: string
+    montagem_inicio_hora?: string
+    montagem_fim_data?: string
+    montagem_fim_hora?: string
+    
+    // Período do Evento
+    evento_inicio_data?: string
+    evento_inicio_hora?: string
+    evento_fim_data?: string
+    evento_fim_hora?: string
+    
+    // Período de Desmontagem
+    desmontagem_inicio_data?: string
+    desmontagem_inicio_hora?: string
+    desmontagem_fim_data?: string
+    desmontagem_fim_hora?: string
+    
+    created_at?: string
+}
+
 export class OpServiceV2 {
     /**
      * Busca todos os colaboradores ativos
@@ -148,5 +185,74 @@ export class OpServiceV2 {
             .upsert(dados, { onConflict: 'colaborador_id,data_plantao' })
         
         if (error) throw error
+    }
+
+    /**
+     * Busca eventos para um período
+     */
+    static async getEventosPeriodo(dataInicio: string, dataFim: string): Promise<OpEvento[]> {
+        const { data, error } = await supabase
+            .from('op_eventos')
+            .select('*')
+            .gte('data_inicio', dataInicio)
+            .lte('data_inicio', dataFim)
+        
+        if (error) throw error
+        return data || []
+    }
+
+    /**
+     * Cria um novo evento e automatiza inserções no Kanban e Postos
+     */
+    static async createEvento(evento: OpEvento) {
+        // 1. Inserir na tabela de eventos
+        const { data, error } = await supabase
+            .from('op_eventos')
+            .insert(evento)
+            .select()
+        
+        if (error) throw error
+        const novoEvento = data?.[0]
+
+        try {
+            // 2. Automação Kanban
+            const { error: kanbanError } = await supabase.from('kanban_tarefas').insert({
+                titulo: `EVENTO: ${evento.nome}`,
+                categoria: 'eventos',
+                status: 'entrada',
+                descricao: evento.observacoes || '',
+                created_by_name: 'Sistema (Evento)',
+                dados_especificos: {
+                    local_evento: evento.local_detalhado || evento.local,
+                    publico_estimado: evento.publico_estimado,
+                    // Dados de Períodos
+                    montagem_periodo: `${evento.montagem_inicio_data} ${evento.montagem_inicio_hora} até ${evento.montagem_fim_data} ${evento.montagem_fim_hora}`,
+                    evento_periodo: `${evento.evento_inicio_data} ${evento.evento_inicio_hora} até ${evento.evento_fim_data} ${evento.evento_fim_hora}`,
+                    desmontagem_periodo: `${evento.desmontagem_inicio_data} ${evento.desmontagem_inicio_hora} até ${evento.desmontagem_fim_data} ${evento.desmontagem_fim_hora}`,
+                    // Backup para campos antigos se existirem no Kanban
+                    data_hora_inicio_evento: `${evento.evento_inicio_data}T${evento.evento_inicio_hora || '00:00'}`,
+                    data_hora_fim_evento: `${evento.evento_fim_data}T${evento.evento_fim_hora || '00:00'}`
+                }
+            })
+
+            if (kanbanError) throw kanbanError
+
+            // 3. Automação Painel Tático (Postos)
+            const { error: postError } = await supabase.from('op_postos').insert({
+                nome_posto: `EVENTO: ${evento.nome}`,
+                nivel_criticidade: evento.tipo === 'Crítico' ? 1 : 3,
+                is_active: true,
+                exige_armamento: false
+            })
+
+            if (postError) {
+                console.error("Erro ao criar posto para o evento:", postError)
+            }
+        } catch (autoError) {
+            console.error("Erro na automação do evento:", autoError)
+            // Não barramos a criação do evento se a automação falhar
+        }
+
+        return novoEvento
     }
 }

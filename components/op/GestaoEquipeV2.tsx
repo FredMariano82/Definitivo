@@ -33,7 +33,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { OpServiceV2, OpEquipe, OpEscalaDiaria } from "@/services/op-service-v2"
+import { OpServiceV2, OpEquipe, OpEscalaDiaria, OpEvento } from "@/services/op-service-v2"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { 
@@ -46,11 +46,15 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { toast } from "sonner"
 
 export default function GestaoEquipeV2() {
     const [currentDate, setCurrentDate] = useState(new Date())
     const [equipe, setEquipe] = useState<OpEquipe[]>([])
     const [excecoes, setExcecoes] = useState<OpEscalaDiaria[]>([])
+    const [eventos, setEventos] = useState<OpEvento[]>([])
     const [loading, setLoading] = useState(true)
     
     // Estados para o Modal de Edição
@@ -61,6 +65,36 @@ export default function GestaoEquipeV2() {
         data_reciclagem: "",
         data_inicio_ferias: "",
         data_fim_ferias: ""
+    })
+    
+    // Estados para o Modal de Novo Evento
+    const [isEventModalOpen, setIsEventModalOpen] = useState(false)
+    const [eventFormData, setEventFormData] = useState<OpEvento>({
+        nome: "",
+        tipo: "Social",
+        data_inicio: format(new Date(), 'yyyy-MM-dd'),
+        data_fim: format(new Date(), 'yyyy-MM-dd'),
+        cor: "#3b82f6",
+        local: "",
+        observacoes: "",
+        local_detalhado: "",
+        publico_estimado: "",
+        foto_evento: "",
+        // Montagem
+        montagem_inicio_data: format(new Date(), 'yyyy-MM-dd'),
+        montagem_inicio_hora: "08:00",
+        montagem_fim_data: format(new Date(), 'yyyy-MM-dd'),
+        montagem_fim_hora: "18:00",
+        // Evento
+        evento_inicio_data: format(new Date(), 'yyyy-MM-dd'),
+        evento_inicio_hora: "19:00",
+        evento_fim_data: format(new Date(), 'yyyy-MM-dd'),
+        evento_fim_hora: "23:59",
+        // Desmontagem
+        desmontagem_inicio_data: format(new Date(), 'yyyy-MM-dd'),
+        desmontagem_inicio_hora: "00:00",
+        desmontagem_fim_data: format(new Date(), 'yyyy-MM-dd'),
+        desmontagem_fim_hora: "08:00"
     })
 
     const monthStart = startOfMonth(currentDate)
@@ -74,12 +108,13 @@ export default function GestaoEquipeV2() {
     const loadData = async () => {
         setLoading(true)
         try {
-            const [membros, listaExcecoes] = await Promise.all([
+            const startStr = format(monthStart, 'yyyy-MM-dd')
+            const endStr = format(monthEnd, 'yyyy-MM-dd')
+
+            const [membros, listaExcecoes, listaEventos] = await Promise.all([
                 OpServiceV2.getEquipe(),
-                OpServiceV2.getEscalasPeriodo(
-                    format(monthStart, 'yyyy-MM-dd'),
-                    format(monthEnd, 'yyyy-MM-dd')
-                )
+                OpServiceV2.getEscalasPeriodo(startStr, endStr),
+                OpServiceV2.getEventosPeriodo(startStr, endStr)
             ])
 
             // Ordenação Personalizada: 12x36 -> 5x1 -> 5x2
@@ -93,6 +128,7 @@ export default function GestaoEquipeV2() {
 
             setEquipe(sortedMembros)
             setExcecoes(listaExcecoes)
+            setEventos(listaEventos)
         } catch (error) {
             console.error("Erro ao carregar dados operacionais:", error)
         } finally {
@@ -151,12 +187,72 @@ export default function GestaoEquipeV2() {
     const handleSaveEdits = async () => {
         if (!editingColab) return
         setLoading(true)
+        
+        // Limpeza dos dados: Converter strings vazias em null para evitar erro de tipo 'date' no Postgres
+        const cleanedData = {
+            referencia_escala: editFormData.referencia_escala || null,
+            data_reciclagem: editFormData.data_reciclagem || null,
+            data_inicio_ferias: editFormData.data_inicio_ferias || null,
+            data_fim_ferias: editFormData.data_fim_ferias || null
+        }
+
         try {
-            await OpServiceV2.updateEquipe(editingColab.id, editFormData)
+            await OpServiceV2.updateEquipe(editingColab.id, cleanedData)
             setIsEditModalOpen(false)
             loadData()
         } catch (error) {
             console.error("Erro ao atualizar colaborador:", error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleCreateEvento = async () => {
+        if (!eventFormData.nome) return
+        setLoading(true)
+        try {
+            // Sincronizar data_inicio/data_fim globais (para a barra no calendário) com o período do EVENTO real
+            const payload = {
+                ...eventFormData,
+                data_inicio: eventFormData.montagem_inicio_data, // Inicia na montagem
+                data_fim: eventFormData.desmontagem_fim_data    // Termina na desmontagem
+            }
+            
+            console.log("Iniciando criação de evento com payload:", payload)
+            const res = await OpServiceV2.createEvento(payload)
+            console.log("Evento criado com sucesso:", res)
+            
+            setIsEventModalOpen(false)
+            // Resetar form
+            setEventFormData({
+                nome: "",
+                tipo: "Social",
+                data_inicio: format(new Date(), 'yyyy-MM-dd'),
+                data_fim: format(new Date(), 'yyyy-MM-dd'),
+                cor: "#3b82f6",
+                local: "",
+                observacoes: "",
+                local_detalhado: "",
+                publico_estimado: "",
+                foto_evento: "",
+                montagem_inicio_data: format(new Date(), 'yyyy-MM-dd'),
+                montagem_inicio_hora: "08:00",
+                montagem_fim_data: format(new Date(), 'yyyy-MM-dd'),
+                montagem_fim_hora: "18:00",
+                evento_inicio_data: format(new Date(), 'yyyy-MM-dd'),
+                evento_inicio_hora: "19:00",
+                evento_fim_data: format(new Date(), 'yyyy-MM-dd'),
+                evento_fim_hora: "23:59",
+                desmontagem_inicio_data: format(new Date(), 'yyyy-MM-dd'),
+                desmontagem_inicio_hora: "00:00",
+                desmontagem_fim_data: format(new Date(), 'yyyy-MM-dd'),
+                desmontagem_fim_hora: "08:00"
+            })
+            loadData()
+            toast.success("Evento planejado e enviado ao Kanban!")
+        } catch (error: any) {
+            console.error("Erro fatal ao criar evento:", error)
+            toast.error("Erro ao salvar: " + (error.message || "tente novamente"))
         } finally {
             setLoading(false)
         }
@@ -186,6 +282,14 @@ export default function GestaoEquipeV2() {
                         </CardDescription>
                     </div>
                     <div className="flex items-center gap-4 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+                        <Button 
+                            onClick={() => setIsEventModalOpen(true)}
+                            className="bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-widest rounded-xl h-10 px-4 flex items-center gap-2 transition-all active:scale-95 mr-2"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Adicionar Evento
+                        </Button>
+                        <div className="h-6 w-px bg-slate-200 mr-2"></div>
                         <Button variant="ghost" size="icon" onClick={prevMonth} className="hover:bg-slate-100 rounded-xl h-10 w-10">
                             <ChevronLeft className="h-6 w-6 text-slate-600" />
                         </Button>
@@ -207,19 +311,76 @@ export default function GestaoEquipeV2() {
                                     <th className="p-6 text-left font-black text-slate-400 text-[10px] uppercase tracking-[0.2em] sticky left-0 z-40 bg-slate-50 border-r min-w-[320px]">
                                         Colaborador / Especialidade
                                     </th>
-                                    {days.map(day => (
-                                        <th key={day.toString()} className={`p-3 text-center border-r last:border-r-0 min-w-[48px] ${isToday(day) ? 'bg-blue-50/80 shadow-inner' : ''}`}>
-                                            <div className="flex flex-col items-center">
-                                                <span className={`text-[10px] font-black uppercase tracking-tighter ${isToday(day) ? 'text-blue-600' : 'text-slate-400'}`}>
-                                                    {format(day, "eee", { locale: ptBR })}
-                                                </span>
-                                                <span className={`text-base font-black mt-1 ${isToday(day) ? 'text-blue-600' : 'text-slate-700'}`}>
-                                                    {format(day, "d")}
-                                                </span>
+                                    {days.map(day => {
+                                        const isWeekend = day.getDay() === 0 || day.getDay() === 6
+                                        // Mapeamento manual para garantir exatamente o que o usuário quer
+                                        const weekdayNames: { [key: number]: string } = {
+                                            0: 'dom.', 1: 'seg.', 2: 'ter.', 3: 'qua.', 4: 'qui.', 5: 'sex.', 6: 'sab.'
+                                        }
+                                        const weekdayName = weekdayNames[day.getDay()]
+
+                                        return (
+                                            <th 
+                                                key={day.toString()} 
+                                                className={`p-3 text-center border-r last:border-r-0 min-w-[48px] transition-colors ${isToday(day) ? 'bg-blue-200 shadow-inner' : isWeekend ? 'bg-slate-300' : ''}`}
+                                            >
+                                                <div className="flex flex-col items-center">
+                                                    <span className={`text-[10px] font-black uppercase tracking-tighter ${isToday(day) ? 'text-blue-700' : isWeekend ? 'text-slate-600' : 'text-slate-400'}`}>
+                                                        {weekdayName}
+                                                    </span>
+                                                    <span className={`text-base font-black mt-1 ${isToday(day) ? 'text-blue-700' : 'text-slate-700'}`}>
+                                                        {format(day, "d")}
+                                                    </span>
+                                                </div>
+                                            </th>
+                                        )
+                                    })}
+                                </tr>
+                                
+                                {/* ZONA DE EVENTOS */}
+                                {eventos.length > 0 && (
+                                    <tr className="border-b border-slate-200 bg-white">
+                                        <th className="sticky left-0 z-40 bg-white p-4 text-left border-r shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)]">
+                                            <div className="flex items-center gap-2">
+                                                <div className="p-1 px-2 bg-blue-50 rounded-lg border border-blue-100">
+                                                    <span className="text-[9px] font-black uppercase tracking-widest text-blue-600">Eventos</span>
+                                                </div>
                                             </div>
                                         </th>
-                                    ))}
-                                </tr>
+                                        {days.map(day => {
+                                            const dayStr = format(day, 'yyyy-MM-dd')
+                                            const eventosDia = eventos.filter(ev => dayStr >= ev.data_inicio && dayStr <= ev.data_fim)
+                                            const isWeekend = day.getDay() === 0 || day.getDay() === 6
+                                            
+                                            return (
+                                                <td key={day.toString()} className={`p-1 border-r last:border-r-0 transition-all duration-300 ${isToday(day) ? 'bg-blue-50/60' : isWeekend ? 'bg-slate-200/50' : ''}`}>
+                                                    <div className="flex flex-col gap-1 min-h-[20px] justify-center">
+                                                        {eventosDia.map(ev => (
+                                                            <TooltipProvider key={ev.id}>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <div 
+                                                                            className="h-2 w-full rounded-full cursor-help hover:opacity-80 transition-opacity"
+                                                                            style={{ backgroundColor: ev.cor || '#3b82f6' }}
+                                                                        />
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent side="top" className="bg-slate-900 text-white p-3 rounded-2xl border-none shadow-2xl">
+                                                                        <p className="font-black text-xs uppercase tracking-tight">{ev.nome}</p>
+                                                                        <div className="flex items-center gap-2 mt-1 opacity-60">
+                                                                            <span className="text-[9px] font-black uppercase">{ev.tipo}</span>
+                                                                            <span className="text-[9px]">•</span>
+                                                                            <span className="text-[9px] font-black uppercase text-blue-400">{ev.local}</span>
+                                                                        </div>
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                            </TooltipProvider>
+                                                        ))}
+                                                    </div>
+                                                </td>
+                                            )
+                                        })}
+                                    </tr>
+                                )}
                             </thead>
                             <tbody>
                                 {equipe.map((membro) => (
@@ -260,6 +421,7 @@ export default function GestaoEquipeV2() {
                                         {days.map(day => {
                                             const statusTeorico = OpServiceV2.getTrabalhaNoDia(membro, day, [])
                                             const excecao = excecoes.find(ex => ex.colaborador_id === membro.id && ex.data_plantao === format(day, 'yyyy-MM-dd'))
+                                            const isWeekend = day.getDay() === 0 || day.getDay() === 6
                                             
                                             let status = statusTeorico ? 'Trabalhando' : 'Folga'
                                             if (excecao) status = excecao.status_dia
@@ -272,7 +434,7 @@ export default function GestaoEquipeV2() {
                                             }
 
                                             return (
-                                                <td key={day.toString()} className={`p-1.5 border-r last:border-r-0 ${isToday(day) ? 'bg-blue-50/20' : ''}`}>
+                                                <td key={day.toString()} className={`p-1.5 border-r last:border-r-0 transition-all ${isToday(day) ? 'bg-blue-100/10' : isWeekend ? 'bg-slate-100/40' : ''}`}>
                                                     <div className="flex justify-center group/cell relative">
                                                         <TooltipProvider>
                                                             <Tooltip>
@@ -409,6 +571,272 @@ export default function GestaoEquipeV2() {
                         </Button>
                         <Button onClick={handleSaveEdits} className="flex-[2] h-14 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-2xl font-black text-white shadow-xl shadow-blue-500/30 uppercase tracking-widest text-xs transition-all active:scale-95 disabled:opacity-50">
                             {loading ? "Processando..." : "Salvar Configurações"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isEventModalOpen} onOpenChange={setIsEventModalOpen}>
+                <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden rounded-[32px] border-none shadow-2xl bg-white max-h-[90vh] flex flex-col">
+                    <div className="h-2 shrink-0" style={{ backgroundColor: eventFormData.cor }}></div>
+                    <DialogHeader className="p-8 pb-4 shrink-0">
+                        <DialogTitle className="text-2xl font-black text-slate-900 flex items-center gap-3">
+                            <div className="p-2 bg-slate-100 rounded-2xl">
+                                <Plus className="h-6 w-6 text-slate-900" />
+                            </div>
+                            Planejamento de Evento
+                        </DialogTitle>
+                        <DialogDescription className="text-slate-500 font-bold mt-2">
+                            Detalhe todos os períodos do projeto para automação e escala de equipe.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="px-8 py-4 space-y-8 overflow-y-auto custom-scrollbar pb-10">
+                        {/* INFORMAÇÕES BÁSICAS */}
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <div className="h-4 w-1 bg-slate-900 rounded-full"></div>
+                                <h3 className="text-xs font-black uppercase tracking-widest text-slate-900">Informações Gerais</h3>
+                            </div>
+                            <div className="grid grid-cols-12 gap-4">
+                                <div className="col-span-8 space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Nome do Evento</Label>
+                                    <Input 
+                                        placeholder="Ex: Casamento Fred & Maria"
+                                        value={eventFormData.nome}
+                                        onChange={(e) => setEventFormData({ ...eventFormData, nome: e.target.value })}
+                                        className="h-12 rounded-xl border-slate-200 font-bold"
+                                    />
+                                </div>
+                                <div className="col-span-4 space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Tipo</Label>
+                                    <Select 
+                                        value={eventFormData.tipo} 
+                                        onValueChange={(val) => setEventFormData({ ...eventFormData, tipo: val })}
+                                    >
+                                        <SelectTrigger className="h-12 rounded-xl border-slate-200 font-bold">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Social">Social</SelectItem>
+                                            <SelectItem value="Operacional">Operacional</SelectItem>
+                                            <SelectItem value="Crítico">Crítico</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-12 gap-4">
+                                <div className="col-span-8 space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Local Detalhado / Posto</Label>
+                                    <Input 
+                                        placeholder="Ex: Salão de Festas Principal"
+                                        value={eventFormData.local_detalhado}
+                                        onChange={(e) => setEventFormData({ ...eventFormData, local_detalhado: e.target.value })}
+                                        className="h-12 rounded-xl border-slate-200 font-bold"
+                                    />
+                                </div>
+                                <div className="col-span-4 space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Cor</Label>
+                                    <div className="flex gap-2 p-1 bg-slate-50 rounded-xl border border-slate-100 h-12">
+                                        {['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'].map(color => (
+                                            <div 
+                                                key={color}
+                                                onClick={() => setEventFormData({ ...eventFormData, cor: color })}
+                                                className={`h-full flex-1 rounded-lg cursor-pointer transition-all ${eventFormData.cor === color ? 'scale-110 shadow-md ring-2 ring-offset-2 ring-slate-200' : 'opacity-40 hover:opacity-100'}`}
+                                                style={{ backgroundColor: color }}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* SEÇÃO MONTAGEM */}
+                        <div className="p-6 bg-slate-50 rounded-[24px] border border-slate-100 space-y-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <div className="h-4 w-1 bg-blue-500 rounded-full"></div>
+                                <h3 className="text-xs font-black uppercase tracking-widest text-blue-600">Fase 1: Montagem</h3>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Início (Data)</Label>
+                                    <Input 
+                                        type="date"
+                                        value={eventFormData.montagem_inicio_data}
+                                        onChange={(e) => setEventFormData({ ...eventFormData, montagem_inicio_data: e.target.value })}
+                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Horário</Label>
+                                    <Input 
+                                        type="time"
+                                        value={eventFormData.montagem_inicio_hora}
+                                        onChange={(e) => setEventFormData({ ...eventFormData, montagem_inicio_hora: e.target.value })}
+                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Término (Data)</Label>
+                                    <Input 
+                                        type="date"
+                                        value={eventFormData.montagem_fim_data}
+                                        onChange={(e) => setEventFormData({ ...eventFormData, montagem_fim_data: e.target.value })}
+                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Horário</Label>
+                                    <Input 
+                                        type="time"
+                                        value={eventFormData.montagem_fim_hora}
+                                        onChange={(e) => setEventFormData({ ...eventFormData, montagem_fim_hora: e.target.value })}
+                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* SEÇÃO EVENTO */}
+                        <div className="p-6 bg-indigo-50/50 rounded-[24px] border border-indigo-100/50 space-y-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <div className="h-4 w-1 bg-indigo-600 rounded-full"></div>
+                                <h3 className="text-xs font-black uppercase tracking-widest text-indigo-700">Fase 2: O Evento</h3>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Início (Data)</Label>
+                                    <Input 
+                                        type="date"
+                                        value={eventFormData.evento_inicio_data}
+                                        onChange={(e) => setEventFormData({ ...eventFormData, evento_inicio_data: e.target.value })}
+                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Horário</Label>
+                                    <Input 
+                                        type="time"
+                                        value={eventFormData.evento_inicio_hora}
+                                        onChange={(e) => setEventFormData({ ...eventFormData, evento_inicio_hora: e.target.value })}
+                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Término (Data)</Label>
+                                    <Input 
+                                        type="date"
+                                        value={eventFormData.evento_fim_data}
+                                        onChange={(e) => setEventFormData({ ...eventFormData, evento_fim_data: e.target.value })}
+                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Horário</Label>
+                                    <Input 
+                                        type="time"
+                                        value={eventFormData.evento_fim_hora}
+                                        onChange={(e) => setEventFormData({ ...eventFormData, evento_fim_hora: e.target.value })}
+                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Público Estimado</Label>
+                                    <Input 
+                                        placeholder="Ex: 800 pessoas"
+                                        value={eventFormData.publico_estimado}
+                                        onChange={(e) => setEventFormData({ ...eventFormData, publico_estimado: e.target.value })}
+                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Link/URL Foto Evento</Label>
+                                    <Input 
+                                        placeholder="URL da imagem (opcional)"
+                                        value={eventFormData.foto_evento}
+                                        onChange={(e) => setEventFormData({ ...eventFormData, foto_evento: e.target.value })}
+                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* SEÇÃO DESMONTAGEM */}
+                        <div className="p-6 bg-slate-50 rounded-[24px] border border-slate-100 space-y-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <div className="h-4 w-1 bg-amber-500 rounded-full"></div>
+                                <h3 className="text-xs font-black uppercase tracking-widest text-amber-600">Fase 3: Desmontagem</h3>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Início (Data)</Label>
+                                    <Input 
+                                        type="date"
+                                        value={eventFormData.desmontagem_inicio_data}
+                                        onChange={(e) => setEventFormData({ ...eventFormData, desmontagem_inicio_data: e.target.value })}
+                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Horário</Label>
+                                    <Input 
+                                        type="time"
+                                        value={eventFormData.desmontagem_inicio_hora}
+                                        onChange={(e) => setEventFormData({ ...eventFormData, desmontagem_inicio_hora: e.target.value })}
+                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Término (Data)</Label>
+                                    <Input 
+                                        type="date"
+                                        value={eventFormData.desmontagem_fim_data}
+                                        onChange={(e) => setEventFormData({ ...eventFormData, desmontagem_fim_data: e.target.value })}
+                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Horário</Label>
+                                    <Input 
+                                        type="time"
+                                        value={eventFormData.desmontagem_fim_hora}
+                                        onChange={(e) => setEventFormData({ ...eventFormData, desmontagem_fim_hora: e.target.value })}
+                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* OBSERVAÇÕES */}
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Observações Gerais / Plano de Segurança</Label>
+                            <Textarea 
+                                placeholder="Descreva detalhes importantes..."
+                                value={eventFormData.observacoes}
+                                onChange={(e) => setEventFormData({ ...eventFormData, observacoes: e.target.value })}
+                                className="min-h-[120px] rounded-xl border-slate-200 font-medium resize-none shadow-inner"
+                            />
+                        </div>
+                    </div>
+
+                    <DialogFooter className="p-8 pt-4 bg-slate-50 border-t border-slate-100 shrink-0">
+                        <Button variant="ghost" onClick={() => setIsEventModalOpen(false)} className="h-14 rounded-2xl font-black text-slate-400 uppercase tracking-widest text-xs hover:bg-slate-200/50">
+                            Cancelar
+                        </Button>
+                        <Button 
+                            onClick={handleCreateEvento} 
+                            disabled={loading || !eventFormData.nome}
+                            className="h-14 px-10 bg-slate-900 hover:bg-black rounded-2xl font-black text-white uppercase tracking-widest text-xs transition-all active:scale-95 shadow-xl shadow-slate-200"
+                        >
+                            {loading ? "Processando..." : "Confirmar Planejamento"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

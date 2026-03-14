@@ -6,7 +6,7 @@ import { KanbanForm } from "@/components/admin/kanban-form"
 import { KanbanDesfechoModal, DesfechoTipo } from "@/components/admin/kanban-desfecho-modal"
 import { KanbanDetailsModal } from "@/components/admin/kanban-details-modal"
 import { Button } from "@/components/ui/button"
-import { PlusIcon, BookTextIcon } from "lucide-react"
+import { PlusIcon, BookTextIcon, MapPin } from "lucide-react"
 import Link from "next/link"
 import {
   Dialog,
@@ -308,6 +308,27 @@ export default function KanbanBoardPage() {
                              </span>
                           )}
                           {tarefa.dados_especificos?.local_bloco && <span>{tarefa.dados_especificos.local_bloco}</span>}
+                        </div>
+                      )}
+
+                      {tarefa.categoria === 'eventos' && (
+                        <div className="text-xs text-muted-foreground mt-1 space-y-1 bg-rose-50/50 p-2 rounded-lg border border-rose-100/50">
+                          {tarefa.dados_especificos?.local_evento && (
+                            <div className="flex items-center gap-1.5 capitalize text-rose-700 font-bold">
+                              <MapPin className="h-3 w-3" />
+                              {tarefa.dados_especificos.local_evento}
+                            </div>
+                          )}
+                          {tarefa.dados_especificos?.evento_periodo && (
+                            <div className="text-[10px] font-medium text-slate-500">
+                              <span className="font-bold text-slate-700">Período:</span> {tarefa.dados_especificos.evento_periodo}
+                            </div>
+                          )}
+                          {tarefa.dados_especificos?.publico_estimado && (
+                            <div className="text-[10px] font-medium text-slate-500">
+                              <span className="font-bold text-slate-700">Público:</span> {tarefa.dados_especificos.publico_estimado}
+                            </div>
+                          )}
                         </div>
                       )}
 
