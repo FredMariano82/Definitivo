@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "../contexts/auth-context"
-import { CheckCircle, FileText, Users, BarChart3, HeadphonesIcon, Crown } from "lucide-react"
+import { CheckCircle, FileText, Users, BarChart3, HeadphonesIcon, Crown, DollarSign } from "lucide-react"
 import { getSolicitacoesByDepartamento } from "../services/solicitacoes-service"
 import { getLiberacaoStatus } from "./ui/status-badges"
 import { converterDataBrParaDate, getCurrentDate } from "../utils/date-helpers"
@@ -188,6 +188,12 @@ export default function Navigation() {
             icon: BarChart3,
             className: getButtonClass("/admin/kanban"),
           },
+          {
+            href: "/admin/financeiro",
+            label: "Financeiro",
+            icon: DollarSign,
+            className: getButtonClass("/admin/financeiro"),
+          },
         ]
 
       case "gestor":
@@ -269,6 +275,12 @@ export default function Navigation() {
             label: "Kanban",
             icon: BarChart3,
             className: getButtonClass("/admin/kanban"),
+          },
+          {
+            href: "/admin/financeiro",
+            label: "Financeiro",
+            icon: DollarSign,
+            className: getButtonClass("/admin/financeiro"),
           },
         ]
 

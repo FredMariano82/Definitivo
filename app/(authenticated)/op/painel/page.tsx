@@ -1,8 +1,10 @@
 "use client"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, LayoutDashboard, Settings, MapPin } from "lucide-react"
+import { Users, LayoutDashboard, Settings } from "lucide-react"
 import GestaoEquipeV2 from "@/components/op/GestaoEquipeV2"
+import DashboardOperacional from "@/components/op/DashboardOperacional"
+import ConfiguracoesOperacionais from "@/components/op/ConfiguracoesOperacionais"
 
 export default function PainelOperacional() {
   return (
@@ -22,45 +24,23 @@ export default function PainelOperacional() {
             <Users className="h-4 w-4" />
             Escala de Equipe
           </TabsTrigger>
-          <TabsTrigger value="postos" className="rounded-lg gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold text-xs uppercase tracking-wider py-2.5 px-6">
-            <MapPin className="h-4 w-4" />
-            Postos e Alocação
-          </TabsTrigger>
           <TabsTrigger value="config" className="rounded-lg gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold text-xs uppercase tracking-wider py-2.5 px-6">
             <Settings className="h-4 w-4" />
             Configurações
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="dashboard" className="border-none p-0 outline-none">
-          <div className="h-[400px] flex items-center justify-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
-            <div className="text-center space-y-2">
-              <LayoutDashboard className="h-8 w-8 text-slate-300 mx-auto" />
-              <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Em desenvolvimento</p>
-            </div>
-          </div>
+        <TabsContent value="dashboard" className="border-none p-0 outline-none animate-in fade-in duration-500">
+          <DashboardOperacional />
         </TabsContent>
 
         <TabsContent value="equipe" className="border-none p-0 outline-none animate-in fade-in duration-500">
           <GestaoEquipeV2 />
         </TabsContent>
 
-        <TabsContent value="postos" className="border-none p-0 outline-none">
-          <div className="h-[400px] flex items-center justify-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
-            <div className="text-center space-y-2">
-              <MapPin className="h-8 w-8 text-slate-300 mx-auto" />
-              <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Em desenvolvimento</p>
-            </div>
-          </div>
-        </TabsContent>
         
-        <TabsContent value="config" className="border-none p-0 outline-none">
-          <div className="h-[400px] flex items-center justify-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
-            <div className="text-center space-y-2">
-              <Settings className="h-8 w-8 text-slate-300 mx-auto" />
-              <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Em desenvolvimento</p>
-            </div>
-          </div>
+        <TabsContent value="config" className="border-none p-0 outline-none animate-in fade-in duration-500">
+          <ConfiguracoesOperacionais />
         </TabsContent>
       </Tabs>
     </div>

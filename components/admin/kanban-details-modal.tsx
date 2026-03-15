@@ -235,16 +235,32 @@ export function KanbanDetailsModal({
                       </div>
 
                       <div className="pt-2">
-                        <span className="text-muted-foreground font-semibold block mb-2">Vigilantes Escalados:</span>
+                        <span className="text-muted-foreground font-semibold block mb-2 font-black uppercase text-[10px] tracking-widest text-slate-400">Profissionais Escalados:</span>
                         <div className="flex flex-wrap gap-2">
                           {tarefa.dados_especificos?.vigilantes_escalados?.length > 0 
                             ? tarefa.dados_especificos.vigilantes_escalados.map((vigilante: string, idx: number) => (
-                                <Badge key={idx} variant="secondary" className="font-medium">{vigilante}</Badge>
+                                <Badge key={idx} variant="secondary" className="font-bold bg-slate-100 text-slate-700 border-none px-3 py-1.5 rounded-lg">
+                                  {vigilante}
+                                </Badge>
                               ))
-                            : <span className="text-muted-foreground text-sm italic">Nenhum vigilante escalado.</span>
+                            : <span className="text-muted-foreground text-sm italic">Nenhum profissional escalado.</span>
                           }
                         </div>
                       </div>
+
+                      {tarefa.dados_especificos?.valor_previsto && (
+                        <div className="mt-6 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center justify-between">
+                           <div>
+                              <span className="text-emerald-700/60 font-black uppercase text-[10px] tracking-[0.15em] block mb-1">Custo Previsto da Fase</span>
+                              <div className="text-2xl font-black text-emerald-800 tracking-tight">
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(tarefa.dados_especificos.valor_previsto)}
+                              </div>
+                           </div>
+                           <div className="h-12 w-12 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                              <span className="text-white font-bold">$</span>
+                           </div>
+                        </div>
+                      )}
                     </>
                   )}
 

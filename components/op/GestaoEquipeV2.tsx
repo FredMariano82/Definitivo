@@ -29,7 +29,9 @@ import {
     AlertCircle,
     Plane,
     Plus,
-    Settings
+    Settings,
+    Filter,
+    Search as SearchIcon
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -57,6 +59,12 @@ export default function GestaoEquipeV2() {
     const [eventos, setEventos] = useState<OpEvento[]>([])
     const [loading, setLoading] = useState(true)
     
+    // Estados para Filtros
+    const [filtroNome, setFiltroNome] = useState("")
+    const [filtroEscala, setFiltroEscala] = useState("todos")
+    const [filtroVSPP, setFiltroVSPP] = useState("todos")
+    const [filtroStatusHoje, setFiltroStatusHoje] = useState("todos")
+    
     // Estados para o Modal de Edição
     const [editingColab, setEditingColab] = useState<OpEquipe | null>(null)
     const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -64,7 +72,8 @@ export default function GestaoEquipeV2() {
         referencia_escala: "",
         data_reciclagem: "",
         data_inicio_ferias: "",
-        data_fim_ferias: ""
+        data_fim_ferias: "",
+        tipo_servico: "Vigilante/Operacional"
     })
     
     // Estados para o Modal de Novo Evento
@@ -80,21 +89,31 @@ export default function GestaoEquipeV2() {
         local_detalhado: "",
         publico_estimado: "",
         foto_evento: "",
+        // Novos Campos Fase 2.2
+        patrocinador: "Hagana",
+        responsavel_nome: "",
+        nivel_criticidade: 3,
         // Montagem
         montagem_inicio_data: format(new Date(), 'yyyy-MM-dd'),
         montagem_inicio_hora: "08:00",
         montagem_fim_data: format(new Date(), 'yyyy-MM-dd'),
         montagem_fim_hora: "18:00",
+        equipe_montagem: [],
+        has_montagem: true,
         // Evento
         evento_inicio_data: format(new Date(), 'yyyy-MM-dd'),
         evento_inicio_hora: "19:00",
         evento_fim_data: format(new Date(), 'yyyy-MM-dd'),
         evento_fim_hora: "23:59",
+        equipe_realizacao: [],
+        has_realizacao: true,
         // Desmontagem
         desmontagem_inicio_data: format(new Date(), 'yyyy-MM-dd'),
         desmontagem_inicio_hora: "00:00",
         desmontagem_fim_data: format(new Date(), 'yyyy-MM-dd'),
-        desmontagem_fim_hora: "08:00"
+        desmontagem_fim_hora: "08:00",
+        equipe_desmontagem: [],
+        has_desmontagem: false
     })
 
     const monthStart = startOfMonth(currentDate)
@@ -179,7 +198,8 @@ export default function GestaoEquipeV2() {
             referencia_escala: membro.referencia_escala || "",
             data_reciclagem: membro.data_reciclagem || "",
             data_inicio_ferias: membro.data_inicio_ferias || "",
-            data_fim_ferias: membro.data_fim_ferias || ""
+            data_fim_ferias: membro.data_fim_ferias || "",
+            tipo_servico: membro.tipo_servico || "Vigilante/Operacional"
         })
         setIsEditModalOpen(true)
     }
@@ -188,12 +208,13 @@ export default function GestaoEquipeV2() {
         if (!editingColab) return
         setLoading(true)
         
-        // Limpeza dos dados: Converter strings vazias em null para evitar erro de tipo 'date' no Postgres
-        const cleanedData = {
-            referencia_escala: editFormData.referencia_escala || null,
-            data_reciclagem: editFormData.data_reciclagem || null,
-            data_inicio_ferias: editFormData.data_inicio_ferias || null,
-            data_fim_ferias: editFormData.data_fim_ferias || null
+        // Limpeza dos dados: Converter strings vazias em undefined para satisfazer Partial<OpEquipe>
+        const cleanedData: Partial<OpEquipe> = {
+            referencia_escala: editFormData.referencia_escala || undefined,
+            data_reciclagem: editFormData.data_reciclagem || undefined,
+            data_inicio_ferias: editFormData.data_inicio_ferias || undefined,
+            data_fim_ferias: editFormData.data_fim_ferias || undefined,
+            tipo_servico: editFormData.tipo_servico
         }
 
         try {
@@ -212,10 +233,10 @@ export default function GestaoEquipeV2() {
         setLoading(true)
         try {
             // Sincronizar data_inicio/data_fim globais (para a barra no calendário) com o período do EVENTO real
-            const payload = {
+            const payload: OpEvento = {
                 ...eventFormData,
-                data_inicio: eventFormData.montagem_inicio_data, // Inicia na montagem
-                data_fim: eventFormData.desmontagem_fim_data    // Termina na desmontagem
+                data_inicio: eventFormData.montagem_inicio_data || eventFormData.data_inicio,
+                data_fim: eventFormData.desmontagem_fim_data || eventFormData.data_fim
             }
             
             console.log("Iniciando criação de evento com payload:", payload)
@@ -245,8 +266,16 @@ export default function GestaoEquipeV2() {
                 evento_fim_hora: "23:59",
                 desmontagem_inicio_data: format(new Date(), 'yyyy-MM-dd'),
                 desmontagem_inicio_hora: "00:00",
-                desmontagem_fim_data: format(new Date(), 'yyyy-MM-dd'),
-                desmontagem_fim_hora: "08:00"
+                desmontagem_fim_hora: "08:00",
+                equipe_montagem: [],
+                equipe_realizacao: [],
+                equipe_desmontagem: [],
+                has_montagem: true,
+                has_realizacao: true,
+                has_desmontagem: false,
+                patrocinador: "Hagana",
+                responsavel_nome: "",
+                nivel_criticidade: 3
             })
             loadData()
             toast.success("Evento planejado e enviado ao Kanban!")
@@ -289,18 +318,78 @@ export default function GestaoEquipeV2() {
                             <Plus className="h-4 w-4" />
                             Adicionar Evento
                         </Button>
-                        <div className="h-6 w-px bg-slate-200 mr-2"></div>
-                        <Button variant="ghost" size="icon" onClick={prevMonth} className="hover:bg-slate-100 rounded-xl h-10 w-10">
-                            <ChevronLeft className="h-6 w-6 text-slate-600" />
-                        </Button>
-                        <div className="flex flex-col items-center min-w-[160px]">
-                            <span className="font-black text-slate-800 capitalize text-sm tracking-tight">
-                                {format(currentDate, "MMMM yyyy", { locale: ptBR })}
-                            </span>
+                        <div className="flex items-center gap-3">
+                            <div className="relative group/search">
+                                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-hover/search:text-blue-500 transition-colors" />
+                                <Input 
+                                    placeholder="Buscar por nome..." 
+                                    value={filtroNome}
+                                    onChange={(e) => setFiltroNome(e.target.value)}
+                                    className="h-10 pl-9 w-[200px] rounded-xl border-slate-200 bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-bold text-xs"
+                                />
+                            </div>
+
+                            <Select value={filtroEscala} onValueChange={setFiltroEscala}>
+                                <SelectTrigger className="h-10 w-[120px] rounded-xl border-slate-200 bg-white font-bold text-[10px] uppercase tracking-wider">
+                                    <div className="flex items-center gap-2">
+                                        <Filter className="h-3.5 w-3.5 text-slate-400" />
+                                        <SelectValue placeholder="Escala" />
+                                    </div>
+                                </SelectTrigger>
+                                <SelectContent className="rounded-2xl border-slate-200 shadow-2xl">
+                                    <SelectItem value="todos" className="text-[10px] font-black uppercase tracking-widest">Todas Escalas</SelectItem>
+                                    <SelectItem value="12x36" className="text-[10px] font-black uppercase tracking-widest">12x36</SelectItem>
+                                    <SelectItem value="5x1" className="text-[10px] font-black uppercase tracking-widest">5x1</SelectItem>
+                                    <SelectItem value="5x2" className="text-[10px] font-black uppercase tracking-widest">5x2</SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            <Select value={filtroVSPP} onValueChange={setFiltroVSPP}>
+                                <SelectTrigger className="h-10 w-[120px] rounded-xl border-slate-200 bg-white font-bold text-[10px] uppercase tracking-wider">
+                                    <div className="flex items-center gap-2">
+                                        <Shield className="h-3.5 w-3.5 text-slate-400" />
+                                        <SelectValue placeholder="Tipo" />
+                                    </div>
+                                </SelectTrigger>
+                                <SelectContent className="rounded-2xl border-slate-200 shadow-2xl">
+                                    <SelectItem value="todos" className="text-[10px] font-black uppercase tracking-widest">Todos Tipos</SelectItem>
+                                    <SelectItem value="VSPP" className="text-[10px] font-black uppercase tracking-widest">Apenas VSPP</SelectItem>
+                                    <SelectItem value="Vigilante" className="text-[10px] font-black uppercase tracking-widest">Apenas Vigilante</SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            <Select value={filtroStatusHoje} onValueChange={setFiltroStatusHoje}>
+                                <SelectTrigger className="h-10 w-[135px] rounded-xl border-slate-200 bg-white font-bold text-[10px] uppercase tracking-wider">
+                                    <div className="flex items-center gap-2">
+                                        <Clock className="h-3.5 w-3.5 text-slate-400" />
+                                        <SelectValue placeholder="Status Hoje" />
+                                    </div>
+                                </SelectTrigger>
+                                <SelectContent className="rounded-2xl border-slate-200 shadow-2xl">
+                                    <SelectItem value="todos" className="text-[10px] font-black uppercase tracking-widest">Status (Hoje)</SelectItem>
+                                    <SelectItem value="Trabalhando" className="text-[10px] font-black uppercase tracking-widest">Trabalhando</SelectItem>
+                                    <SelectItem value="Folga" className="text-[10px] font-black uppercase tracking-widest">Folga</SelectItem>
+                                    <SelectItem value="Falta" className="text-[10px] font-black uppercase tracking-widest">Falta</SelectItem>
+                                    <SelectItem value="Atestado" className="text-[10px] font-black uppercase tracking-widest">Atestado</SelectItem>
+                                    <SelectItem value="Férias" className="text-[10px] font-black uppercase tracking-widest">Férias</SelectItem>
+                                    <SelectItem value="Reciclagem" className="text-[10px] font-black uppercase tracking-widest">Reciclagem Próxima</SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            <div className="h-6 w-px bg-slate-200 mx-2"></div>
+                            
+                            <Button variant="ghost" size="icon" onClick={prevMonth} className="hover:bg-slate-100 rounded-xl h-10 w-10">
+                                <ChevronLeft className="h-6 w-6 text-slate-600" />
+                            </Button>
+                            <div className="flex flex-col items-center min-w-[140px]">
+                                <span className="font-black text-slate-800 capitalize text-sm tracking-tight">
+                                    {format(currentDate, "MMMM yyyy", { locale: ptBR })}
+                                </span>
+                            </div>
+                            <Button variant="ghost" size="icon" onClick={nextMonth} className="hover:bg-slate-100 rounded-xl h-10 w-10">
+                                <ChevronRight className="h-6 w-6 text-slate-600" />
+                            </Button>
                         </div>
-                        <Button variant="ghost" size="icon" onClick={nextMonth} className="hover:bg-slate-100 rounded-xl h-10 w-10">
-                            <ChevronRight className="h-6 w-6 text-slate-600" />
-                        </Button>
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -383,7 +472,49 @@ export default function GestaoEquipeV2() {
                                 )}
                             </thead>
                             <tbody>
-                                {equipe.map((membro) => (
+                                {equipe
+                                    .filter(membro => {
+                                        const matchNome = membro.nome_completo.toLowerCase().includes(filtroNome.toLowerCase())
+                                        const matchEscala = filtroEscala === "todos" || membro.tipo_escala === filtroEscala
+                                        
+                                        // Filtro VSPP mais resiliente (checa tipo_servico e funcao)
+                                        const isVSPP = (membro.tipo_servico?.toUpperCase() === 'VSPP') || 
+                                                     (membro.funcao?.toUpperCase().includes('VSPP'))
+                                        const matchVSPP = filtroVSPP === "todos" || 
+                                                        (filtroVSPP === "VSPP" && isVSPP) ||
+                                                        (filtroVSPP === "Vigilante" && !isVSPP)
+                                        
+                                        // Filtro Status Hoje
+                                        let matchStatusHoje = true
+                                        if (filtroStatusHoje !== "todos") {
+                                            const hoje = startOfDay(new Date())
+                                            const statusTeorico = OpServiceV2.getTrabalhaNoDia(membro, hoje, [])
+                                            const excecao = excecoes.find(ex => ex.colaborador_id === membro.id && ex.data_plantao === format(hoje, 'yyyy-MM-dd'))
+                                            
+                                            let statusAtual = statusTeorico ? 'Trabalhando' : 'Folga'
+                                            if (excecao) statusAtual = excecao.status_dia
+                                            if (membro.data_inicio_ferias && membro.data_fim_ferias) {
+                                                const hojeStr = format(hoje, 'yyyy-MM-dd')
+                                                if (hojeStr >= membro.data_inicio_ferias && hojeStr <= membro.data_fim_ferias) {
+                                                    statusAtual = 'Férias'
+                                                }
+                                            }
+                                            if (filtroStatusHoje === 'Reciclagem') {
+                                                if (membro.data_reciclagem) {
+                                                    const dataRec = new Date(membro.data_reciclagem)
+                                                    const diff = (dataRec.getTime() - hoje.getTime()) / (1000 * 3600 * 24)
+                                                    matchStatusHoje = diff <= 30
+                                                } else {
+                                                    matchStatusHoje = false
+                                                }
+                                            } else {
+                                                matchStatusHoje = statusAtual === filtroStatusHoje
+                                            }
+                                        }
+
+                                        return matchNome && matchEscala && matchVSPP && matchStatusHoje
+                                    })
+                                    .map((membro) => (
                                     <tr key={membro.id} className="hover:bg-blue-50/30 transition-all border-b last:border-0 border-slate-100 group">
                                         <td className="p-5 sticky left-0 z-20 bg-white group-hover:bg-blue-50/50 border-r shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)] transition-colors">
                                             <div className="flex items-center gap-4">
@@ -563,6 +694,24 @@ export default function GestaoEquipeV2() {
                                 />
                             </div>
                         </div>
+
+                        <div className="space-y-3">
+                            <Label className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Tipo de Serviço (Cálculo Hagana)</Label>
+                            <div className="flex gap-2 p-1.5 bg-slate-100 rounded-[20px] border border-slate-200">
+                                {[
+                                    { id: 'Vigilante/Operacional', label: 'Vig. / Op.' },
+                                    { id: 'VSPP', label: 'VSPP (Armado)' }
+                                ].map(option => (
+                                    <div 
+                                        key={option.id}
+                                        onClick={() => setEditFormData({ ...editFormData, tipo_servico: option.id })}
+                                        className={`flex-1 py-3 text-center rounded-[14px] cursor-pointer transition-all text-xs font-black uppercase tracking-tighter ${editFormData.tipo_servico === option.id ? 'bg-white text-blue-600 shadow-md ring-1 ring-blue-100' : 'text-slate-400 hover:text-slate-600'}`}
+                                    >
+                                        {option.label}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
                     <DialogFooter className="p-8 pt-4 bg-slate-50 border-t border-slate-100 flex-col sm:flex-row gap-3">
@@ -649,171 +798,244 @@ export default function GestaoEquipeV2() {
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* SEÇÃO MONTAGEM */}
-                        <div className="p-6 bg-slate-50 rounded-[24px] border border-slate-100 space-y-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <div className="h-4 w-1 bg-blue-500 rounded-full"></div>
-                                <h3 className="text-xs font-black uppercase tracking-widest text-blue-600">Fase 1: Montagem</h3>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Início (Data)</Label>
+                            {/* NOVOS CAMPOS FASE 2.2 */}
+                            <div className="grid grid-cols-12 gap-4">
+                                <div className="col-span-12 md:col-span-6 space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Responsável p/ Evento</Label>
                                     <Input 
-                                        type="date"
-                                        value={eventFormData.montagem_inicio_data}
-                                        onChange={(e) => setEventFormData({ ...eventFormData, montagem_inicio_data: e.target.value })}
+                                        placeholder="Nome do cliente/organizador"
+                                        value={eventFormData.responsavel_nome}
+                                        onChange={(e) => setEventFormData({ ...eventFormData, responsavel_nome: e.target.value })}
                                         className="h-12 rounded-xl border-slate-200 font-bold bg-white"
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Horário</Label>
-                                    <Input 
-                                        type="time"
-                                        value={eventFormData.montagem_inicio_hora}
-                                        onChange={(e) => setEventFormData({ ...eventFormData, montagem_inicio_hora: e.target.value })}
-                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
-                                    />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Término (Data)</Label>
-                                    <Input 
-                                        type="date"
-                                        value={eventFormData.montagem_fim_data}
-                                        onChange={(e) => setEventFormData({ ...eventFormData, montagem_fim_data: e.target.value })}
-                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Horário</Label>
-                                    <Input 
-                                        type="time"
-                                        value={eventFormData.montagem_fim_hora}
-                                        onChange={(e) => setEventFormData({ ...eventFormData, montagem_fim_hora: e.target.value })}
-                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
-                                    />
+                                <div className="col-span-12 md:col-span-6 space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Patrocinador ($$$)</Label>
+                                    <div className="flex gap-1 p-1 bg-slate-50 rounded-xl border border-slate-100 h-12">
+                                        {['Hagana', 'Paulão', 'OR'].map(patro => (
+                                            <div 
+                                                key={patro}
+                                                onClick={() => setEventFormData({ ...eventFormData, patrocinador: patro })}
+                                                className={`flex-1 flex items-center justify-center rounded-lg cursor-pointer transition-all text-[9px] font-black uppercase tracking-tighter ${eventFormData.patrocinador === patro ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-slate-200 border-emerald-100' : 'text-slate-400 hover:bg-slate-100'}`}
+                                            >
+                                                {patro}
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* SEÇÃO EVENTO */}
-                        <div className="p-6 bg-indigo-50/50 rounded-[24px] border border-indigo-100/50 space-y-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <div className="h-4 w-1 bg-indigo-600 rounded-full"></div>
-                                <h3 className="text-xs font-black uppercase tracking-widest text-indigo-700">Fase 2: O Evento</h3>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 gap-4">
                                 <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Início (Data)</Label>
-                                    <Input 
-                                        type="date"
-                                        value={eventFormData.evento_inicio_data}
-                                        onChange={(e) => setEventFormData({ ...eventFormData, evento_inicio_data: e.target.value })}
-                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Horário</Label>
-                                    <Input 
-                                        type="time"
-                                        value={eventFormData.evento_inicio_hora}
-                                        onChange={(e) => setEventFormData({ ...eventFormData, evento_inicio_hora: e.target.value })}
-                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
-                                    />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Término (Data)</Label>
-                                    <Input 
-                                        type="date"
-                                        value={eventFormData.evento_fim_data}
-                                        onChange={(e) => setEventFormData({ ...eventFormData, evento_fim_data: e.target.value })}
-                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Horário</Label>
-                                    <Input 
-                                        type="time"
-                                        value={eventFormData.evento_fim_hora}
-                                        onChange={(e) => setEventFormData({ ...eventFormData, evento_fim_hora: e.target.value })}
-                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
-                                    />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Público Estimado</Label>
-                                    <Input 
-                                        placeholder="Ex: 800 pessoas"
-                                        value={eventFormData.publico_estimado}
-                                        onChange={(e) => setEventFormData({ ...eventFormData, publico_estimado: e.target.value })}
-                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Link/URL Foto Evento</Label>
-                                    <Input 
-                                        placeholder="URL da imagem (opcional)"
-                                        value={eventFormData.foto_evento}
-                                        onChange={(e) => setEventFormData({ ...eventFormData, foto_evento: e.target.value })}
-                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
-                                    />
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Nível de Criticidade</Label>
+                                    <div className="flex gap-2 p-1 bg-slate-50 rounded-xl border border-slate-100 h-12">
+                                        {[
+                                            { id: 1, label: 'Nível 1 (Crítico)', color: 'rose' },
+                                            { id: 2, label: 'Nível 2 (Atenção)', color: 'orange' },
+                                            { id: 3, label: 'Nível 3 (Normal)', color: 'emerald' }
+                                        ].map(nivel => (
+                                            <div 
+                                                key={nivel.id}
+                                                onClick={() => setEventFormData({ ...eventFormData, nivel_criticidade: nivel.id })}
+                                                className={`flex-1 flex items-center justify-center rounded-lg cursor-pointer transition-all text-[9px] font-black uppercase tracking-tighter border ${eventFormData.nivel_criticidade === nivel.id ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-300'}`}
+                                            >
+                                                <div className={`w-2 h-2 rounded-full mr-2 bg-${nivel.color}-500 shadow-sm`}></div>
+                                                {nivel.label}
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* SEÇÃO DESMONTAGEM */}
-                        <div className="p-6 bg-slate-50 rounded-[24px] border border-slate-100 space-y-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <div className="h-4 w-1 bg-amber-500 rounded-full"></div>
-                                <h3 className="text-xs font-black uppercase tracking-widest text-amber-600">Fase 3: Desmontagem</h3>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Início (Data)</Label>
-                                    <Input 
-                                        type="date"
-                                        value={eventFormData.desmontagem_inicio_data}
-                                        onChange={(e) => setEventFormData({ ...eventFormData, desmontagem_inicio_data: e.target.value })}
-                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
-                                    />
+                        <div className={`p-6 rounded-[24px] border transition-all ${eventFormData.has_montagem ? 'bg-blue-50/50 border-blue-200/50' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                    <div className={`h-4 w-1 ${eventFormData.has_montagem ? 'bg-blue-500' : 'bg-slate-300'} rounded-full`}></div>
+                                    <h3 className={`text-xs font-black uppercase tracking-widest ${eventFormData.has_montagem ? 'text-blue-600' : 'text-slate-400'}`}>Fase 1: Montagem</h3>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Horário</Label>
-                                    <Input 
-                                        type="time"
-                                        value={eventFormData.desmontagem_inicio_hora}
-                                        onChange={(e) => setEventFormData({ ...eventFormData, desmontagem_inicio_hora: e.target.value })}
-                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
-                                    />
+                                <div 
+                                    onClick={() => setEventFormData({ ...eventFormData, has_montagem: !eventFormData.has_montagem })}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full border cursor-pointer transition-all ${eventFormData.has_montagem ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-400'}`}
+                                >
+                                    <div className={`h-2 w-2 rounded-full ${eventFormData.has_montagem ? 'bg-white' : 'bg-slate-300'}`}></div>
+                                    <span className="text-[10px] font-black uppercase tracking-tighter">{eventFormData.has_montagem ? 'Habilitado' : 'Desabilitado'}</span>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Término (Data)</Label>
-                                    <Input 
-                                        type="date"
-                                        value={eventFormData.desmontagem_fim_data}
-                                        onChange={(e) => setEventFormData({ ...eventFormData, desmontagem_fim_data: e.target.value })}
-                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
-                                    />
+
+                            {eventFormData.has_montagem && (
+                                <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Início (Data)</Label>
+                                            <Input type="date" value={eventFormData.montagem_inicio_data} onChange={(e) => setEventFormData({ ...eventFormData, montagem_inicio_data: e.target.value })} className="h-12 rounded-xl border-slate-200 font-bold bg-white" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Horário</Label>
+                                            <Input type="time" value={eventFormData.montagem_inicio_hora} onChange={(e) => setEventFormData({ ...eventFormData, montagem_inicio_hora: e.target.value })} className="h-12 rounded-xl border-slate-200 font-bold bg-white" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Término (Data)</Label>
+                                            <Input type="date" value={eventFormData.montagem_fim_data} onChange={(e) => setEventFormData({ ...eventFormData, montagem_fim_data: e.target.value })} className="h-12 rounded-xl border-slate-200 font-bold bg-white" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Horário</Label>
+                                            <Input type="time" value={eventFormData.montagem_fim_hora} onChange={(e) => setEventFormData({ ...eventFormData, montagem_fim_hora: e.target.value })} className="h-12 rounded-xl border-slate-200 font-bold bg-white" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Equipe de Montagem</Label>
+                                        <div className="grid grid-cols-2 gap-2 max-h-[150px] overflow-y-auto p-2 bg-white rounded-xl border border-slate-200 custom-scrollbar">
+                                            {equipe.map(membro => (
+                                                <div 
+                                                    key={membro.id}
+                                                    onClick={() => {
+                                                        const current = eventFormData.equipe_montagem || [];
+                                                        setEventFormData({ ...eventFormData, equipe_montagem: current.includes(membro.id) ? current.filter(id => id !== membro.id) : [...current, membro.id] });
+                                                    }}
+                                                    className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${(eventFormData.equipe_montagem || []).includes(membro.id) ? 'bg-blue-50 border-blue-200 ring-2 ring-blue-500/20' : 'bg-slate-50 border-transparent'}`}
+                                                >
+                                                    <div className={`h-1.5 w-1.5 rounded-full ${(eventFormData.equipe_montagem || []).includes(membro.id) ? 'bg-blue-500' : 'bg-slate-300'}`}></div>
+                                                    <span className="text-[10px] font-bold text-slate-700 truncate">{membro.nome_completo.split(' ')[0]} {membro.nome_completo.split(' ').pop()}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Horário</Label>
-                                    <Input 
-                                        type="time"
-                                        value={eventFormData.desmontagem_fim_hora}
-                                        onChange={(e) => setEventFormData({ ...eventFormData, desmontagem_fim_hora: e.target.value })}
-                                        className="h-12 rounded-xl border-slate-200 font-bold bg-white"
-                                    />
-                                </div>
-                            </div>
+                            )}
                         </div>
+
+                        <div className={`p-6 rounded-[24px] border transition-all ${eventFormData.has_realizacao ? 'bg-indigo-50/50 border-indigo-200/50' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                    <div className={`h-4 w-1 ${eventFormData.has_realizacao ? 'bg-indigo-600' : 'bg-slate-300'} rounded-full`}></div>
+                                    <h3 className={`text-xs font-black uppercase tracking-widest ${eventFormData.has_realizacao ? 'text-indigo-700' : 'text-slate-400'}`}>Fase 2: O Evento</h3>
+                                </div>
+                                <div 
+                                    onClick={() => setEventFormData({ ...eventFormData, has_realizacao: !eventFormData.has_realizacao })}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full border cursor-pointer transition-all ${eventFormData.has_realizacao ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-400'}`}
+                                >
+                                    <div className={`h-2 w-2 rounded-full ${eventFormData.has_realizacao ? 'bg-white' : 'bg-slate-300'}`}></div>
+                                    <span className="text-[10px] font-black uppercase tracking-tighter">{eventFormData.has_realizacao ? 'Habilitado' : 'Desabilitado'}</span>
+                                </div>
+                            </div>
+
+                            {eventFormData.has_realizacao && (
+                                <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Início (Data)</Label>
+                                            <Input type="date" value={eventFormData.evento_inicio_data} onChange={(e) => setEventFormData({ ...eventFormData, evento_inicio_data: e.target.value })} className="h-12 rounded-xl border-slate-200 font-bold bg-white" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Horário</Label>
+                                            <Input type="time" value={eventFormData.evento_inicio_hora} onChange={(e) => setEventFormData({ ...eventFormData, evento_inicio_hora: e.target.value })} className="h-12 rounded-xl border-slate-200 font-bold bg-white" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Término (Data)</Label>
+                                            <Input type="date" value={eventFormData.evento_fim_data} onChange={(e) => setEventFormData({ ...eventFormData, evento_fim_data: e.target.value })} className="h-12 rounded-xl border-slate-200 font-bold bg-white" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Horário</Label>
+                                            <Input type="time" value={eventFormData.evento_fim_hora} onChange={(e) => setEventFormData({ ...eventFormData, evento_fim_hora: e.target.value })} className="h-12 rounded-xl border-slate-200 font-bold bg-white" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Público Estimado</Label>
+                                            <Input placeholder="Ex: 800" value={eventFormData.publico_estimado} onChange={(e) => setEventFormData({ ...eventFormData, publico_estimado: e.target.value })} className="h-12 rounded-xl border-slate-200 font-bold bg-white" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">URL Foto</Label>
+                                            <Input placeholder="Opcional" value={eventFormData.foto_evento} onChange={(e) => setEventFormData({ ...eventFormData, foto_evento: e.target.value })} className="h-12 rounded-xl border-slate-200 font-bold bg-white" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Equipe Realização</Label>
+                                        <div className="grid grid-cols-2 gap-2 max-h-[150px] overflow-y-auto p-2 bg-white rounded-xl border border-slate-200 custom-scrollbar">
+                                            {equipe.map(membro => (
+                                                <div 
+                                                    key={membro.id}
+                                                    onClick={() => {
+                                                        const current = eventFormData.equipe_realizacao || [];
+                                                        setEventFormData({ ...eventFormData, equipe_realizacao: current.includes(membro.id) ? current.filter(id => id !== membro.id) : [...current, membro.id] });
+                                                    }}
+                                                    className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${(eventFormData.equipe_realizacao || []).includes(membro.id) ? 'bg-indigo-50 border-indigo-200 ring-2 ring-indigo-500/20' : 'bg-slate-50 border-transparent'}`}
+                                                >
+                                                    <div className={`h-1.5 w-1.5 rounded-full ${(eventFormData.equipe_realizacao || []).includes(membro.id) ? 'bg-indigo-600' : 'bg-slate-300'}`}></div>
+                                                    <span className="text-[10px] font-bold text-slate-700 truncate">{membro.nome_completo.split(' ')[0]} {membro.nome_completo.split(' ').pop()}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className={`p-6 rounded-[24px] border transition-all ${eventFormData.has_desmontagem ? 'bg-amber-50/50 border-amber-200/50' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                    <div className={`h-4 w-1 ${eventFormData.has_desmontagem ? 'bg-amber-500' : 'bg-slate-300'} rounded-full`}></div>
+                                    <h3 className={`text-xs font-black uppercase tracking-widest ${eventFormData.has_desmontagem ? 'text-amber-600' : 'text-slate-400'}`}>Fase 3: Desmontagem</h3>
+                                </div>
+                                <div 
+                                    onClick={() => setEventFormData({ ...eventFormData, has_desmontagem: !eventFormData.has_desmontagem })}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full border cursor-pointer transition-all ${eventFormData.has_desmontagem ? 'bg-amber-600 border-amber-600 text-white' : 'bg-white border-slate-200 text-slate-400'}`}
+                                >
+                                    <div className={`h-2 w-2 rounded-full ${eventFormData.has_desmontagem ? 'bg-white' : 'bg-slate-300'}`}></div>
+                                    <span className="text-[10px] font-black uppercase tracking-tighter">{eventFormData.has_desmontagem ? 'Habilitado' : 'Desabilitado'}</span>
+                                </div>
+                            </div>
+
+                            {eventFormData.has_desmontagem && (
+                                <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Início (Data)</Label>
+                                            <Input type="date" value={eventFormData.desmontagem_inicio_data} onChange={(e) => setEventFormData({ ...eventFormData, desmontagem_inicio_data: e.target.value })} className="h-12 rounded-xl border-slate-200 font-bold bg-white" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Horário</Label>
+                                            <Input type="time" value={eventFormData.desmontagem_inicio_hora} onChange={(e) => setEventFormData({ ...eventFormData, desmontagem_inicio_hora: e.target.value })} className="h-12 rounded-xl border-slate-200 font-bold bg-white" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Término (Data)</Label>
+                                            <Input type="date" value={eventFormData.desmontagem_fim_data} onChange={(e) => setEventFormData({ ...eventFormData, desmontagem_fim_data: e.target.value })} className="h-12 rounded-xl border-slate-200 font-bold bg-white" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Horário</Label>
+                                            <Input type="time" value={eventFormData.desmontagem_fim_hora} onChange={(e) => setEventFormData({ ...eventFormData, desmontagem_fim_hora: e.target.value })} className="h-12 rounded-xl border-slate-200 font-bold bg-white" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Equipe Desmontagem</Label>
+                                        <div className="grid grid-cols-2 gap-2 max-h-[150px] overflow-y-auto p-2 bg-white rounded-xl border border-slate-200 custom-scrollbar">
+                                            {equipe.map(membro => (
+                                                <div 
+                                                    key={membro.id}
+                                                    onClick={() => {
+                                                        const current = eventFormData.equipe_desmontagem || [];
+                                                        setEventFormData({ ...eventFormData, equipe_desmontagem: current.includes(membro.id) ? current.filter(id => id !== membro.id) : [...current, membro.id] });
+                                                    }}
+                                                    className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${(eventFormData.equipe_desmontagem || []).includes(membro.id) ? 'bg-amber-100 border-amber-300 ring-2 ring-amber-500/20' : 'bg-slate-50 border-transparent'}`}
+                                                >
+                                                    <div className={`h-1.5 w-1.5 rounded-full ${(eventFormData.equipe_desmontagem || []).includes(membro.id) ? 'bg-amber-600' : 'bg-slate-300'}`}></div>
+                                                    <span className="text-[10px] font-bold text-slate-700 truncate">{membro.nome_completo.split(' ')[0]} {membro.nome_completo.split(' ').pop()}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
 
                         {/* OBSERVAÇÕES */}
                         <div className="space-y-2">
