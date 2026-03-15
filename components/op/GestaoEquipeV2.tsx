@@ -31,7 +31,8 @@ import {
     Plus,
     Settings,
     Filter,
-    Search as SearchIcon
+    Search as SearchIcon,
+    Star
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -63,7 +64,8 @@ export default function GestaoEquipeV2() {
     const [filtroNome, setFiltroNome] = useState("")
     const [filtroEscala, setFiltroEscala] = useState("todos")
     const [filtroVSPP, setFiltroVSPP] = useState("todos")
-    const [filtroStatusHoje, setFiltroStatusHoje] = useState("todos")
+    const [filtroVisao, setFiltroVisao] = useState("todos")
+    const [filtroEventoId, setFiltroEventoId] = useState("todos")
     
     // Estados para o Modal de Edição
     const [editingColab, setEditingColab] = useState<OpEquipe | null>(null)
@@ -83,7 +85,7 @@ export default function GestaoEquipeV2() {
         tipo: "Social",
         data_inicio: format(new Date(), 'yyyy-MM-dd'),
         data_fim: format(new Date(), 'yyyy-MM-dd'),
-        cor: "#3b82f6",
+        cor: "#f59e0b",
         local: "",
         observacoes: "",
         local_detalhado: "",
@@ -118,7 +120,31 @@ export default function GestaoEquipeV2() {
 
     const monthStart = startOfMonth(currentDate)
     const monthEnd = endOfMonth(currentDate)
-    const days = eachDayOfInterval({ start: monthStart, end: monthEnd })
+    const allDays = eachDayOfInterval({ start: monthStart, end: monthEnd })
+    
+    // Filtro de Dias: Se visão "Evento" ou filtro de projeto ativo
+    const days = filtroEventoId !== "todos"
+        ? allDays.filter(day => {
+            const dayStr = format(day, 'yyyy-MM-dd')
+            const ev = eventos.find(e => e.id === filtroEventoId)
+            return ev ? (dayStr >= ev.data_inicio && dayStr <= ev.data_fim) : false
+        })
+        : filtroVisao === "Evento" 
+            ? allDays.filter(day => {
+                const dayStr = format(day, 'yyyy-MM-dd')
+                return eventos.some(ev => dayStr >= ev.data_inicio && dayStr <= ev.data_fim)
+            })
+            : filtroVisao === "Atestado"
+                ? allDays.filter(day => {
+                    const dayStr = format(day, 'yyyy-MM-dd')
+                    return excecoes.some(ex => ex.data_plantao === dayStr && ex.status_dia === 'Atestado')
+                })
+                : filtroVisao === "Férias"
+                    ? allDays.filter(day => {
+                        const dayStr = format(day, 'yyyy-MM-dd')
+                        return equipe.some(m => m.data_inicio_ferias && m.data_fim_ferias && dayStr >= m.data_inicio_ferias && dayStr <= m.data_fim_ferias)
+                    })
+                    : allDays
 
     useEffect(() => {
         loadData()
@@ -250,7 +276,7 @@ export default function GestaoEquipeV2() {
                 tipo: "Social",
                 data_inicio: format(new Date(), 'yyyy-MM-dd'),
                 data_fim: format(new Date(), 'yyyy-MM-dd'),
-                cor: "#3b82f6",
+                cor: "#f59e0b",
                 local: "",
                 observacoes: "",
                 local_detalhado: "",
@@ -358,21 +384,37 @@ export default function GestaoEquipeV2() {
                                 </SelectContent>
                             </Select>
 
-                            <Select value={filtroStatusHoje} onValueChange={setFiltroStatusHoje}>
-                                <SelectTrigger className="h-10 w-[135px] rounded-xl border-slate-200 bg-white font-bold text-[10px] uppercase tracking-wider">
+                            <Select value={filtroVisao} onValueChange={setFiltroVisao}>
+                                <SelectTrigger className="h-10 w-[145px] rounded-xl border-slate-200 bg-white font-bold text-[10px] uppercase tracking-wider">
                                     <div className="flex items-center gap-2">
                                         <Clock className="h-3.5 w-3.5 text-slate-400" />
-                                        <SelectValue placeholder="Status Hoje" />
+                                        <SelectValue placeholder="Visão" />
                                     </div>
                                 </SelectTrigger>
                                 <SelectContent className="rounded-2xl border-slate-200 shadow-2xl">
-                                    <SelectItem value="todos" className="text-[10px] font-black uppercase tracking-widest">Status (Hoje)</SelectItem>
-                                    <SelectItem value="Trabalhando" className="text-[10px] font-black uppercase tracking-widest">Trabalhando</SelectItem>
-                                    <SelectItem value="Folga" className="text-[10px] font-black uppercase tracking-widest">Folga</SelectItem>
-                                    <SelectItem value="Falta" className="text-[10px] font-black uppercase tracking-widest">Falta</SelectItem>
-                                    <SelectItem value="Atestado" className="text-[10px] font-black uppercase tracking-widest">Atestado</SelectItem>
-                                    <SelectItem value="Férias" className="text-[10px] font-black uppercase tracking-widest">Férias</SelectItem>
-                                    <SelectItem value="Reciclagem" className="text-[10px] font-black uppercase tracking-widest">Reciclagem Próxima</SelectItem>
+                                    <SelectItem value="todos" className="text-[10px] font-black uppercase tracking-widest">Visão Geral</SelectItem>
+                                    <SelectItem value="Evento" className="text-[10px] font-black uppercase tracking-widest text-blue-600">Isolar Eventos</SelectItem>
+                                    <SelectItem value="Atestado" className="text-[10px] font-black uppercase tracking-widest text-orange-600">Isolar Atestados</SelectItem>
+                                    <SelectItem value="Férias" className="text-[10px] font-black uppercase tracking-widest text-purple-600">Isolar Férias</SelectItem>
+                                    <SelectItem value="Reciclagem" className="text-[10px] font-black uppercase tracking-widest text-rose-600">Próximas Reciclagens</SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            <Select value={filtroEventoId} onValueChange={setFiltroEventoId}>
+                                <SelectTrigger className="h-10 w-[180px] rounded-xl border-slate-200 bg-white font-bold text-[10px] uppercase tracking-wider">
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
+                                        <SelectValue placeholder="Isolar Evento" />
+                                    </div>
+                                </SelectTrigger>
+                                <SelectContent className="rounded-2xl border-slate-200 shadow-2xl">
+                                    <SelectItem value="todos" className="text-[10px] font-black uppercase tracking-widest text-slate-400">Todos os Projetos</SelectItem>
+                                    {eventos.map(ev => (
+                                        <SelectItem key={ev.id} value={ev.id!} className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full inline-block mr-2" style={{ backgroundColor: ev.cor }} />
+                                            {ev.nome}
+                                        </SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
 
@@ -394,7 +436,7 @@ export default function GestaoEquipeV2() {
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-320px)] custom-scrollbar">
-                        <table className="w-full border-collapse">
+                        <table className="w-auto border-collapse">
                             <thead className="sticky top-0 z-30 bg-slate-50 shadow-sm border-b border-slate-200">
                                 <tr>
                                     <th className="p-6 text-left font-black text-slate-400 text-[10px] uppercase tracking-[0.2em] sticky left-0 z-40 bg-slate-50 border-r min-w-[320px]">
@@ -411,7 +453,7 @@ export default function GestaoEquipeV2() {
                                         return (
                                             <th 
                                                 key={day.toString()} 
-                                                className={`p-3 text-center border-r last:border-r-0 min-w-[48px] transition-colors ${isToday(day) ? 'bg-blue-200 shadow-inner' : isWeekend ? 'bg-slate-300' : ''}`}
+                                                className={`p-3 text-center border-r last:border-r-0 min-w-[80px] transition-colors ${isToday(day) ? 'bg-blue-200 shadow-inner' : isWeekend ? 'bg-slate-300' : ''}`}
                                             >
                                                 <div className="flex flex-col items-center">
                                                     <span className={`text-[10px] font-black uppercase tracking-tighter ${isToday(day) ? 'text-blue-700' : isWeekend ? 'text-slate-600' : 'text-slate-400'}`}>
@@ -474,8 +516,10 @@ export default function GestaoEquipeV2() {
                             <tbody>
                                 {equipe
                                     .filter(membro => {
-                                        const matchNome = membro.nome_completo.toLowerCase().includes(filtroNome.toLowerCase())
-                                        const matchEscala = filtroEscala === "todos" || membro.tipo_escala === filtroEscala
+                                        const matchNome = membro.nome_completo.toLowerCase().includes(filtroNome.toLowerCase()) ||
+                                                          membro.re.toLowerCase().includes(filtroNome.toLowerCase())
+                                        const matchEscala = filtroEscala === "todos" || 
+                                                           membro.tipo_escala?.toUpperCase() === filtroEscala.toUpperCase()
                                         
                                         // Filtro VSPP mais resiliente (checa tipo_servico e funcao)
                                         const isVSPP = (membro.tipo_servico?.toUpperCase() === 'VSPP') || 
@@ -484,9 +528,9 @@ export default function GestaoEquipeV2() {
                                                         (filtroVSPP === "VSPP" && isVSPP) ||
                                                         (filtroVSPP === "Vigilante" && !isVSPP)
                                         
-                                        // Filtro Status Hoje
-                                        let matchStatusHoje = true
-                                        if (filtroStatusHoje !== "todos") {
+                                        // Filtro de Visão
+                                        let matchVisao = true
+                                        if (filtroVisao !== "todos") {
                                             const hoje = startOfDay(new Date())
                                             const statusTeorico = OpServiceV2.getTrabalhaNoDia(membro, hoje, [])
                                             const excecao = excecoes.find(ex => ex.colaborador_id === membro.id && ex.data_plantao === format(hoje, 'yyyy-MM-dd'))
@@ -499,20 +543,56 @@ export default function GestaoEquipeV2() {
                                                     statusAtual = 'Férias'
                                                 }
                                             }
-                                            if (filtroStatusHoje === 'Reciclagem') {
+
+                                            if (filtroVisao === 'Reciclagem') {
                                                 if (membro.data_reciclagem) {
                                                     const dataRec = new Date(membro.data_reciclagem)
                                                     const diff = (dataRec.getTime() - hoje.getTime()) / (1000 * 3600 * 24)
-                                                    matchStatusHoje = diff <= 30
+                                                    matchVisao = diff <= 30
                                                 } else {
-                                                    matchStatusHoje = false
+                                                    matchVisao = false
                                                 }
-                                            } else {
-                                                matchStatusHoje = statusAtual === filtroStatusHoje
+                                            } else if (filtroVisao === 'Evento') {
+                                                // Verifica se o profissional está escalado em QUALQUER evento do mês atual
+                                                matchVisao = eventos.some(ev => 
+                                                    (ev.equipe_montagem?.includes(membro.id)) || 
+                                                    (ev.equipe_realizacao?.includes(membro.id)) || 
+                                                    (ev.equipe_desmontagem?.includes(membro.id)) ||
+                                                    (ev.equipe_escalada?.includes(membro.id))
+                                                )
+                                            } else if (filtroVisao === 'Atestado') {
+                                                // Verifica se tem algum atestado no mês atual
+                                                matchVisao = excecoes.some(ex => ex.colaborador_id === membro.id && ex.status_dia === 'Atestado')
+                                            } else if (filtroVisao === 'Férias') {
+                                                // Verifica se está de férias em algum momento do mês atual
+                                                if (membro.data_inicio_ferias && membro.data_fim_ferias) {
+                                                    const startFer = format(parseISO(membro.data_inicio_ferias), 'yyyy-MM-dd')
+                                                    const endFer = format(parseISO(membro.data_fim_ferias), 'yyyy-MM-dd')
+                                                    const monthStartStr = format(monthStart, 'yyyy-MM-dd')
+                                                    const monthEndStr = format(monthEnd, 'yyyy-MM-dd')
+                                                    // Interseção de períodos
+                                                    matchVisao = (startFer <= monthEndStr && endFer >= monthStartStr)
+                                                } else {
+                                                    matchVisao = false
+                                                }
                                             }
                                         }
 
-                                        return matchNome && matchEscala && matchVSPP && matchStatusHoje
+                                        // Filtro de Evento Específico (Isolamento)
+                                        let matchEventoId = true
+                                        if (filtroEventoId !== "todos") {
+                                            const ev = eventos.find(e => e.id === filtroEventoId)
+                                            if (ev) {
+                                                matchEventoId = !!(
+                                                    ev.equipe_montagem?.includes(membro.id) || 
+                                                    ev.equipe_realizacao?.includes(membro.id) || 
+                                                    ev.equipe_desmontagem?.includes(membro.id) ||
+                                                    ev.equipe_escalada?.includes(membro.id)
+                                                )
+                                            }
+                                        }
+
+                                        return matchNome && matchEscala && matchVSPP && matchVisao && matchEventoId
                                     })
                                     .map((membro) => (
                                     <tr key={membro.id} className="hover:bg-blue-50/30 transition-all border-b last:border-0 border-slate-100 group">
@@ -579,15 +659,53 @@ export default function GestaoEquipeV2() {
                                                                             ${excecao ? 'ring-4 ring-white shadow-xl' : ''}
                                                                         `}
                                                                     >
-                                                                        {status === 'Trabalhando' && <CheckCircle2 className="h-5 w-5 text-white opacity-90 drop-shadow-md" />}
+                                                                        {status === 'Trabalhando' && <div className="h-5 w-5" />}
                                                                         {status === 'Falta' && <XCircle className="h-5 w-5 text-white opacity-90 drop-shadow-md" />}
                                                                         {status === 'Atestado' && <AlertCircle className="h-5 w-5 text-white opacity-90 drop-shadow-md" />}
                                                                         {status === 'Férias' && <Plane className="h-5 w-5 text-white opacity-90 drop-shadow-md" />}
+                                                                        
+                                                                        {/* Sobreposição de Estrela para Eventos */}
+                                                                        {(() => {
+                                                                            const dayStr = format(day, 'yyyy-MM-dd');
+                                                                            const eventoNoDia = eventos.find(ev => 
+                                                                                dayStr >= ev.data_inicio && dayStr <= ev.data_fim && (
+                                                                                    (ev.equipe_montagem?.includes(membro.id)) || 
+                                                                                    (ev.equipe_realizacao?.includes(membro.id)) || 
+                                                                                    (ev.equipe_desmontagem?.includes(membro.id)) ||
+                                                                                    (ev.equipe_escalada?.includes(membro.id))
+                                                                                )
+                                                                            );
+                                                                            if (eventoNoDia) {
+                                                                                return (
+                                                                                    <div className="absolute inset-0 flex items-center justify-center">
+                                                                                        <Star 
+                                                                                            className="h-6 w-6 fill-current drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" 
+                                                                                            style={{ color: eventoNoDia.cor || '#f59e0b' }}
+                                                                                        />
+                                                                                    </div>
+                                                                                );
+                                                                            }
+                                                                            return null;
+                                                                        })()}
                                                                     </div>
                                                                 </TooltipTrigger>
                                                                 <TooltipContent side="top" className="bg-slate-900 text-white font-bold p-2 rounded-lg border-none shadow-2xl">
-                                                                    {status.toUpperCase()}
-                                                                    {excecao && <span className="block text-[10px] font-medium opacity-50 mt-0.5 italic">Alteração Manual</span>}
+                                                                    <div className="flex flex-col gap-1">
+                                                                        <span>{status.toUpperCase()}</span>
+                                                                        {(() => {
+                                                                            const dayStr = format(day, 'yyyy-MM-dd');
+                                                                            const ev = eventos.find(ev => 
+                                                                                dayStr >= ev.data_inicio && dayStr <= ev.data_fim && (
+                                                                                    (ev.equipe_montagem?.includes(membro.id)) || 
+                                                                                    (ev.equipe_realizacao?.includes(membro.id)) || 
+                                                                                    (ev.equipe_desmontagem?.includes(membro.id)) ||
+                                                                                    (ev.equipe_escalada?.includes(membro.id))
+                                                                                )
+                                                                            );
+                                                                            return ev ? <span className="text-yellow-400 text-[10px] font-black uppercase tracking-widest border-t border-white/10 pt-1 mt-1">Evento: {ev.nome}</span> : null;
+                                                                        })()}
+                                                                        {excecao && <span className="block text-[10px] font-medium opacity-50 italic">Alteração Manual</span>}
+                                                                    </div>
                                                                 </TooltipContent>
                                                             </Tooltip>
                                                         </TooltipProvider>
@@ -787,7 +905,7 @@ export default function GestaoEquipeV2() {
                                 <div className="col-span-4 space-y-2">
                                     <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Cor</Label>
                                     <div className="flex gap-2 p-1 bg-slate-50 rounded-xl border border-slate-100 h-12">
-                                        {['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'].map(color => (
+                                        {['#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899'].map(color => (
                                             <div 
                                                 key={color}
                                                 onClick={() => setEventFormData({ ...eventFormData, cor: color })}
