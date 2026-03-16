@@ -34,6 +34,8 @@ export function extrairPrestadoresDeTexto(textoLivre: string): {
 
                 if (partesPeloDocumento.length > 0) {
                     let parteEsquerda = partesPeloDocumento[0].trim();
+                    // Captura o que estiver à direita do documento como empresa
+                    let parteDireita = partesPeloDocumento.slice(1).join(docMatchCompleto).trim();
 
                     // Limpa traços colados ao lado do nome (ex: "Joãozinho -")
                     parteEsquerda = parteEsquerda.replace(/(RG|CPF|Doc|Documento)[\s]*\:?/gi, '');
@@ -43,6 +45,9 @@ export function extrairPrestadoresDeTexto(textoLivre: string): {
                     // Lê o começo da frase e apaga TUDO (símbolos de bullet point, asteriscos, números, espaços)
                     // até bater de frente com a PRIMEIRA LETRA (incluindo letras acentuadas).
                     parteEsquerda = parteEsquerda.replace(/^[^a-zA-ZÀ-ÿ]+/g, '');
+
+                    // Limpeza da empresa (remove separadores comuns no início)
+                    let empresaExtraida = parteDireita.replace(/^[-:/|.,\s]+/, '').trim();
 
                     const nomeProvavel = parteEsquerda.trim();
                     const nomeLcase = nomeProvavel.toLowerCase();
@@ -54,7 +59,7 @@ export function extrairPrestadoresDeTexto(textoLivre: string): {
                             nome: nomeProvavel,
                             doc1: docPrincipal,
                             doc2: matchesDoc.length > 1 ? (matchesDoc[1][1] || matchesDoc[1][0]).replace(/[^0-9X]/gi, '') : undefined,
-                            empresa: ""
+                            empresa: empresaExtraida || ""
                         });
                         return;
                     }

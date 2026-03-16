@@ -45,7 +45,9 @@ export interface Solicitacao {
   departamento: string
   departamento_id?: number // PRODUÇÃO REAL: ID do departamento
   dataSolicitacao: string
+  dataSolicitacaoRaw?: string // YYYY-MM-DD
   horaSolicitacao: string
+  horaSolicitacaoRaw?: string // HH:mm:ss
   tipoSolicitacao: "checagem_liberacao" | "somente_liberacao"
   finalidade: "evento" | "obra"
   local: string

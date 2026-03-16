@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { PrestadoresService } from "../../services/prestadores-service"
 import type { Prestador } from "../../types"
-import { CheckCircle, DollarSign, Users, Send } from "lucide-react"
+import { CheckCircle, DollarSign, Users, Send, AlertTriangle } from "lucide-react"
 
 interface EconomiaCalculada {
   prestadorId: string
@@ -17,12 +17,14 @@ interface EconomiaCalculada {
   tipoEconomia: "maxima" | "operacional" | "evitado" | "nenhuma"
   valorEconomizado: number
   detalhes: string
+  conflitoData?: boolean
+  validadeCalculada?: string
 }
 
 interface ModalPreviaSolicitacaoProps {
   isOpen: boolean
   onClose: () => void
-  onConfirmar: (economias: EconomiaCalculada[]) => Promise<void>
+  onConfirmar: (economias: EconomiaCalculada[], overrideDataFinal?: string) => Promise<void>
   prestadores: Array<{ id: string; nome: string; doc1: string; empresa?: string }>
   tipoSolicitacao: "checagem_liberacao" | "somente_liberacao"
   dataInicial: string
@@ -31,6 +33,7 @@ interface ModalPreviaSolicitacaoProps {
   departamento: string
   local: string
   empresa: string
+  onAjustarDataFinal?: (novaData: string) => void
 }
 
 export default function ModalPreviaSolicitacao({
@@ -45,10 +48,18 @@ export default function ModalPreviaSolicitacao({
   departamento,
   local,
   empresa,
+  onAjustarDataFinal,
 }: ModalPreviaSolicitacaoProps) {
   const [economias, setEconomias] = useState<EconomiaCalculada[]>([])
   const [carregandoAnalise, setCarregandoAnalise] = useState(false)
   const [enviandoSolicitacao, setEnviandoSolicitacao] = useState(false)
+  const [decisoesConflito, setDecisoesConflito] = useState<Record<string, "ajustar" | "pagar">>({})
+  const [dataFinalExibicao, setDataFinalExibicao] = useState(dataFinal)
+
+  // Sincronizar data final de exibição
+  useEffect(() => {
+    setDataFinalExibicao(dataFinal)
+  }, [dataFinal])
 
   // Calcular economias quando modal abrir
   useEffect(() => {
@@ -172,6 +183,49 @@ export default function ModalPreviaSolicitacao({
           }
         }
 
+        // 🎯 NOVA REGRA: CONFLITO DE DATA (Data Final > Validade Checagem)
+        if (
+          (economia.tipoEconomia === "maxima" || economia.tipoEconomia === "operacional") &&
+          prestadorEncontrado.validadeChecagem
+        ) {
+          const [diaV, mesV, anoV] = prestadorEncontrado.validadeChecagem.split("/").map(Number)
+          const dataValidade = new Date(anoV, mesV - 1, diaV)
+          const dataFinalSolicitacao = new Date(dataFinal + "T23:59:59")
+
+          if (dataFinalSolicitacao > dataValidade) {
+            console.log(`⚠️ CONFLITO DETECTADO para ${prestador.nome}: Final=${dataFinal} > Validade=${prestadorEncontrado.validadeChecagem}`)
+            
+            const decisaoAtual = decisoesConflito[prestador.id]
+
+            if (decisaoAtual === "ajustar") {
+              // Usuário escolheu ajustar -> Mantém economia e muda detalhes
+              economia = {
+                ...economia,
+                conflitoData: true,
+                validadeCalculada: prestadorEncontrado.validadeChecagem,
+                detalhes: `Data final será ajustada para ${prestadorEncontrado.validadeChecagem} (limite da checagem)`,
+              }
+            } else if (decisaoAtual === "pagar") {
+              // Usuário escolheu pagar -> Perde economia e exige nova checagem
+              economia = {
+                ...economia,
+                tipoEconomia: "nenhuma",
+                valorEconomizado: 0,
+                conflitoData: true,
+                validadeCalculada: prestadorEncontrado.validadeChecagem,
+                detalhes: "Nova checagem será realizada para cobrir todo o período solicitado",
+              }
+            } else {
+              // Aguardando decisão -> Avisa no modal
+              economia = {
+                ...economia,
+                conflitoData: true,
+                validadeCalculada: prestadorEncontrado.validadeChecagem,
+              }
+            }
+          }
+        }
+
         economiasCalculadas.push(economia)
       }
 
@@ -184,12 +238,34 @@ export default function ModalPreviaSolicitacao({
     }
   }
 
+  const handleDecidirConflito = (prestadorId: string, decisao: "ajustar" | "pagar") => {
+    setDecisoesConflito((prev) => ({ ...prev, [prestadorId]: decisao }))
+    
+    // Se escolheu ajustar e é o primeiro/único ajuste, vamos sugerir a data final menor no topo
+    if (decisao === "ajustar") {
+      const economia = economias.find(e => e.prestadorId === prestadorId)
+      if (economia?.validadeCalculada) {
+        // Converter DD/MM/YYYY para YYYY-MM-DD
+        const [d, m, a] = economia.validadeCalculada.split("/")
+        const dataFormatada = `${a}-${m}-${d}`
+        setDataFinalExibicao(dataFormatada)
+      }
+    }
+  }
+
   const handleConfirmar = async () => {
     console.log(`🚀 CONFIRMANDO ENVIO - Contabilizando ${economias.length} economias`)
+
+    // Se houve algum ajuste de data, notificar o componente pai (via prop)
+    const temAjuste = Object.values(decisoesConflito).includes("ajustar")
+    if (temAjuste && onAjustarDataFinal) {
+      onAjustarDataFinal(dataFinalExibicao)
+    }
+
     setEnviandoSolicitacao(true)
 
     try {
-      await onConfirmar(economias)
+      await onConfirmar(economias, temAjuste ? dataFinalExibicao : undefined)
     } catch (error) {
       console.error("💥 Erro ao confirmar:", error)
     } finally {
@@ -237,9 +313,18 @@ export default function ModalPreviaSolicitacao({
                   {tipoSolicitacao === "checagem_liberacao" ? "Checagem + Liberação" : "Somente Liberação"}
                 </div>
                 <div>
-                  <strong>Período:</strong> {dataInicial} até {dataFinal}
+                  <strong>Período:</strong> {dataInicial} até {dataFinalExibicao !== dataFinal ? (
+                    <span className="text-blue-600 font-bold underline decoration-blue-300">
+                      {new Date(dataFinalExibicao + "T00:00:00").toLocaleDateString("pt-BR")}*
+                    </span>
+                  ) : dataFinal}
                 </div>
               </div>
+              {dataFinalExibicao !== dataFinal && (
+                <div className="mt-2 text-[10px] text-blue-600 italic">
+                  * A data final foi reduzida para respeitar a validade das checagens existentes.
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -285,38 +370,68 @@ export default function ModalPreviaSolicitacao({
               ) : (
                 <div className="space-y-3 max-h-60 overflow-y-auto">
                   {economias.map((economia) => (
-                    <div key={economia.prestadorId} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex-1">
-                        <div className="font-medium text-slate-800">{economia.prestadorNome}</div>
-                        <div className="text-sm text-slate-600">Doc: {economia.prestadorDoc1}</div>
-                        <div className="text-xs text-slate-500 mt-1">{economia.detalhes}</div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {economia.tipoEconomia !== "nenhuma" && (
-                          <Badge variant="outline" className="text-green-600 border-green-600">
-                            R$ {economia.valorEconomizado.toFixed(2)}
-                          </Badge>
-                        )}
-                        <Badge
-                          variant={
-                            economia.tipoEconomia === "maxima"
-                              ? "secondary"
-                              : economia.tipoEconomia === "operacional"
+                    <div key={economia.prestadorId} className={`flex flex-col p-3 border rounded-lg ${economia.conflitoData && !decisoesConflito[economia.prestadorId] ? 'border-amber-400 bg-amber-50' : ''}`}>
+                      <div className="flex items-center justify-between ">
+                        <div className="flex-1">
+                          <div className="font-medium text-slate-800">{economia.prestadorNome}</div>
+                          <div className="text-sm text-slate-600">Doc: {economia.prestadorDoc1}</div>
+                          <div className="text-xs text-slate-500 mt-1">{economia.detalhes}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {economia.tipoEconomia !== "nenhuma" && (
+                            <Badge variant="outline" className="text-green-600 border-green-600">
+                              R$ {economia.valorEconomizado.toFixed(2)}
+                            </Badge>
+                          )}
+                          <Badge
+                            variant={
+                              economia.tipoEconomia === "maxima"
                                 ? "secondary"
+                                : economia.tipoEconomia === "operacional"
+                                  ? "secondary"
+                                  : economia.tipoEconomia === "evitado"
+                                    ? "destructive"
+                                    : "outline"
+                            }
+                          >
+                            {economia.tipoEconomia === "maxima"
+                              ? "✅ Liberado"
+                              : economia.tipoEconomia === "operacional"
+                                ? "⏳ Já em processo"
                                 : economia.tipoEconomia === "evitado"
-                                  ? "destructive"
-                                  : "outline"
-                          }
-                        >
-                          {economia.tipoEconomia === "maxima"
-                            ? "✅ Liberado"
-                            : economia.tipoEconomia === "operacional"
-                              ? "⏳ Já em processo"
-                              : economia.tipoEconomia === "evitado"
-                                ? "🛡️ Evitado"
-                                : "➖ Sem economia"}
-                        </Badge>
+                                  ? "🛡️ Evitado"
+                                  : "➖ Sem economia"}
+                          </Badge>
+                        </div>
                       </div>
+
+                      {/* ⚠️ ÁREA DE CONFLITO DE DATA */}
+                      {economia.conflitoData && (
+                        <div className="mt-3 pt-3 border-t border-amber-200">
+                          <div className="flex items-center gap-2 text-amber-700 text-xs font-semibold mb-2">
+                            <AlertTriangle className="h-4 w-4" />
+                            Atenção: Data final ({new Date(dataFinal + "T00:00:00").toLocaleDateString("pt-BR")}) extrapola validade da checagem ({economia.validadeCalculada}).
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant={decisoesConflito[economia.prestadorId] === "ajustar" ? "default" : "outline"}
+                              className={`text-[10px] h-7 ${decisoesConflito[economia.prestadorId] === "ajustar" ? "bg-amber-600 hover:bg-amber-700" : "border-amber-300 text-amber-700 hover:bg-amber-100"}`}
+                              onClick={() => handleDecidirConflito(economia.prestadorId, "ajustar")}
+                            >
+                              Ajustar Data para {economia.validadeCalculada}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant={decisoesConflito[economia.prestadorId] === "pagar" ? "default" : "outline"}
+                              className={`text-[10px] h-7 ${decisoesConflito[economia.prestadorId] === "pagar" ? "bg-blue-600 hover:bg-blue-700" : "border-blue-300 text-blue-700 hover:bg-blue-100"}`}
+                              onClick={() => handleDecidirConflito(economia.prestadorId, "pagar")}
+                            >
+                              Manter e Pagar Nova Checagem
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -331,7 +446,11 @@ export default function ModalPreviaSolicitacao({
             <Button
               onClick={handleConfirmar}
               className="bg-green-600 hover:bg-green-700 text-white"
-              disabled={carregandoAnalise || enviandoSolicitacao}
+              disabled={
+                carregandoAnalise || 
+                enviandoSolicitacao || 
+                economias.some(e => e.conflitoData && !decisoesConflito[e.prestadorId])
+              }
             >
               {enviandoSolicitacao ? (
                 <>

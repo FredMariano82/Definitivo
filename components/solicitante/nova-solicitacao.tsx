@@ -469,7 +469,7 @@ export default function NovaSolicitacao({
     setMostrarModalPrevia(true)
   }
 
-  const confirmarEnvioAposModal = async (economias: any[]) => {
+  const confirmarEnvioAposModal = async (economias: any[], overrideDataFinal?: string) => {
     if (!usuario) return
 
     setCarregando(true)
@@ -547,7 +547,7 @@ export default function NovaSolicitacao({
         empresa: empresaSolicitacao,
         prestadores: prestadoresComEmpresa,
         dataInicial: dataInicial,
-        dataFinal: dataFinal,
+        dataFinal: overrideDataFinal || dataFinal,
       })
 
       if (sucessoEnvio && solicitacao) {
@@ -1029,6 +1029,7 @@ export default function NovaSolicitacao({
           departamento={usuario?.departamento || ""}
           local={local}
           empresa={empresa}
+          onAjustarDataFinal={(novaData) => setDataFinal(novaData)}
         />
       )}
     </div>

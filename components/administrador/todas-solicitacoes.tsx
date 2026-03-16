@@ -18,6 +18,8 @@ import {
   ArrowUp,
   ArrowDown,
   ChevronDown,
+  Edit,
+  Calendar,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -36,6 +38,8 @@ import { Badge } from "../ui/badge"
 import * as XLSX from "xlsx"
 import { DataInicialIndicator } from "../../utils/date-indicators"
 import PageHeader from "@/components/page-header"
+import { useAuth } from "../../contexts/auth-context"
+import { SolicitacoesService } from "../../services/solicitacoes-service"
 
 type StatusLiberacao = "pendente" | "ok" | "urgente" | "vencida" | "negada"
 
@@ -50,11 +54,13 @@ const COLUNAS_DISPONIVEIS = [
   { key: "validaAte", label: "Válida até" },
   { key: "acoes", label: "Ações" },
   { key: "justificativa", label: "Justificativa" },
+  { key: "solicitacao", label: "Solicitação" },
 ]
 
 const PRESTADORES_POR_PAGINA = 10
 
 export default function TodasSolicitacoes() {
+  const { usuario } = useAuth()
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([])
   const [carregando, setCarregando] = useState(true)
   const [carregandoDownload, setCarregandoDownload] = useState(false)
@@ -81,6 +87,13 @@ export default function TodasSolicitacoes() {
   } | null>(null)
   const [observacoes, setObservacoes] = useState("")
   const [carregandoNegacao, setCarregandoNegacao] = useState(false)
+
+  // 🎯 ESTADOS PARA EDIÇÃO DE SOLICITAÇÃO (EXCLUSIVO SUPERADMIN)
+  const [modalEditarSolicitacaoAberta, setModalEditarSolicitacaoAberta] = useState(false)
+  const [solicitacaoParaEditar, setSolicitacaoParaEditar] = useState<Solicitacao | null>(null)
+  const [novaDataSolicitacao, setNovaDataSolicitacao] = useState("")
+  const [novaHoraSolicitacao, setNovaHoraSolicitacao] = useState("")
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false)
 
   // Estado para controlar colunas visíveis
   const [colunasVisiveis, setColunasVisiveis] = useState<Record<string, boolean>>(() => {
@@ -553,6 +566,51 @@ export default function TodasSolicitacoes() {
     }
   }
 
+  // 🎯 FUNÇÕES PARA EDIÇÃO DE SOLICITAÇÃO
+  const handleAbrirEdicaoSolicitacao = (sol: Solicitacao) => {
+    setSolicitacaoParaEditar(sol)
+    setNovaDataSolicitacao(sol.dataSolicitacaoRaw || "")
+    setNovaHoraSolicitacao(sol.horaSolicitacaoRaw?.substring(0, 5) || "")
+    setModalEditarSolicitacaoAberta(true)
+  }
+
+  const handleSalvarEdicaoSolicitacao = async () => {
+    if (!solicitacaoParaEditar || !novaDataSolicitacao || !novaHoraSolicitacao) return
+
+    try {
+      setSalvandoEdicao(true)
+      const { sucesso, erro } = await SolicitacoesService.atualizarDadosGeraisSolicitacao(
+        solicitacaoParaEditar.id,
+        {
+          dataSolicitacao: novaDataSolicitacao,
+          horaSolicitacao: `${novaHoraSolicitacao}:00`
+        }
+      )
+
+      if (sucesso) {
+        // Atualizar localmente
+        setSolicitacoes(prev => prev.map(s =>
+          s.id === solicitacaoParaEditar.id
+            ? {
+              ...s,
+              dataSolicitacao: new Date(novaDataSolicitacao + "T00:00:00").toLocaleDateString("pt-BR"),
+              dataSolicitacaoRaw: novaDataSolicitacao,
+              horaSolicitacao: `${novaHoraSolicitacao}:00`,
+              horaSolicitacaoRaw: `${novaHoraSolicitacao}:00`
+            }
+            : s
+        ))
+        setModalEditarSolicitacaoAberta(false)
+      } else {
+        alert("Erro ao atualizar: " + erro)
+      }
+    } catch (error: any) {
+      alert("Erro inesperado: " + error.message)
+    } finally {
+      setSalvandoEdicao(false)
+    }
+  }
+
   const handleCancelar = () => {
     setPopoverAberto(null)
   }
@@ -1012,6 +1070,14 @@ export default function TodasSolicitacoes() {
                       Justificativa
                     </th>
                   )}
+                  {colunasVisiveis.solicitacao && (
+                    <th
+                      className="h-12 px-4 text-center align-middle font-semibold text-slate-800 min-w-[150px]"
+                      style={{ position: 'sticky', top: 0, zIndex: 40, backgroundColor: '#f8fafc' }}
+                    >
+                      Solicitação
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="[&_tr:last-child]:border-0">
@@ -1201,6 +1267,30 @@ export default function TodasSolicitacoes() {
                           ) : null}
                         </td>
                       )}
+                      {colunasVisiveis.solicitacao && (
+                        <td className="p-4 align-middle text-sm text-center">
+                          <div className="flex flex-col items-center">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-slate-700">{solicitacao.numero}</span>
+                              {usuario?.perfil === "superadmin" && (
+                                <Button
+                                  onClick={() => handleAbrirEdicaoSolicitacao(solicitacao)}
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                                  title="Editar data/hora da solicitação"
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {solicitacao.dataSolicitacao} {solicitacao.horaSolicitacao?.substring(0, 5)}
+                            </div>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   )
                 })}
@@ -1313,6 +1403,86 @@ export default function TodasSolicitacoes() {
           </DialogFooter>
         </DialogContent>
       </Dialog >
+
+      {/* 🎯 MODAL DE EDIÇÃO DE SOLICITAÇÃO (EXCLUSIVO SUPERADMIN) */}
+      <Dialog open={modalEditarSolicitacaoAberta} onOpenChange={setModalEditarSolicitacaoAberta}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+              <Edit className="h-5 w-5 text-blue-600" />
+              Editar Dados da Solicitação
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {solicitacaoParaEditar && (
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 mb-4">
+                <p className="text-sm text-blue-800">
+                  <strong>Solicitação:</strong> {solicitacaoParaEditar.numero}
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  Estes campos alteram a data/hora oficial de registro da solicitação.
+                </p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="dataSolicitacao" className="text-sm font-medium text-slate-700">
+                  Data de Registro
+                </Label>
+                <Input
+                  id="dataSolicitacao"
+                  type="date"
+                  value={novaDataSolicitacao}
+                  onChange={(e) => setNovaDataSolicitacao(e.target.value)}
+                  className="border-slate-300"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="horaSolicitacao" className="text-sm font-medium text-slate-700">
+                  Hora de Registro
+                </Label>
+                <Input
+                  id="horaSolicitacao"
+                  type="time"
+                  value={novaHoraSolicitacao}
+                  onChange={(e) => setNovaHoraSolicitacao(e.target.value)}
+                  className="border-slate-300"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button
+              onClick={() => setModalEditarSolicitacaoAberta(false)}
+              variant="outline"
+              className="border-slate-300 text-slate-600"
+              disabled={salvandoEdicao}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSalvarEdicaoSolicitacao}
+              disabled={!novaDataSolicitacao || !novaHoraSolicitacao || salvandoEdicao}
+              className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+            >
+              {salvandoEdicao ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-white mr-2"></div>
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-1" />
+                  Salvar Alterações
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

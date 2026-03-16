@@ -10,10 +10,11 @@ import { useAuth } from "../../contexts/auth-context"
 import { SolicitacoesService } from "../../services/solicitacoes-service"
 import { PrestadoresService } from "../../services/prestadores-service"
 import type { Prestador } from "../../types"
-import { Plus, Trash2, User, FileSpreadsheet, X, AlertTriangle, CheckCircle, Camera } from "lucide-react"
+import { Plus, Trash2, User, FileSpreadsheet, X, AlertTriangle, CheckCircle, Camera, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import UploadListaExcel from "../solicitante/upload-lista-excel"
 import UploadFotoLista from "../solicitante/upload-foto-lista"
 import ModalPreviaSolicitacao from "../solicitante/modal-previa-solicitacao"
@@ -73,11 +74,18 @@ export default function NovaSolicitacaoAdmin({
   // Adicionar estado para controlar modal de upload histórico
   const [mostrarUploadHistorico, setMostrarUploadHistorico] = useState(false)
 
+  // 🎯 MODO DE APROVAÇÃO DIRETA (EXCLUSIVO SUPERADMIN)
+  const [modoAprovacaoDireta, setModoAprovacaoDireta] = useState<"padrao" | "solo_liberacao" | "solo_checagem" | "lib_checagem_ok">("padrao")
+
   const dataAtual = new Date()
 
   // ← ADM: Campos editáveis para nome e departamento
   const [nomesolicitante, setNomeSolicitante] = useState(usuario?.nome || "")
   const [departamentoSolicitante, setDepartamentoSolicitante] = useState(usuario?.departamento || "")
+
+  // 🎯 DATA E HORA MANUAIS (EXCLUSIVO SUPERADMIN)
+  const [dataSolicitacaoManual, setDataSolicitacaoManual] = useState(new Date().toISOString().split("T")[0])
+  const [horaSolicitacaoManual, setHoraSolicitacaoManual] = useState(new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }))
 
   const dadosAutomaticos = {
     solicitante: nomesolicitante,
@@ -311,6 +319,9 @@ export default function NovaSolicitacaoAdmin({
         prestadores: prestadoresComEmpresa,
         dataInicial: dataInicial,
         dataFinal: dataFinal,
+        dataSolicitacao: usuario?.perfil === "superadmin" ? dataSolicitacaoManual : undefined,
+        horaSolicitacao: usuario?.perfil === "superadmin" ? `${horaSolicitacaoManual}:00` : undefined,
+        modoAprovacaoDireta: usuario?.perfil === "superadmin" ? modoAprovacaoDireta : "padrao",
       })
 
       if (sucessoEnvio && solicitacao) {
@@ -533,7 +544,24 @@ export default function NovaSolicitacaoAdmin({
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-slate-700">Data e Hora da Solicitação</Label>
-                  <Input value={dadosAutomaticos.dataHoraSolicitacao} disabled className="bg-slate-50 text-slate-600" />
+                  {usuario?.perfil === "superadmin" ? (
+                    <div className="flex gap-2">
+                      <Input
+                        type="date"
+                        value={dataSolicitacaoManual}
+                        onChange={(e) => setDataSolicitacaoManual(e.target.value)}
+                        className="border-slate-300 focus:border-blue-600 focus:ring-blue-600 h-10"
+                      />
+                      <Input
+                        type="time"
+                        value={horaSolicitacaoManual}
+                        onChange={(e) => setHoraSolicitacaoManual(e.target.value)}
+                        className="border-slate-300 focus:border-blue-600 focus:ring-blue-600 h-10"
+                      />
+                    </div>
+                  ) : (
+                    <Input value={dadosAutomaticos.dataHoraSolicitacao} disabled className="bg-slate-50 text-slate-600 h-10" />
+                  )}
                 </div>
               </div>
 
@@ -751,6 +779,66 @@ export default function NovaSolicitacaoAdmin({
                   <CheckCircle className="h-4 w-4 text-green-600" />
                   <AlertDescription>{sucesso}</AlertDescription>
                 </Alert>
+              )}
+
+              {/* 🎯 SELETOR DE MODO DE APROVAÇÃO (EXCLUSIVO SUPERADMIN) */}
+              {usuario?.perfil === "superadmin" && (
+                <div className="bg-blue-50/50 p-6 rounded-xl border border-blue-100 space-y-4">
+                  <div className="flex items-center gap-2 text-blue-800">
+                    <ShieldCheck className="h-5 w-5" />
+                    <span className="font-bold uppercase tracking-wider text-sm">Controle de Aprovação Direta (SuperAdmin)</span>
+                  </div>
+                  
+                  <RadioGroup 
+                    value={modoAprovacaoDireta} 
+                    onValueChange={(val: any) => setModoAprovacaoDireta(val)}
+                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+                  >
+                    <div className="relative">
+                      <RadioGroupItem value="padrao" id="padrao" className="peer sr-only" />
+                      <Label
+                        htmlFor="padrao"
+                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-blue-600 [&:has([data-state=checked])]:border-blue-600 cursor-pointer"
+                      >
+                        <div className="text-sm font-semibold">Fluxo Padrão</div>
+                        <div className="text-[10px] text-muted-foreground text-center mt-1">Segue para aprovação pendente</div>
+                      </Label>
+                    </div>
+
+                    <div className="relative">
+                      <RadioGroupItem value="solo_liberacao" id="solo_liberacao" className="peer sr-only" />
+                      <Label
+                        htmlFor="solo_liberacao"
+                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-blue-600 [&:has([data-state=checked])]:border-blue-600 cursor-pointer"
+                      >
+                        <div className="text-sm font-semibold">Só Liberação OK</div>
+                        <div className="text-[10px] text-muted-foreground text-center mt-1">Cadastra como liberado direto</div>
+                      </Label>
+                    </div>
+
+                    <div className="relative">
+                      <RadioGroupItem value="solo_checagem" id="solo_checagem" className="peer sr-only" />
+                      <Label
+                        htmlFor="solo_checagem"
+                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-blue-600 [&:has([data-state=checked])]:border-blue-600 cursor-pointer"
+                      >
+                        <div className="text-sm font-semibold">Só Checagem OK</div>
+                        <div className="text-[10px] text-muted-foreground text-center mt-1">Aprova checagem (+6 meses)</div>
+                      </Label>
+                    </div>
+
+                    <div className="relative">
+                      <RadioGroupItem value="lib_checagem_ok" id="lib_checagem_ok" className="peer sr-only" />
+                      <Label
+                        htmlFor="lib_checagem_ok"
+                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-blue-600 [&:has([data-state=checked])]:border-blue-600 cursor-pointer"
+                      >
+                        <div className="text-sm font-semibold">Lib + Checagem OK</div>
+                        <div className="text-[10px] text-muted-foreground text-center mt-1">Aprovação total imediata</div>
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
               )}
 
               <div className="flex justify-end pt-4">

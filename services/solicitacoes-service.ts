@@ -14,14 +14,14 @@ export class SolicitacoesService {
     prestadores: Array<{ nome: string; doc1: string; doc2?: string; empresa?: string }>
     dataInicial: string
     dataFinal: string
+    dataSolicitacao?: string
+    horaSolicitacao?: string
+    modoAprovacaoDireta?: "padrao" | "solo_liberacao" | "solo_checagem" | "lib_checagem_ok"
   }): Promise<{ sucesso: boolean; erro: string; solicitacao?: Solicitacao }> {
     try {
       console.log("📝 PRODUÇÃO REAL: Criando nova solicitação...")
       console.log("🏢 EMPRESA GERAL DA SOLICITAÇÃO:", dados.empresa)
-      console.log(
-        "👥 PRESTADORES COM EMPRESAS:",
-        dados.prestadores.map((p) => ({ nome: p.nome, empresa: p.empresa })),
-      )
+      console.log("⚡ MODO APROVAÇÃO DIRETA:", dados.modoAprovacaoDireta || "padrao")
 
       // Verificar conexão com Supabase
       if (!supabase) {
@@ -56,22 +56,15 @@ export class SolicitacoesService {
         }
       }
 
-      // Formato: ANO-000000 (6 dígitos)
       const numeroSolicitacao = `${ano}-${proximoNumero.toString().padStart(6, "0")}`
 
       // Determinar status de liberação baseado na data inicial
-      // CORREÇÃO: Usar data local brasileira para comparação
       const agora = new Date()
       const hojeLocal = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate())
       const hojeFormatado = `${hojeLocal.getFullYear()}-${String(hojeLocal.getMonth() + 1).padStart(2, "0")}-${String(hojeLocal.getDate()).padStart(2, "0")}`
-      // CORREÇÃO: Urgente APENAS quando data inicial === data atual (não <=)
       const isUrgente = dados.dataInicial === hojeFormatado
 
-      console.log(`📅 CORREÇÃO URGÊNCIA - Data atual: ${hojeFormatado}`)
-      console.log(`📅 CORREÇÃO URGÊNCIA - Data inicial: ${dados.dataInicial}`)
-      console.log(`📅 CORREÇÃO URGÊNCIA - É urgente? ${isUrgente}`)
-
-      // 🎯 CRIAR SOLICITAÇÃO COM EMPRESA GERAL
+      // 🎯 CRIAR SOLICITAÇÃO
       const { data: solicitacao, error: solicitacaoError } = (await Promise.race([
         supabase
           .from("solicitacoes")
@@ -81,15 +74,15 @@ export class SolicitacoesService {
               solicitante: dados.solicitante,
               departamento: dados.departamento,
               usuario_id: dados.usuarioId,
-              data_solicitacao: agora.toISOString().split("T")[0],
-              hora_solicitacao: agora.toTimeString().split(" ")[0],
+              data_solicitacao: dados.dataSolicitacao || agora.toISOString().split("T")[0],
+              hora_solicitacao: dados.horaSolicitacao || agora.toTimeString().split(" ")[0],
               tipo_solicitacao: dados.tipoSolicitacao,
               finalidade: dados.finalidade,
               local: dados.local,
-              empresa: dados.empresa, // 🎯 EMPRESA GERAL SALVA NA TABELA SOLICITACOES
+              empresa: dados.empresa,
               data_inicial: dados.dataInicial,
               data_final: dados.dataFinal,
-              status_geral: "pendente",
+              status_geral: (dados.modoAprovacaoDireta === "solo_checagem" || dados.modoAprovacaoDireta === "lib_checagem_ok") ? "aprovado" : "pendente",
               custo_checagem: dados.tipoSolicitacao === "checagem_liberacao" ? dados.prestadores.length * 20 : 0,
               economia_gerada: 0,
             },
@@ -104,27 +97,47 @@ export class SolicitacoesService {
         return { sucesso: false, erro: `Erro ao criar solicitação: ${solicitacaoError.message}` }
       }
 
-      console.log("✅ PRODUÇÃO REAL: Solicitação criada com empresa geral:", dados.empresa)
+      // 🎯 CRIAR PRESTADORES COM STATUS BASEADO NO MODO DE APROVAÇÃO DIRETA
+      const agoraISO = new Date().toISOString().split("T")[0]
+      const validadeChecagem = new Date()
+      validadeChecagem.setMonth(validadeChecagem.getMonth() + 6)
+      const validadeChecagemISO = validadeChecagem.toISOString().split("T")[0]
 
-      // 🎯 CRIAR PRESTADORES COM EMPRESAS ESPECÍFICAS OU HERDADAS
       const prestadoresData = dados.prestadores.map((p) => {
-        // Se prestador não tem empresa específica, usar empresa geral da solicitação
         const empresaFinal = p.empresa?.trim() || dados.empresa
 
-        console.log(`👤 Prestador ${p.nome}: empresa específica="${p.empresa}" | empresa final="${empresaFinal}"`)
+        // Lógica de status inicial
+        let checagemStatus: any = "pendente"
+        let liberacaoStatus: any = isUrgente ? "urgente" : "pendente"
+        let validadeAte = null
+        let dataAvaliacao = null
+
+        if (dados.modoAprovacaoDireta === "solo_liberacao") {
+          liberacaoStatus = "ok"
+        } else if (dados.modoAprovacaoDireta === "solo_checagem") {
+          checagemStatus = "aprovado"
+          validadeAte = validadeChecagemISO
+          dataAvaliacao = agoraISO
+        } else if (dados.modoAprovacaoDireta === "lib_checagem_ok") {
+          liberacaoStatus = "ok"
+          checagemStatus = "aprovado"
+          validadeAte = validadeChecagemISO
+          dataAvaliacao = agoraISO
+        }
 
         return {
           solicitacao_id: solicitacao.id,
           nome: p.nome,
           doc1: p.doc1,
           doc2: p.doc2,
-          empresa: empresaFinal, // 🎯 EMPRESA ESPECÍFICA OU GERAL
-          checagem: "pendente" as const,
-          liberacao: isUrgente ? ("urgente" as const) : ("pendente" as const),
+          empresa: empresaFinal,
+          checagem: checagemStatus,
+          liberacao: liberacaoStatus,
+          checagem_valida_ate: validadeAte,
+          data_avaliacao: dataAvaliacao,
+          aprovado_por: dataAvaliacao ? "SuperAdmin (Direto)" : null,
         }
       })
-
-      console.log("📝 PRODUÇÃO REAL: Dados dos prestadores para inserir:", prestadoresData)
 
       const { error: prestadoresError } = (await Promise.race([
         supabase.from("prestadores").insert(prestadoresData),
@@ -133,12 +146,9 @@ export class SolicitacoesService {
 
       if (prestadoresError) {
         console.error("PRODUÇÃO REAL: Erro ao criar prestadores:", prestadoresError)
-        // Reverter criação da solicitação
         await supabase.from("solicitacoes").delete().eq("id", solicitacao.id)
         return { sucesso: false, erro: `Erro ao criar prestadores: ${prestadoresError.message}` }
       }
-
-      console.log("✅ PRODUÇÃO REAL: Solicitação criada com sucesso:", numeroSolicitacao)
 
       return {
         sucesso: true,
@@ -147,15 +157,6 @@ export class SolicitacoesService {
       }
     } catch (error: any) {
       console.error("💥 PRODUÇÃO REAL: Erro ao criar solicitação:", error)
-
-      if (error.message?.includes("Failed to fetch")) {
-        return { sucesso: false, erro: "Erro de conexão com o banco de dados. Verifique sua internet." }
-      }
-
-      if (error.message?.includes("Timeout")) {
-        return { sucesso: false, erro: "Operação demorou muito para responder. Tente novamente." }
-      }
-
       return { sucesso: false, erro: `Erro interno: ${error.message || "Erro desconhecido"}` }
     }
   }
@@ -194,7 +195,9 @@ export class SolicitacoesService {
         solicitante: solicitacao.solicitante,
         departamento: solicitacao.departamento,
         dataSolicitacao: new Date(solicitacao.data_solicitacao + "T00:00:00").toLocaleDateString("pt-BR"),
+        dataSolicitacaoRaw: solicitacao.data_solicitacao,
         horaSolicitacao: solicitacao.hora_solicitacao,
+        horaSolicitacaoRaw: solicitacao.hora_solicitacao,
         tipoSolicitacao: solicitacao.tipo_solicitacao,
         finalidade: solicitacao.finalidade,
         local: solicitacao.local,
@@ -302,7 +305,9 @@ export class SolicitacoesService {
         solicitante: s.solicitante,
         departamento: s.departamento,
         dataSolicitacao: new Date(s.data_solicitacao + "T00:00:00").toLocaleDateString("pt-BR"),
+        dataSolicitacaoRaw: s.data_solicitacao,
         horaSolicitacao: s.hora_solicitacao,
+        horaSolicitacaoRaw: s.hora_solicitacao,
         tipoSolicitacao: s.tipo_solicitacao,
         finalidade: s.finalidade,
         local: s.local,
@@ -457,6 +462,38 @@ export class SolicitacoesService {
       console.log("✅ PRODUÇÃO REAL: Status geral atualizado para:", novoStatus)
     } catch (error) {
       console.error("PRODUÇÃO REAL: Erro ao atualizar status geral:", error)
+    }
+  }
+
+  // Atualizar dados gerais da solicitação (Exclusivo SuperAdmin)
+  static async atualizarDadosGeraisSolicitacao(
+    id: string,
+    dados: {
+      dataSolicitacao?: string // Formato YYYY-MM-DD
+      horaSolicitacao?: string // Formato HH:mm:ss
+    }
+  ): Promise<{ sucesso: boolean; erro: string }> {
+    try {
+      if (!supabase) return { sucesso: false, erro: "Conexão com banco não inicializada" }
+
+      const updateData: any = {}
+      if (dados.dataSolicitacao) updateData.data_solicitacao = dados.dataSolicitacao
+      if (dados.horaSolicitacao) updateData.hora_solicitacao = dados.horaSolicitacao
+
+      const { error } = await supabase
+        .from("solicitacoes")
+        .update(updateData)
+        .eq("id", id)
+
+      if (error) {
+        console.error("❌ Erro ao atualizar dados gerais da solicitação:", error)
+        return { sucesso: false, erro: error.message }
+      }
+
+      return { sucesso: true, erro: "" }
+    } catch (error: any) {
+      console.error("💥 Erro interno ao atualizar solicitação:", error)
+      return { sucesso: false, erro: error.message }
     }
   }
 }
