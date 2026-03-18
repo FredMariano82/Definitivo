@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import Header from "@/components/header"
 import Navigation from "@/components/navigation"
+import InvitationMonitor from "@/components/op/InvitationMonitor"
 
 export default function AuthenticatedLayout({
     children,
@@ -44,6 +45,7 @@ export default function AuthenticatedLayout({
                     </div>
                 </main>
             </div>
+            <InvitationMonitor />
         </div>
     )
 }

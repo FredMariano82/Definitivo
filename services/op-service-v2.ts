@@ -29,6 +29,11 @@ export interface OpEquipe {
     data_inicio_ferias?: string
     data_fim_ferias?: string
     tipo_servico?: string // 'VSPP' ou 'Vigilante/Operacional'
+    nivel?: number // 1, 2, 3
+    foto_perfil?: string
+    cel1?: string
+    cel2?: string
+    tipo_vinculo?: 'clube' | 'externo'
 }
 
 export interface OpEscalaDiaria {
@@ -93,7 +98,18 @@ export interface OpEvento {
     equipe_escalada?: string[] 
     
     tipo_servico?: string // 'VSPP' ou 'Vigilante/Operacional'
+    vagas_necessarias?: number
     created_at?: string
+}
+
+export interface OpEventoEquipe {
+    id?: string
+    evento_id: string
+    colaborador_id: string
+    fase: string
+    status: 'PENDENTE' | 'CONVIDADO' | 'ACEITO' | 'RECUSADO'
+    data_convite?: string
+    data_resposta?: string
 }
 
 export class OpServiceV2 {
@@ -109,6 +125,83 @@ export class OpServiceV2 {
         
         if (error) throw error
         return data || []
+    }
+
+    /**
+     * Busca todos os eventos futuros ou em andamento
+     */
+    static async getEventos(): Promise<OpEvento[]> {
+        const hoje = format(new Date(), 'yyyy-MM-dd')
+        const { data, error } = await supabase
+            .from('op_eventos')
+            .select('*')
+            .gte('data_fim', hoje)
+            .order('data_inicio')
+        
+        if (error) throw error
+        return data || []
+    }
+
+    /**
+     * Calcula a disponibilidade de um profissional para um evento específico
+     */
+    static async getDisponibilidade(colaborador: OpEquipe, data: string, horaInicio: string, horaFim: string): Promise<{
+        status: 'disponivel' | 'conflito' | 'alerta' | 'afastado'
+        motivo?: string
+    }> {
+        const dataAlvo = parseISO(data)
+        
+        // 1. Verificar Férias
+        if (colaborador.data_inicio_ferias && colaborador.data_fim_ferias) {
+            if (data >= colaborador.data_inicio_ferias && data <= colaborador.data_fim_ferias) {
+                return { status: 'afastado', motivo: 'Férias' }
+            }
+        }
+
+        // 2. Verificar Escala Fixa (Teórica + Exceções)
+        // Precisamos buscar as exceções para esse dia específico se não as tivermos
+        const { data: excecoes } = await supabase
+            .from('op_escala_diaria')
+            .select('*')
+            .eq('colaborador_id', colaborador.id)
+            .eq('data_plantao', data)
+        
+        const trabalhaTeorico = this.getTrabalhaNoDia(colaborador, dataAlvo, excecoes || [])
+        
+        if (trabalhaTeorico) {
+            // Se trabalha no dia, precisamos ver se o horário do evento conflita com o turno dele
+            // Turno padrão: 08:00 às 20:00 (ajustável se tivermos o horário da exceção)
+            const turnoInicio = excecoes?.[0]?.horario_inicio || '08:00'
+            const turnoFim = excecoes?.[0]?.horario_fim || '20:00'
+
+            // Lógica de interseção de horários
+            const conflito = (horaInicio < turnoFim && horaFim > turnoInicio)
+            
+            if (conflito) {
+                return { status: 'conflito', motivo: `Em plantão fixo (${turnoInicio}-${turnoFim})` }
+            } else {
+                return { status: 'alerta', motivo: `Trabalha no dia, mas em outro turno (${turnoInicio}-${turnoFim})` }
+            }
+        }
+
+        // 3. Verificar outros Eventos no mesmo horário
+        const { data: outrosEventos } = await supabase
+            .from('op_eventos')
+            .select('*')
+            .contains('equipe_realizacao', [colaborador.id])
+            .or(`data_inicio.eq.${data},data_fim.eq.${data}`)
+
+        if (outrosEventos && outrosEventos.length > 0) {
+            for (const ev of outrosEventos) {
+                const evInicio = ev.evento_inicio_hora || '00:00'
+                const evFim = ev.evento_fim_hora || '23:59'
+                if (horaInicio < evFim && horaFim > evInicio) {
+                    return { status: 'conflito', motivo: `Já escalado no evento: ${ev.nome}` }
+                }
+            }
+        }
+
+        return { status: 'disponivel' }
     }
 
     // FUNÇÕES AUXILIARES DE CÁLCULO FINANCEIRO
@@ -483,5 +576,93 @@ export class OpServiceV2 {
             ...t,
             posto_id: postos?.find(p => p.nome_posto === t.titulo)?.id
         }))
+    }
+
+    /**
+     * Atualiza dados de um evento
+     */
+    static async updateEvento(id: string, dados: Partial<OpEvento>) {
+        const { error } = await supabase
+            .from('op_eventos')
+            .update(dados)
+            .eq('id', id)
+        
+        if (error) throw error
+    }
+
+    /**
+     * Busca o status de convites de um evento
+     */
+    static async getConvitesEvento(eventoId: string): Promise<OpEventoEquipe[]> {
+        const { data, error } = await supabase
+            .from('op_eventos_equipe')
+            .select('*')
+            .eq('evento_id', eventoId)
+        
+        if (error) throw error
+        return data || []
+    }
+
+    /**
+     * Atualiza ou cria um status de convite
+     */
+    static async upsertConvite(dados: Partial<OpEventoEquipe>) {
+        const { error } = await supabase
+            .from('op_eventos_equipe')
+            .upsert(dados, { onConflict: 'evento_id,colaborador_id,fase' })
+        
+        if (error) throw error
+    }
+
+    /**
+     * Busca o próximo melhor profissional para substituir um recusado
+     */
+    static async findBestSubstitute(evento: OpEvento, fase: string, nivelAlvo: number, profissionaisExcluidos: string[]): Promise<OpEquipe | null> {
+        const equipe = await this.getEquipe()
+        const dataEv = evento.evento_inicio_data || evento.data_inicio
+        const horaIni = evento.evento_inicio_hora || "08:00"
+        const horaFim = evento.evento_fim_hora || "20:00"
+
+        // Definir a ordem de busca baseada no nível alvo (prioridade flexível)
+        let ordemNiveis: number[] = [nivelAlvo]
+        if (nivelAlvo === 1) ordemNiveis = [1, 2, 3]
+        else if (nivelAlvo === 2) ordemNiveis = [2, 1, 3]
+        else ordemNiveis = [3, 2, 1]
+
+        for (const nivel of ordemNiveis) {
+            const candidatos = equipe.filter(m => 
+                (m.nivel || 3) === nivel && 
+                !profissionaisExcluidos.includes(m.id)
+            )
+
+            for (const candidato of candidatos) {
+                const disp = await this.getDisponibilidade(candidato, dataEv, horaIni, horaFim)
+                if (disp.status === 'disponivel') {
+                    return candidato
+                }
+            }
+        }
+
+        return null
+    }
+
+    /**
+     * Busca convites que estão em aberto há mais de X horas
+     */
+    static async getExpiredInvitations(hoursThreshold: number = 3): Promise<any[]> {
+        const thresholdDate = new Date(Date.now() - hoursThreshold * 60 * 60 * 1000).toISOString()
+        
+        const { data, error } = await supabase
+            .from('op_eventos_equipe')
+            .select(`
+                *,
+                op_eventos (nome, data_inicio),
+                op_equipe (nome_completo)
+            `)
+            .eq('status', 'CONVIDADO')
+            .lt('data_convite', thresholdDate)
+        
+        if (error) throw error
+        return data || []
     }
 }

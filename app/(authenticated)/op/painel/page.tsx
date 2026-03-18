@@ -1,10 +1,11 @@
 "use client"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, LayoutDashboard, Settings } from "lucide-react"
+import { Users, LayoutDashboard, Settings, Calendar } from "lucide-react"
 import GestaoEquipeV2 from "@/components/op/GestaoEquipeV2"
 import DashboardOperacional from "@/components/op/DashboardOperacional"
 import ConfiguracoesOperacionais from "@/components/op/ConfiguracoesOperacionais"
+import GestaoEventos from "@/components/op/GestaoEventos"
 
 export default function PainelOperacional() {
   return (
@@ -20,6 +21,10 @@ export default function PainelOperacional() {
             <LayoutDashboard className="h-4 w-4" />
             Dashboard
           </TabsTrigger>
+          <TabsTrigger value="eventos" className="rounded-lg gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold text-xs uppercase tracking-wider py-2.5 px-6">
+            <Calendar className="h-4 w-4" />
+            Eventos
+          </TabsTrigger>
           <TabsTrigger value="equipe" className="rounded-lg gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold text-xs uppercase tracking-wider py-2.5 px-6">
             <Users className="h-4 w-4" />
             Escala de Equipe
@@ -32,6 +37,10 @@ export default function PainelOperacional() {
 
         <TabsContent value="dashboard" className="border-none p-0 outline-none animate-in fade-in duration-500">
           <DashboardOperacional />
+        </TabsContent>
+
+        <TabsContent value="eventos" className="border-none p-0 outline-none animate-in fade-in duration-500">
+          <GestaoEventos />
         </TabsContent>
 
         <TabsContent value="equipe" className="border-none p-0 outline-none animate-in fade-in duration-500">
