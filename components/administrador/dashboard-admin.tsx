@@ -13,6 +13,9 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import GraficoProdutividadeUsuarios from "./grafico-produtividade-usuarios"
 import PageHeader from "@/components/page-header"
+import { Switch } from "@/components/ui/switch"
+import { toast } from "sonner"
+import { Power, Play, Pause } from "lucide-react"
 
 export default function DashboardAdmin() {
   const [solicitacoes, setSolicitacoes] = useState<any[]>([])
@@ -30,6 +33,10 @@ export default function DashboardAdmin() {
     porSolicitante: [],
   })
   const [carregandoEconomia, setCarregandoEconomia] = useState(false)
+  const [roboAtivo, setRoboAtivo] = useState(true)
+  const [carregandoRobo, setCarregandoRobo] = useState(false)
+  const [historicoRobo, setHistoricoRobo] = useState<any[]>([])
+  const [carregandoHistorico, setCarregandoHistorico] = useState(false)
 
   // 📅 NOVOS ESTADOS PARA FILTRO DE DATA
   const [dataInicial, setDataInicial] = useState<string>("")
@@ -60,7 +67,60 @@ export default function DashboardAdmin() {
       }
     }
     buscarDados()
+
+    // Buscar status do robô
+    const buscarStatusRobo = async () => {
+      try {
+        const res = await fetch('/api/robo-control')
+        const data = await res.json()
+        setRoboAtivo(data.active)
+      } catch (error) {
+        console.error("Erro ao buscar status do robô:", error)
+      }
+    }
+    buscarStatusRobo()
+
+    // Buscar histórico do robô
+    const buscarHistoricoRobo = async () => {
+      try {
+        setCarregandoHistorico(true)
+        const res = await fetch('/api/robo-history')
+        const data = await res.json()
+        setHistoricoRobo(data)
+      } catch (error) {
+        console.error("Erro ao buscar histórico do robô:", error)
+      } finally {
+        setCarregandoHistorico(false)
+      }
+    }
+    buscarHistoricoRobo()
+
+    // Atualizar histórico a cada 30 segundos se o dashboard estiver aberto
+    const interval = setInterval(buscarHistoricoRobo, 30000)
+    return () => clearInterval(interval)
   }, [filtroSolicitante, filtroMes])
+
+  const handleToggleRobo = async (checked: boolean) => {
+    try {
+      setCarregandoRobo(true)
+      const res = await fetch('/api/robo-control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: checked })
+      })
+
+      if (res.ok) {
+        setRoboAtivo(checked)
+        toast.success(checked ? "Robô 4 Ativado" : "Robô 4 Pausado")
+      } else {
+        toast.error("Erro ao alterar status do robô")
+      }
+    } catch (error) {
+      toast.error("Erro na comunicação com o servidor")
+    } finally {
+      setCarregandoRobo(false)
+    }
+  }
 
   const solicitantes = Array.from(new Set(solicitacoes.map((s) => s.solicitante)))
   const departamentos = Array.from(new Set(solicitacoes.map((s) => s.departamento)))
@@ -455,6 +515,113 @@ export default function DashboardAdmin() {
           <CardContent>
             <div className="text-2xl font-bold text-emerald-700">R$ {metricasEconomia.totalEconomizado.toFixed(2)}</div>
             <p className="text-xs text-gray-500 mt-1">{metricasEconomia.totalCasos} casos detectados</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Controle do Robô */}
+      <div className="grid grid-cols-1 gap-6">
+        <Card className={`border-2 transition-all ${roboAtivo ? 'border-emerald-500 bg-emerald-50/30' : 'border-slate-300 bg-slate-50'}`}>
+          <CardContent className="py-4 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className={`p-3 rounded-full ${roboAtivo ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-500'}`}>
+                {roboAtivo ? <Play className="h-6 w-6" /> : <Pause className="h-6 w-6" />}
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                  Robô 4 de Sincronização (Produção)
+                  <Badge className={roboAtivo ? "bg-emerald-500 hover:bg-emerald-600" : "bg-slate-500 hover:bg-slate-600"}>
+                    {roboAtivo ? "ATIVO" : "PAUSADO"}
+                  </Badge>
+                </h3>
+                <p className="text-sm text-slate-600">
+                  {roboAtivo 
+                    ? "O robô está processando a fila de aprovados automaticamente a cada 10 minutos." 
+                    : "O robô está em modo de espera. Nenhuma sincronização será realizada."}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
+              <Label htmlFor="robo-toggle" className="font-semibold text-slate-700 cursor-pointer">
+                {roboAtivo ? "Pausar Robô" : "Retomar Robô"}
+              </Label>
+              <Switch 
+                id="robo-toggle" 
+                checked={roboAtivo} 
+                onCheckedChange={handleToggleRobo}
+                disabled={carregandoRobo}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Histórico de Sincronização */}
+      <div className="grid grid-cols-1 gap-6">
+        <Card className="border-slate-200">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <CardTitle className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Histórico de Sincronização (Últimas Ações)
+              </CardTitle>
+              <p className="text-xs text-slate-500">Monitoramento em tempo real das atividades do Robô 4</p>
+            </div>
+            <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={async () => {
+                    const res = await fetch('/api/robo-history')
+                    const data = await res.json()
+                    setHistoricoRobo(data)
+                }}
+                disabled={carregandoHistorico}
+                className="h-8 text-xs bg-white hover:bg-slate-50 border-slate-200"
+            >
+                {carregandoHistorico ? "Atualizando..." : "Atualizar Agora"}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50">
+                    <th className="py-2 px-3 font-semibold text-slate-700">Data/Hora</th>
+                    <th className="py-2 px-3 font-semibold text-slate-700">Prestador</th>
+                    <th className="py-2 px-3 font-semibold text-slate-700">Documento</th>
+                    <th className="py-2 px-3 font-semibold text-slate-700">Status</th>
+                    <th className="py-2 px-3 font-semibold text-slate-700">Resultado/ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historicoRobo.length > 0 ? (
+                    historicoRobo.map((log, index) => (
+                      <tr key={index} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                        <td className="py-2 px-3 text-slate-600 whitespace-nowrap">
+                          {new Date(log.timestamp).toLocaleString('pt-BR')}
+                        </td>
+                        <td className="py-2 px-3 font-medium text-slate-800">{log.nome}</td>
+                        <td className="py-2 px-3 text-slate-600">{log.doc}</td>
+                        <td className="py-2 px-3">
+                          <Badge className={log.status === 'sucesso' ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-red-100 text-red-700 border-red-200"}>
+                            {log.status === 'sucesso' ? "SUCESSO" : "ERRO"}
+                          </Badge>
+                        </td>
+                        <td className="py-2 px-3 text-slate-600 font-mono text-xs">
+                          {log.id_control || log.mensagem}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-500 italic bg-white">
+                        Nenhuma atividade registrada no histórico.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
       </div>

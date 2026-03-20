@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase"
 import { KanbanForm } from "@/components/admin/kanban-form"
 import { KanbanDesfechoModal, DesfechoTipo } from "@/components/admin/kanban-desfecho-modal"
 import { KanbanDetailsModal } from "@/components/admin/kanban-details-modal"
+import { OpServiceV2 } from "@/services/op-service-v2"
 import { Button } from "@/components/ui/button"
 import { PlusIcon, BookTextIcon, MapPin } from "lucide-react"
 import Link from "next/link"
@@ -105,6 +106,8 @@ export default function KanbanBoardPage() {
 
   const updateTarefaStatus = async (tarefaId: string, newStatus: TarefaStatus, dadosExtra?: Record<string, any>) => {
     try {
+      const tarefa = tarefas.find(t => t.id === tarefaId)
+      
       const { error } = await supabase
         .from('kanban_tarefas')
         .update({ 
@@ -112,12 +115,21 @@ export default function KanbanBoardPage() {
           updated_by_name: usuario?.nome || 'Sistema',
           updated_at: new Date().toISOString(),
           ...(dadosExtra ? { 
-            dados_especificos: { ...tarefas.find(t => t.id === tarefaId)?.dados_especificos, ...dadosExtra }
+            dados_especificos: { ...tarefa?.dados_especificos, ...dadosExtra }
           } : {})
         })
         .eq('id', tarefaId)
 
       if (error) throw error
+
+      // Sincronização com Eventos se for categoria 'eventos'
+      if (tarefa?.categoria === 'eventos' && tarefa.dados_especificos?.evento_id) {
+        if (newStatus === 'historico') {
+          await OpServiceV2.setEventoConcluido(tarefa.dados_especificos.evento_id, true)
+        } else if (tarefa.status === 'historico' && newStatus !== 'historico') {
+          await OpServiceV2.setEventoConcluido(tarefa.dados_especificos.evento_id, false)
+        }
+      }
 
       toast.success(`Tarefa movida para ${newStatus}`)
       fetchTarefas() // Recarrega

@@ -644,8 +644,8 @@ export default function NovaSolicitacao({
     const novosPrestadores = prestadoresExcel.map((p, index) => ({
       id: `excel_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 5)}`,
       nome: p.nome || "",
-      doc1: p.doc1 || p.documento || "", // Suporte para ambos os nomes vindos do Excel
-      doc2: p.doc2 || p.documento2 || "",
+      doc1: p.doc1 || "",
+      doc2: p.doc2 || "",
       empresa: p.empresa || "",
       validando: false,
       validado: false,
@@ -774,7 +774,7 @@ export default function NovaSolicitacao({
                     <Button
                       type="button"
                       onClick={() => setMostrarUploadFoto(true)}
-                      className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-[0_0_15px_rgba(192,38,211,0.3)] transition-all order-1"
+                      className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-[0_0_15px_rgba(192,38,211,0.3)] transition-all"
                       size="sm"
                     >
                       <Camera className="h-4 w-4 mr-2" />
@@ -785,7 +785,7 @@ export default function NovaSolicitacao({
                       onClick={() => setMostrarUploadLista(true)}
                       variant="outline"
                       size="sm"
-                      className="border-slate-600 text-slate-600 hover:bg-slate-50 order-2"
+                      className="border-slate-600 text-slate-600 hover:bg-slate-50"
                     >
                       <FileSpreadsheet className="h-4 w-4 mr-2" />
                       Upload Excel

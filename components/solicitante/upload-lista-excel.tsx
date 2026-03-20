@@ -110,16 +110,16 @@ export default function UploadListaExcel({ onListaProcessada }: UploadListaExcel
               </p>
               <ul className="list-disc list-inside space-y-1 text-sm">
                 <li>
-                  <strong>Nome</strong> - Nome completo do prestador (obrigatório)
+                  <strong>Nome</strong> - Nome completo (Coluna 1)
                 </li>
                 <li>
-                  <strong>Doc1</strong> - RG ou documento principal (obrigatório)
+                  <strong>Empresa</strong> - Nome da empresa (Coluna 2)
                 </li>
                 <li>
-                  <strong>Doc2</strong> - CPF, CNH ou documento secundário (opcional)
+                  <strong>RG / Doc1</strong> - Documento principal (Coluna 3)
                 </li>
                 <li>
-                  <strong>Empresa</strong> - Nome da empresa (opcional)
+                  <strong>CPF / Doc2</strong> - Documento secundário (Coluna 4 - Opcional)
                 </li>
               </ul>
               <p className="text-xs text-slate-600 mt-2">

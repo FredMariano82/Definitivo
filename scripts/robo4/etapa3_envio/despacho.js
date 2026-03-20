@@ -1,22 +1,51 @@
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config({ path: path.resolve(__dirname, '../../../.env.local') });
 const { createClient } = require('@supabase/supabase-js');
 
+const LOCK_FILE = path.resolve(__dirname, 'robo4.lock');
+const STATUS_FILE = path.resolve(__dirname, '../../../robo4_status.json');
+const HISTORY_FILE = path.resolve(__dirname, '../../../robo4_history.json');
+
 // ============================================================================
-// 1. UTILITÁRIOS DA ETAPA 2 (Gera o Payload blindado)
+// 1. UTILITÁRIOS
 // ============================================================================
+function isRoboAtivo() {
+    try {
+        if (!fs.existsSync(STATUS_FILE)) return true;
+        const data = JSON.parse(fs.readFileSync(STATUS_FILE, 'utf-8'));
+        return data.active !== false;
+    } catch (e) {
+        return true; // Fallback para ativo
+    }
+}
+
+function addLogToHistory(logEntry) {
+    try {
+        let history = [];
+        if (fs.existsSync(HISTORY_FILE)) {
+            history = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf-8'));
+        }
+        
+        // Adicionar novo log ao início
+        history.unshift({
+            timestamp: new Date().toISOString(),
+            ...logEntry
+        });
+
+        // Manter apenas os últimos 50 logs
+        if (history.length > 50) history = history.slice(0, 50);
+
+        fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
+    } catch (e) {
+        console.error("❌ ERRO ao salvar histórico:", e.message);
+    }
+}
+
 function normalizar(str) {
     return (str || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, "").trim();
 }
-function formatDateF12(dateStr, isEnd) {
-    if (!dateStr) return "";
-    const d = new Date(dateStr);
-    const day = String(d.getUTCDate()).padStart(2, '0');
-    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-    const year = d.getUTCFullYear();
-    const time = isEnd ? "23:59" : "00:00";
-    return `${day}/${month}/${year} ${time}`;
-}
+
 function formatDateOnly(dateStr) {
     if (!dateStr) return "";
     const d = new Date(dateStr);
@@ -26,17 +55,17 @@ function formatDateOnly(dateStr) {
     return `${day}/${month}/${year}`;
 }
 
+function wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 function construirPayloadUniversal(prestador) {
-    // PASSO 1: APENAS DADOS DA PÁGINA "GERAL" (Observação vem de checagem_valida_ate)
-    // Usando exatamente o que o F12 mostrou mas sem IDs
     const payload = {
         name: prestador.nome,
         rg: (prestador.doc1 || "").replace(/[^0-9]/g, ""),
         document: `RG: ${(prestador.doc1 || "").replace(/[^0-9]/g, "")}`,
         cpf: (prestador.doc2 || "").replace(/[^0-9]/g, ""),
         comments: `checagem válida até ${formatDateOnly(prestador.checagem_valida_ate)}`,
-
-        // Boilerplate essencial do Passo 1
         idType: 0,
         idArea: 0,
         registration: "",
@@ -44,8 +73,6 @@ function construirPayloadUniversal(prestador) {
         canUseFacial: true,
         admin: false,
         deleted: false,
-
-        // Arrays vazios que o C# exige para não dar NullReference
         groups: [],
         groupsList: [],
         userGroupsList: [],
@@ -58,226 +85,240 @@ function construirPayloadUniversal(prestador) {
         rulesList: [],
         customFields: {}
     };
-
     return payload;
 }
 
 // ============================================================================
-// 3. EXECUÇÃO DA ETAPA 3 (O Envio para a API via FETCH IGUAL MODO 1)
+// 3. EXECUÇÃO DA ETAPA 3 (O Envio para a API via FETCH em LOOP)
 // ============================================================================
 async function despacharParaIDControl() {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-    const ID_CONTROL_URL = "https://192.168.100.20:30443";
-
-    console.log("==================================================");
-    console.log("🤖 ROBO 4: PASSO 3 - SINCRONIZAÇÃO DE DATAS");
-    console.log("==================================================");
-
-    const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    // 1. Buscar o próximo alvo pendente (Universal)
-    console.log("Buscando próximo prestador aprovado sem vínculo...");
-    const { data: pendentes, error: dbError } = await supabase
-        .from('prestadores')
-        .select('*, solicitacoes:solicitacao_id(*)')
-        .eq('checagem', 'aprovado') // Apenas aprovados
-        .is('id_control_id', null)  // Que ainda não têm ID Control
-        .limit(1);
-
-    if (dbError) throw new Error("Erro no banco: " + dbError.message);
-
-    if (!pendentes || pendentes.length === 0) {
-        return console.log("✨ NADA PARA SINCRONIZAR: Todos os aprovados já têm ID Control.");
+    // A0. VERIFICAR SE O ROBÔ ESTÁ ATIVO (PAUSE/RESUME)
+    if (!isRoboAtivo()) {
+        console.log("⏸️ ROBÔ PAUSADO: A execução foi suspensa via Dashboard (SuperAdmin).");
+        return;
     }
 
-    const prestador = pendentes[0];
-    const sol = prestador.solicitacoes || {};
-
-    console.log(`\n🎯 ALVO ENCONTRADO: [${prestador.nome}]`);
-    console.log(`🔗 Link Supabase: ${prestador.id}`);
-
-    // Datas da Solicitação
-    const dIni = sol.data_inicial;
-    const dFim = sol.data_final;
-
-    if (!dIni || !dFim) {
-        return console.log("⚠️ Datas não encontradas para este prestador. Ignorando...");
+    // A. VERIFICAR CADEADO (LOCK)
+    if (fs.existsSync(LOCK_FILE)) {
+        console.log("🛑 CONFLITO: Outra instância do Robô 4 já está em execução. Encerrando para evitar duplicidade.");
+        return;
     }
 
-    // Formatação
-    const formatarDataSimples = (iso) => {
-        const [y, m, d] = iso.split('-');
-        return `${d}/${m}/${y}`;
-    };
+    try {
+        // B. FECHAR CADEADO
+        fs.writeFileSync(LOCK_FILE, `Iniciado em: ${new Date().toLocaleString()}`);
+        
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+        const ID_CONTROL_URL = "https://192.168.100.20:30443";
 
-    const dataIni = formatarDataSimples(dIni);
-    const dataFim = formatarDataSimples(dFim);
+        console.log("==================================================");
+        console.log("🤖 ROBO 4: PASSO 3 - MODO LOOP ROBUSTO");
+        console.log("==================================================");
 
-    console.log(`📅 VIGÊNCIA: ${dataIni} até ${dataFim}`);
+        const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // 2. Autenticação
-    const loginRes = await fetch(`${ID_CONTROL_URL}/api/login/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: "mariano", password: "123456789" })
-    });
-    const { accessToken } = await loginRes.json();
-
-    // 4. Mapeamento de Grupos (Dinâmico e Inteligente)
-    console.log("Buscando lista de grupos oficial do ID Control...");
-    const groupsRes = await fetch(`${ID_CONTROL_URL}/api/group/`, {
-        method: "GET",
-        headers: { "Authorization": `Bearer ${accessToken}` }
-    });
-    const groupsJson = await groupsRes.json();
-    // A API pode retornar o array direto ou dentro de uma propriedade 'data'
-    const allGroups = Array.isArray(groupsJson) ? groupsJson : (groupsJson.data || []);
-
-    console.log(`📊 Carregados ${allGroups.length} grupos do servidor.`);
-
-    const normalize = (n) => (n || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
-
-    const findGroupId = (name) => {
-        if (!name) return null;
-        const normTarget = normalize(name);
-        // Tenta achar o grupo cujo nome normalizado bata com o alvo
-        const match = allGroups.find(g => normalize(g.name) === normTarget);
-        return match ? match.id : null;
-    };
-
-    const nomeEmpresa = prestador.empresa;
-    const nomeDepto = sol.departamento || prestador.departamento || "Segurança";
-
-    const idEmpresa = findGroupId(nomeEmpresa);
-    const idDepto = findGroupId(nomeDepto);
-
-    const idsGrupos = [];
-    if (idDepto) idsGrupos.push(idDepto);
-    else if (nomeDepto) console.log(`⚠️ Alerta: Departamento '${nomeDepto}' não encontrado no ID Control.`);
-
-    if (idEmpresa) idsGrupos.push(idEmpresa);
-    else if (nomeEmpresa) console.log(`⚠️ Alerta: Empresa '${nomeEmpresa}' não encontrada no ID Control.`);
-
-    console.log(`🏢 GRUPOS LOCALIZADOS: Empresa(${nomeEmpresa}=${idEmpresa || 'N/A'}) | Depto(${nomeDepto}=${idDepto || 'N/A'})`);
-
-    // 5. Verificar se o usuário já existe para decidir entre POST (Novo) ou PUT (Edição)
-    console.log("Verificando existência no ID Control com query expandida...");
-
-    // O F12 manda isso no POST BODY e não na URL, mas a API antiga parsa como query!
-    const searchUrl = `${ID_CONTROL_URL}/api/user/list?idType=0&deleted=false&draw=9&columns%5B0%5D%5Bdata%5D=&columns%5B0%5D%5Bname%5D=&columns%5B0%5D%5Bsearchable%5D=true&columns%5B0%5D%5Borderable%5D=false&columns%5B0%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B0%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B1%5D%5Bdata%5D=idDevice&columns%5B1%5D%5Bname%5D=&columns%5B1%5D%5Bsearchable%5D=true&columns%5B1%5D%5Borderable%5D=true&columns%5B1%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B1%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B2%5D%5Bdata%5D=name&columns%5B2%5D%5Bname%5D=&columns%5B2%5D%5Bsearchable%5D=true&columns%5B2%5D%5Borderable%5D=true&columns%5B2%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B2%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B3%5D%5Bdata%5D=registration&columns%5B3%5D%5Bname%5D=&columns%5B3%5D%5Bsearchable%5D=true&columns%5B3%5D%5Borderable%5D=true&columns%5B3%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B3%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B4%5D%5Bdata%5D=rg&columns%5B4%5D%5Bname%5D=&columns%5B4%5D%5Bsearchable%5D=true&columns%5B4%5D%5Borderable%5D=true&columns%5B4%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B4%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B5%5D%5Bdata%5D=cpf&columns%5B5%5D%5Bname%5D=&columns%5B5%5D%5Bsearchable%5D=true&columns%5B5%5D%5Borderable%5D=true&columns%5B5%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B5%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B6%5D%5Bdata%5D=phone&columns%5B6%5D%5Bname%5D=&columns%5B6%5D%5Bsearchable%5D=true&columns%5B6%5D%5Borderable%5D=true&columns%5B6%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B6%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B7%5D%5Bdata%5D=cargo&columns%5B7%5D%5Bname%5D=&columns%5B7%5D%5Bsearchable%5D=true&columns%5B7%5D%5Borderable%5D=true&columns%5B7%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B7%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B8%5D%5Bdata%5D=inativo&columns%5B8%5D%5Bname%5D=&columns%5B8%5D%5Bsearchable%5D=true&columns%5B8%5D%5Borderable%5D=true&columns%5B8%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B8%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B9%5D%5Bdata%5D=blackList&columns%5B9%5D%5Bname%5D=&columns%5B9%5D%5Bsearchable%5D=true&columns%5B9%5D%5Borderable%5D=true&columns%5B9%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B9%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B10%5D%5Bdata%5D=&columns%5B10%5D%5Bname%5D=&columns%5B10%5D%5Bsearchable%5D=true&columns%5B10%5D%5Borderable%5D=false&columns%5B10%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B10%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B11%5D%5Bdata%5D=&columns%5B11%5D%5Bname%5D=&columns%5B11%5D%5Bsearchable%5D=true&columns%5B11%5D%5Borderable%5D=false&columns%5B11%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B11%5D%5Bsearch%5D%5Bregex%5D=false&order%5B0%5D%5Bcolumn%5D=2&order%5B0%5D%5Bdir%5D=asc&start=0&length=10&search%5Bvalue%5D=${encodeURIComponent(prestador.nome)}&search%5Bregex%5D=false&inactive=0&blacklist=0&filterCol=name`;
-
-    const searchRes = await fetch(searchUrl, {
-        method: "POST",
-        headers: {
-            "Authorization": `Bearer ${accessToken}`,
-            "Content-Type": "application/json"
-        },
-        body: null
-    });
-    const { data: list } = await searchRes.json();
-    const serverUser = list[0];
-
-    // 6. Construir Payload de Carga Total (Universal)
-    const payloadCentral = {
-        ...construirPayloadUniversal(prestador),
-        expireOnDateLimit: true,
-        // Vigência
-        shelfStartLife: `${dataIni} 00:00`,
-        shelfStartLifeDate: dataIni,
-        shelfLife: `${dataFim} 00:00`,
-        shelfLifeDate: dataFim,
-        // Grupos
-        groups: idsGrupos,
-        userGroupsList: idsGrupos.map(gid => ({ idGroup: gid, idUser: serverUser?.id || 0, isVisitor: 0 })),
-        // Limpar campos de ID legado
-        dateStartLimit: null,
-        dateLimit: null
-    };
-
-    if (serverUser) {
-        // MODO VERIFICAÇÃO DE HOMÔNIMO (Escadinha)
-        console.log(`\n🔍 Validando documentos para o ID Control Técnico: ${serverUser.id}`);
-
-        const rgDB = (prestador.doc1 || "").replace(/[^0-9]/g, "");
-        const cpfDB = (prestador.doc2 || "").replace(/[^0-9]/g, "");
-        const rgID = (serverUser.rg || "").replace(/[^0-9]/g, "");
-        const cpfID = (serverUser.cpf || "").replace(/[^0-9]/g, "");
-
-        let aprovadoParaPUT = false;
-
-        // PASSO A: O RG Bate? (Ou está vazio no F12)
-        if (!rgID || rgID === rgDB) {
-            console.log("✔️ Match Sucesso (Regra RG): O RG do ID Control está vazio ou é igual ao do Supabase.");
-            aprovadoParaPUT = true;
-        }
-        // PASSO B: O CPF Bate? (Ou está vazio no F12)
-        else if (cpfDB && (!cpfID || cpfID === cpfDB)) {
-            console.log("✔️ Match Sucesso (Regra CPF): O RG divergiu, mas o CPF do ID Control está vazio ou é igual ao CPF validado no Supabase.");
-            aprovadoParaPUT = true;
-        }
-
-        // PASSO C: Conflito Real
-        if (!aprovadoParaPUT) {
-            console.log(`❌ HOMÔNIMO DETECTADO: Os documentos não batem. RG(${rgDB} != ${rgID}) e CPF(${cpfDB} != ${cpfID}).`);
-            console.log(`⏸️ Pausando sincronização e recuando status para 'revisar' no banco.`);
-
-            await supabase.from('prestadores').update({
-                checagem: 'revisar',
-                observacoes: `[CONFLITO RG: ${rgID}]`
-            }).eq('id', prestador.id);
-            console.log("✅ Solicitacão enviada para a fila de Revisão (Aprovador).");
-            return; // Interrompe o processo para não sobescrever o cadastro alheio
-        }
-
-        // Se chegou aqui, MODO EDIÇÃO (PUT)
-        console.log(`🔄 Liberado para Atualização. Aplicando Carga Total...`);
-        const res = await fetch(`${ID_CONTROL_URL}/api/user/`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
-            body: JSON.stringify({
-                ...payloadCentral,
-                id: serverUser.id,
-                idDevice: Number(prestador.id_control_id) || serverUser.idDevice
-            })
-        });
-
-        if (res.ok) {
-            console.log("🟩 SUCESSO: Cadastro atualizado totalmente (Datas + Grupos)!");
-            if (!prestador.id_control_id) {
-                const idGerado = serverUser.idDevice || serverUser.id;
-                console.log(`🔗 Sincronizando ID Mestre ${idGerado} no Supabase...`);
-                await supabase.from('prestadores').update({ id_control_id: String(idGerado) }).eq('id', prestador.id);
+        // 1. Buscar Alvos Pendentes (Usando Raw Fetch por confiabilidade em ambientes restritos)
+        console.log("Buscando fila de aprovados pendentes de sincronização...");
+        
+        const queryRes = await fetch(`${SUPABASE_URL}/rest/v1/prestadores?select=*,solicitacoes:solicitacao_id(*)&checagem=eq.aprovado&id_control_id=is.null&order=criado_em.asc`, {
+            headers: {
+                "apikey": SUPABASE_KEY,
+                "Authorization": `Bearer ${SUPABASE_KEY}`
             }
-        } else {
-            const erro = await res.text();
-            console.log("❌ Falha na Atualização:", erro);
-            require('fs').writeFileSync('erro_sinc.txt', erro);
-        }
-    } else {
-        // MODO CRIAÇÃO (POST)
-        console.log("🆕 Novo cadastro. Criando com Carga Total...");
-        const res = await fetch(`${ID_CONTROL_URL}/api/user/`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
-            body: JSON.stringify(payloadCentral)
         });
+        
+        if (!queryRes.ok) throw new Error("Erro ao consultar fila no banco de dados.");
+        const pendentes = await queryRes.json();
 
-        if (res.ok) {
-            const novo = await res.json();
-            const idGerado = novo.idDevice || novo.id;
-            console.log(`🟩 SUCESSO: Criado com ID ${idGerado}!`);
-            console.log(`🔗 Sincronizando ID Mestre ${idGerado} no Supabase...`);
-            await supabase.from('prestadores').update({ id_control_id: String(idGerado) }).eq('id', prestador.id);
-        } else {
-            console.log("❌ Falha na Criação:", await res.text());
+        if (!pendentes || pendentes.length === 0) {
+            console.log("✨ FILA VAZIA: Todos os aprovados já têm ID Control.");
+            return;
+        }
+
+        const total = pendentes.length;
+        console.log(`📡 FILA ENCONTRADA: [${total}] registros para processar.\n`);
+
+        // 2. Autenticação (Uma vez por ciclo para eficiência)
+        console.log("Autenticando no ID Control...");
+        const loginRes = await fetch(`${ID_CONTROL_URL}/api/login/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: "mariano", password: "123456789" })
+        });
+        const { accessToken } = await loginRes.json();
+        console.log("🔓 Login efetuado com sucesso.");
+
+        // 3. Buscar grupos uma vez para mapeamento
+        console.log("Mapeando grupos do servidor...");
+        const groupsRes = await fetch(`${ID_CONTROL_URL}/api/group/`, {
+            method: "GET",
+            headers: { "Authorization": `Bearer ${accessToken}` }
+        });
+        const groupsJson = await groupsRes.json();
+        const allGroups = Array.isArray(groupsJson) ? groupsJson : (groupsJson.data || []);
+        console.log(`📊 ${allGroups.length} grupos carregados.`);
+
+        const normalizeLocal = (n) => (n || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+        const findGroupId = (name) => {
+            if (!name) return null;
+            const normTarget = normalizeLocal(name);
+            const match = allGroups.find(g => normalizeLocal(g.name) === normTarget);
+            return match ? match.id : null;
+        };
+
+        // 🎯 INÍCIO DO LOOP METICULOSO
+        let index = 1;
+        for (const prestador of pendentes) {
+            console.log(`\n--------------------------------------------------`);
+            console.log(`👤 [${index}/${total}] PROCESSANDO: ${prestador.nome}`);
+            console.log(`--------------------------------------------------`);
+
+            try {
+                const sol = prestador.solicitacoes || {};
+                
+                // Vigência (Com fallback para datas padrão se sol for vazio)
+                const dIni = sol.data_inicial || "2026-03-20";
+                const dFim = sol.data_final || "2026-12-31";
+
+                const formatarDataLocal = (iso) => {
+                    const [y, m, d] = iso.split('-');
+                    return `${d}/${m}/${y}`;
+                };
+
+                const dataIni = formatarDataLocal(dIni);
+                const dataFim = formatarDataLocal(dFim);
+
+                // Mapeamento de Grupos para ESTE prestador
+                const nomeEmpresa = prestador.empresa;
+                const nomeDepto = sol.departamento || prestador.departamento || "Segurança";
+
+                const idEmpresa = findGroupId(nomeEmpresa);
+                const idDepto = findGroupId(nomeDepto);
+
+                const idsGrupos = [];
+                if (idDepto) idsGrupos.push(idDepto);
+                if (idEmpresa) idsGrupos.push(idEmpresa);
+
+                // Verificar existência (POST vs PUT)
+                const searchRes = await fetch(`${ID_CONTROL_URL}/api/user/list?search%5Bvalue%5D=${encodeURIComponent(prestador.nome)}&inactive=0&blacklist=0&filterCol=name&length=10`, {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${accessToken}`, "Content-Type": "application/json" },
+                    body: null
+                });
+                const { data: list } = await searchRes.json();
+                const serverUser = list && list.length > 0 ? list[0] : null;
+
+                const payloadCentral = {
+                    ...construirPayloadUniversal(prestador),
+                    expireOnDateLimit: true,
+                    shelfStartLife: `${dataIni} 00:00`,
+                    shelfStartLifeDate: dataIni,
+                    shelfLife: `${dataFim} 00:00`,
+                    shelfLifeDate: dataFim,
+                    groups: idsGrupos,
+                    userGroupsList: idsGrupos.map(gid => ({ idGroup: gid, idUser: serverUser?.id || 0, isVisitor: 0 })),
+                    dateStartLimit: null,
+                    dateLimit: null
+                };
+
+                if (serverUser) {
+                    // MODO VERIFICAÇÃO DE HOMÔNIMO
+                    const rgDB = (prestador.doc1 || "").replace(/[^0-9]/g, "");
+                    const cpfDB = (prestador.doc2 || "").replace(/[^0-9]/g, "");
+                    const rgID = (serverUser.rg || "").replace(/[^0-9]/g, "");
+                    const cpfID = (serverUser.cpf || "").replace(/[^0-9]/g, "");
+
+                    let aprovadoParaPUT = false;
+                    if (!rgID || rgID === rgDB) aprovadoParaPUT = true;
+                    else if (cpfDB && (!cpfID || cpfID === cpfDB)) aprovadoParaPUT = true;
+
+                    if (!aprovadoParaPUT) {
+                        console.log(`❌ CONFLITO: Documentos divergem (RG/CPF). Enviando para Revisão Manual.`);
+                        await supabase.from('prestadores').update({ checagem: 'revisar', observacoes: `[CONFLITO RG: ${rgID}]` }).eq('id', prestador.id);
+                        index++;
+                        continue;
+                    }
+
+                    console.log(`🔄 Atualizando cadastro existente (ID: ${serverUser.id})...`);
+                    const res = await fetch(`${ID_CONTROL_URL}/api/user/`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
+                        body: JSON.stringify({ ...payloadCentral, id: serverUser.id, idDevice: serverUser.idDevice })
+                    });
+
+                    if (res.ok) {
+                        const idGerado = serverUser.idDevice || serverUser.id;
+                        console.log(`🟩 SUCESSO: Cadastro atualizado (Link: ${idGerado})`);
+                        await supabase.from('prestadores').update({ id_control_id: String(idGerado), data_integracao: new Date().toISOString() }).eq('id', prestador.id);
+                    }
+                } else {
+                    console.log(`🆕 Criando novo cadastro no ID Control...`);
+                    const res = await fetch(`${ID_CONTROL_URL}/api/user/`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
+                        body: JSON.stringify(payloadCentral)
+                    });
+
+                    if (res.ok) {
+                        const novo = await res.json();
+                        const idGerado = novo.idDevice || novo.id;
+                        console.log(`🟩 SUCESSO: Criado com ID ${idGerado}`);
+            // F. ATUALIZAR STATUS NO SUPABASE
+            await supabase.from('prestadores').update({ id_control_id: String(idGerado), data_integracao: new Date().toISOString() }).eq('id', prestador.id);
+            console.log(`✅ SUCESSO: ${prestador.nome} sincronizado. ID: ${idGerado}`);
+
+            addLogToHistory({
+                nome: prestador.nome,
+                doc: prestador.doc1,
+                status: 'sucesso',
+                id_control: idGerado,
+                mensagem: 'Sincronizado com sucesso'
+            });
+                    } else {
+                        console.log("❌ Falha na Criação:", await res.text());
+                    }
+                }
+            } catch (itemError) {
+                console.error(`💥 Erro ao processar ${prestador.nome}:`, itemError.message);
+            
+            addLogToHistory({
+                nome: prestador.nome,
+                doc: prestador.doc1,
+                status: 'erro',
+                mensagem: itemError.message
+            });
+            }
+
+            // 🕒 FOLGA ENTRE CADASTROS (2 Segundos)
+            if (index < total) {
+                console.log(`...Aguardando 2 segundos para o próximo...`);
+                await wait(2000);
+            }
+            index++;
+        }
+
+        console.log("\n✅ CICLO DE SINCRONIZAÇÃO FINALIZADO COM SUCESSO!");
+
+    } catch (error) {
+        console.error("\n❌ ERRO CRÍTICO NO ROBÔ: ", error.message);
+    } finally {
+        // C. ABRIR CADEADO SEMPRE
+        if (fs.existsSync(LOCK_FILE)) {
+            fs.unlinkSync(LOCK_FILE);
+            console.log("🔓 Cadeado aberto. Sistema liberado para o próximo ciclo.");
         }
     }
-
-    console.log("\n✅ PROCESSO FINALIZADO!");
 }
 
-despacharParaIDControl().catch(e => {
-    console.error("\n❌ ERRO CRÍTICO NO ROBÔ: ", e.message);
-});
+despacharParaIDControl()
+    .then(() => console.log("🏁 Execução encerrada normalmente."))
+    .catch(err => {
+        console.error("💥 ERRO FATAL NA EXECUÇÃO:", err.message);
+        // Tentar abrir o cadeado se deu erro fora do try principal
+        if (fs.existsSync(LOCK_FILE)) {
+            fs.unlinkSync(LOCK_FILE);
+            console.log("🔓 Cadeado aberto (após erro fatal).");
+        }
+    });

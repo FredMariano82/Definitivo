@@ -136,6 +136,7 @@ export class OpServiceV2 {
             .from('op_eventos')
             .select('*')
             .gte('data_fim', hoje)
+            .not('observacoes', 'ilike', '%[CONCLUIDO]%')
             .order('data_inicio')
         
         if (error) throw error
@@ -354,6 +355,7 @@ export class OpServiceV2 {
             .select('*')
             .gte('data_inicio', dataInicio)
             .lte('data_inicio', dataFim)
+            .not('observacoes', 'ilike', '%[CONCLUIDO]%')
         
         if (error) throw error
         return data || []
@@ -561,6 +563,7 @@ export class OpServiceV2 {
             .select('*')
             .eq('categoria', 'eventos')
             .neq('status', 'concluido')
+            .neq('status', 'historico')
         
         if (error) throw error
         if (!tarefas) return []
@@ -664,5 +667,66 @@ export class OpServiceV2 {
         
         if (error) throw error
         return data || []
+    }
+
+    /**
+     * Remove um evento e seus dados relacionados (fases, convites, financeiro)
+     */
+    static async deleteEvento(id: string) {
+        // 1. Remover convites
+        await supabase.from('op_eventos_equipe').delete().eq('evento_id', id)
+        
+        // 2. Remover registros financeiros
+        await supabase.from('op_financeiro_eventos').delete().eq('evento_id', id)
+        
+        // 3. Remover o evento em si
+        const { error } = await supabase.from('op_eventos').delete().eq('id', id)
+        
+        if (error) throw error
+    }
+
+    /**
+     * Reseta a escala manual de um período (deleta registros de op_escala_diaria)
+     */
+    static async clearManualScaleOverrides(dataInicio: string, dataFim: string) {
+        const { error } = await supabase
+            .from('op_escala_diaria')
+            .delete()
+            .gte('data_plantao', dataInicio)
+            .lte('data_plantao', dataFim)
+        
+        if (error) throw error
+    }
+
+    /**
+     * Marca um evento como concluído ou ativo usando o campo observações
+     */
+    static async setEventoConcluido(id: string, concluido: boolean) {
+        const { data: evento, error: fetchError } = await supabase
+            .from('op_eventos')
+            .select('observacoes')
+            .eq('id', id)
+            .single()
+        
+        if (fetchError) throw fetchError
+        
+        const obsAtual = evento.observacoes || ""
+        const tag = "[CONCLUIDO]"
+        let novaObs = obsAtual
+        
+        if (concluido) {
+            if (!obsAtual.includes(tag)) {
+                novaObs = `${tag} ${obsAtual}`.trim()
+            }
+        } else {
+            novaObs = obsAtual.replace(tag, "").trim()
+        }
+        
+        const { error: updateError } = await supabase
+            .from('op_eventos')
+            .update({ observacoes: novaObs })
+            .eq('id', id)
+        
+        if (updateError) throw updateError
     }
 }

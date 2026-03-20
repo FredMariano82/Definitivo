@@ -312,14 +312,43 @@ export class ExcelService {
         }
       }
 
-      const cabecalho = dados[0].map((col: any) => String(col).toLowerCase().trim())
+      if (!dados || dados.length === 0 || !dados[0]) {
+        return {
+          sucesso: false,
+          erro: "Arquivo Excel parece estar vazio ou não pôde ser lido corretamente.",
+          prestadores: [],
+          totalProcessados: 0,
+        }
+      }
+
+      const cabecalho = (dados[0] || []).map((col: any) => {
+        try {
+          return col ? String(col).toLowerCase().trim() : ""
+        } catch (e) {
+          return ""
+        }
+      })
       console.log("📋 SOLICITANTE - Cabeçalho detectado:", cabecalho)
 
-      const colunas = {
+      let colunas = {
         nome: this.encontrarColuna(cabecalho, ["nome", "name"]),
         doc1: this.encontrarColuna(cabecalho, ["doc1", "documento", "rg", "document"]),
         doc2: this.encontrarColuna(cabecalho, ["doc2", "documento2", "cpf", "cnh"]),
         empresa: this.encontrarColuna(cabecalho, ["empresa", "company"]),
+      }
+
+      let pularPrimeiraLinha = true;
+
+      // NOVO: FALLBACK DE SEQUÊNCIA (Se não achou cabeçalhos claros, assume padrão do Clube: 0=Nome, 1=Empresa, 2=Doc1, 3=Doc2)
+      if (colunas.nome === -1 && (colunas.doc1 === -1 || colunas.doc1 === 0)) {
+        console.log("⚠️ SOLICITANTE - Cabeçalhos não encontrados. Usando sequência padrão do Clube: NOME(0), EMPRESA(1), RG(2), CPF(3)");
+        colunas = {
+          nome: 0,
+          empresa: 1,
+          doc1: 2,
+          doc2: 3
+        };
+        pularPrimeiraLinha = false; // Se não tem cabeçalho, a primeira linha já é dado
       }
 
       console.log("🗂️ SOLICITANTE - Mapeamento de colunas:", colunas)
@@ -330,7 +359,7 @@ export class ExcelService {
         if (colunas[coluna as keyof typeof colunas] === -1) {
           return {
             sucesso: false,
-            erro: `Coluna obrigatória não encontrada: ${coluna} `,
+            erro: `Coluna obrigatória não encontrada: ${coluna}. Se o arquivo não tiver cabeçalho, certifique-se de que a sequência seja: Nome, Empresa, Documento.`,
             prestadores: [],
             totalProcessados: 0,
           }
@@ -349,7 +378,7 @@ export class ExcelService {
 
       const prestadores: PrestadorExcelSolicitante[] = []
 
-      for (let i = 1; i < dados.length; i++) {
+      for (let i = pularPrimeiraLinha ? 1 : 0; i < dados.length; i++) {
         const linha = dados[i]
 
         if (!linha || linha.length === 0) continue
@@ -362,10 +391,17 @@ export class ExcelService {
             empresa: this.extrairValor(linha, colunas.empresa) || "",
           }
 
+          // 🎯 NOVO: Ignorar se a linha for um cabeçalho repetido ou lixo
+          const nomeLcase = (prestador.nome || "").toLowerCase().trim()
+          if (nomeLcase === "nome" || nomeLcase === "name" || nomeLcase === "prestador" || nomeLcase === "rg" || nomeLcase === "documento") {
+              console.log("🚫 SOLICITANTE - Pulando linha que parece ser cabeçalho:", prestador.nome)
+              continue
+          }
+
           // 🎯 CORREÇÃO CRÍTICA: Aceitar prestador com Nome E (Doc1 OU Doc2)
-          const temNome = prestador.nome.trim()
-          const temDoc1 = prestador.doc1.trim()
-          const temDoc2 = prestador.doc2?.trim()
+          const temNome = prestador.nome ? prestador.nome.trim() : ""
+          const temDoc1 = prestador.doc1 ? prestador.doc1.trim() : ""
+          const temDoc2 = prestador.doc2 ? prestador.doc2.trim() : ""
           const temAlgumDoc = temDoc1 || temDoc2
 
           console.log(
@@ -469,7 +505,8 @@ export class ExcelService {
   private static encontrarColuna(cabecalho: string[], possiveisNomes: string[]): number {
     for (const nome of possiveisNomes) {
       const index = cabecalho.findIndex((col) => {
-        const c = col.toLowerCase()
+        if (!col) return false;
+        const c = String(col).toLowerCase()
         const n = nome.toLowerCase()
         return c === n || c.includes(n)
       })

@@ -418,11 +418,25 @@ export default function GestaoEventos() {
                 nivel_criticidade: 3
             })
             
-            loadData()
-            toast.success("Evento planejado com sucesso!")
         } catch (error: any) {
             console.error("Erro ao criar evento:", error)
             toast.error("Erro ao salvar: " + (error.message || "tente novamente"))
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleDeleteEvento = async (id: string) => {
+        if (!confirm("Deseja realmente cancelar/excluir este evento? Esta ação não pode ser desfeita.")) return
+        
+        setLoading(true)
+        try {
+            await OpServiceV2.deleteEvento(id)
+            toast.success("Evento removido com sucesso")
+            loadData()
+        } catch (error) {
+            console.error("Erro ao excluir evento:", error)
+            toast.error("Erro ao excluir evento")
         } finally {
             setLoading(false)
         }
@@ -522,6 +536,15 @@ export default function GestaoEventos() {
                                         title="Compartilhar Escala Geral"
                                     >
                                         <Share2 className="h-4 w-4" />
+                                    </Button>
+                                    <Button 
+                                        onClick={() => handleDeleteEvento(evento.id!)}
+                                        variant="ghost" 
+                                        size="icon"
+                                        className="h-9 w-9 rounded-xl text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                                        title="Cancelar/Excluir Evento"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
                                     </Button>
                                     <Button 
                                         onClick={() => openSelectionModal(evento)}

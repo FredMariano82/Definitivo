@@ -46,10 +46,24 @@ export function extrairPrestadoresDeTexto(textoLivre: string): {
                     // até bater de frente com a PRIMEIRA LETRA (incluindo letras acentuadas).
                     parteEsquerda = parteEsquerda.replace(/^[^a-zA-ZÀ-ÿ]+/g, '');
 
-                    // Limpeza da empresa (remove separadores comuns no início)
+                    // NOVA LOGICA: Suporte para [NOME] [SEPARADOR] [EMPRESA] [SEPARADOR] [DOC]
+                    // Se houver vírgula, traço, pipe ou separadores claros, tentamos separar Nome de Empresa
+                    let nomeProvavel = parteEsquerda.trim();
                     let empresaExtraida = parteDireita.replace(/^[-:/|.,\s]+/, '').trim();
 
-                    const nomeProvavel = parteEsquerda.trim();
+                    const separadores = /[,|;]|\s{3,}/; // Vírgula, pipe, ponto-e-vírgula ou 3+ espaços
+                    // Nota: O traço (-) foi removido da regex principal de split para não quebrar nomes compostos 
+                    // ou empresas com hífen, mas podemos usar se houver espaços ao redor.
+                    const partesEsquerda = nomeProvavel.split(separadores).map(p => p.trim()).filter(p => p.length > 0);
+
+                    if (partesEsquerda.length >= 2) {
+                        // Se houver pelo menos 2 partes, a última (antes do documento) é provavelmente a empresa
+                        // e o restante é o nome. 
+                        // Ex: "João da Silva, Empresa ABC" -> Nome: João da Silva, Empresa: Empresa ABC
+                        nomeProvavel = partesEsquerda.slice(0, -1).join(' ');
+                        empresaExtraida = partesEsquerda[partesEsquerda.length - 1];
+                    }
+
                     const nomeLcase = nomeProvavel.toLowerCase();
                     const palavrasProibidas = ['solicita', 'segue', 'obrigado', 'favor', 'verifiquem', 'incluir', 'bom ', 'boa ', 'olá', 'boa tarde'];
                     const temPalavraProibida = palavrasProibidas.some(palavra => nomeLcase.includes(palavra));
