@@ -136,7 +136,9 @@ export default function GestaoEquipeV2() {
 
             setEquipe(sortedMembros)
             setExcecoes(listaExcecoes)
-            setEventos(listaEventos)
+            const hoje = format(new Date(), 'yyyy-MM-dd')
+            const eventosFiltrados = (listaEventos || []).filter(ev => ev.data_fim >= hoje)
+            setEventos(eventosFiltrados)
         } catch (error) {
             console.error("Erro ao carregar dados operacionais:", error)
         } finally {

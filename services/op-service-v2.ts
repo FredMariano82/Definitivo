@@ -526,11 +526,57 @@ export class OpServiceV2 {
     }
 
     /**
+     * Inicia uma pausa para um colaborador
+     */
+    static async startPause(colaborador_id: string, tipo_pausa: string, segundos: number, posto_anterior_id?: string) {
+        const { error } = await supabase
+            .from('op_pausas')
+            .insert({
+                colaborador_id,
+                tipo_pausa,
+                segundos_duracao: segundos,
+                posto_anterior_id,
+                encerrada: false
+            })
+        
+        if (error) throw error
+    }
+
+    /**
+     * Encerra todas as pausas ativas de um colaborador
+     */
+    static async endPause(colaborador_id: string) {
+        const { error } = await supabase
+            .from('op_pausas')
+            .update({ encerrada: true })
+            .eq('colaborador_id', colaborador_id)
+            .eq('encerrada', false)
+        
+        if (error) throw error
+    }
+
+    /**
+     * Busca todas as pausas ativas do dia
+     */
+    static async getActivePauses(): Promise<any[]> {
+        const { data, error } = await supabase
+            .from('op_pausas')
+            .select('*')
+            .eq('encerrada', false)
+        
+        if (error) throw error
+        return data || []
+    }
+
+    /**
      * Salva ou atualiza uma alocação
      */
     static async salvarAlocacao(colaborador_id: string, posto_id: string | null) {
         const hoje = format(new Date(), 'yyyy-MM-dd')
         
+        // Sempre encerra pausas vigentes ao realizar qualquer movimentação de alocação/base
+        await this.endPause(colaborador_id)
+
         if (!posto_id) {
             // Remove alocação
             const { error } = await supabase
@@ -542,6 +588,9 @@ export class OpServiceV2 {
             return
         }
 
+        // Se for alocado em um posto (não é null), encerra pausas ativas
+        await this.endPause(colaborador_id)
+
         const { error } = await supabase
             .from('op_alocacoes')
             .upsert({
@@ -552,6 +601,34 @@ export class OpServiceV2 {
             }, { onConflict: 'colaborador_id,data_alocacao' })
         
         if (error) throw error
+    }
+
+    /**
+     * Garante que um posto exista pelo nome. Retorna o ID (UUID).
+     */
+    static async ensurePostoExists(nome: string): Promise<string> {
+        // Primeiro tenta buscar por nome exato
+        const { data: existente } = await supabase
+            .from('op_postos')
+            .select('id')
+            .eq('nome_posto', nome)
+            .maybeSingle()
+        
+        if (existente?.id) return existente.id
+
+        // Se não existe, cria com o nome fornecido
+        const { data: novo, error } = await supabase
+            .from('op_postos')
+            .insert({ nome_posto: nome })
+            .select('id')
+            .single()
+        
+        if (error) {
+            console.error(`Erro ao criar posto ${nome}:`, error)
+            throw error
+        }
+        
+        return novo.id
     }
 
     /**
@@ -701,32 +778,17 @@ export class OpServiceV2 {
     /**
      * Marca um evento como concluído ou ativo usando o campo observações
      */
-    static async setEventoConcluido(id: string, concluido: boolean) {
-        const { data: evento, error: fetchError } = await supabase
-            .from('op_eventos')
-            .select('observacoes')
-            .eq('id', id)
-            .single()
+    /**
+     * Busca o guia operacional para um turno específico
+     */
+    static async getShiftGuide(turno: 'Dia' | 'Noite'): Promise<any[]> {
+        const { data, error } = await supabase
+            .from('op_guia_turno')
+            .select('*')
+            .eq('turno', turno)
+            .order('horario_alvo')
         
-        if (fetchError) throw fetchError
-        
-        const obsAtual = evento.observacoes || ""
-        const tag = "[CONCLUIDO]"
-        let novaObs = obsAtual
-        
-        if (concluido) {
-            if (!obsAtual.includes(tag)) {
-                novaObs = `${tag} ${obsAtual}`.trim()
-            }
-        } else {
-            novaObs = obsAtual.replace(tag, "").trim()
-        }
-        
-        const { error: updateError } = await supabase
-            .from('op_eventos')
-            .update({ observacoes: novaObs })
-            .eq('id', id)
-        
-        if (updateError) throw updateError
+        if (error) throw error
+        return data || []
     }
 }
