@@ -63,8 +63,26 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Arquivo vazio ou sem dados.' }, { status: 400 });
         }
 
-        // Adicionar header "RG_ENCONTRADO" se não existir
+        // Tenta localizar a coluna de Nomes
         const headers = data[0];
+        let nomeColIndex = -1;
+        for(let i=0; i<headers.length; i++) {
+            const h = String(headers[i] || "").toLowerCase();
+            if (h.includes("nome") || h.includes("prestador") || h.includes("funcionario") || h.includes("pessoa")) {
+                nomeColIndex = i;
+                break;
+            }
+        }
+        
+        // Se não achou por nome, assume a primeira coluna (0)
+        if (nomeColIndex === -1) {
+            console.log("⚠️ Coluna de nome não identificada pelo header. Usando coluna 0.");
+            nomeColIndex = 0;
+        } else {
+            console.log(`✅ Coluna de nome identificada no índice ${nomeColIndex} (${headers[nomeColIndex]})`);
+        }
+
+        // Adicionar header "RG_ENCONTRADO" se não existir
         let rgColIndex = headers.indexOf('RG_ENCONTRADO');
         if (rgColIndex === -1) {
             rgColIndex = headers.length;
@@ -72,15 +90,21 @@ export async function POST(req: NextRequest) {
         }
 
         // 3. Cruzamento de dados (Busca por Nome)
-        console.log(`Buscando RGs para ${data.length - 1} nomes...`);
+        console.log(`🚀 Iniciando enriquecimento para ${data.length - 1} linhas...`);
         
         for (let i = 1; i < data.length; i++) {
             const row = data[i];
-            const nome = row[0]; // Assume que o nome está na primeira coluna
-            if (!nome) continue;
+            const nomeOriginal = row[nomeColIndex];
+            if (!nomeOriginal) {
+                row[rgColIndex] = "Sem nome";
+                continue;
+            }
 
+            const nomeParaBusca = String(nomeOriginal).trim();
+            
             try {
-                const searchUrl = `/api/user/list?idType=0&deleted=false&start=0&length=10&search%5Bvalue%5D=${encodeURIComponent(nome)}&search%5Bregex%5D=false&filterCol=name&inactive=0&blacklist=0`;
+                // Busca na API (aumentado length para 50 para maior precisão)
+                const searchUrl = `/api/user/list?idType=0&deleted=false&start=0&length=50&search%5Bvalue%5D=${encodeURIComponent(nomeParaBusca)}&search%5Bregex%5D=false&filterCol=name&inactive=0&blacklist=0`;
                 const res = await request({
                     hostname: ID_CONTROL_URL, port: ID_CONTROL_PORT, path: searchUrl, method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` },
@@ -88,22 +112,32 @@ export async function POST(req: NextRequest) {
                 });
 
                 const items = res.data?.data || res.data?.content || [];
-                const normNome = normalizar(nome);
+                const normNomeOriginal = normalizar(nomeParaBusca);
                 
-                // Tenta achar um match exato pelo nome normalizado
-                const match = items.find((u: any) => normalizar(u.name) === normNome);
+                // Lógica de match idêntica ao script manual de sucesso
+                const match = items.find((u: any) => {
+                    const nUser = normalizar(u.name);
+                    return nUser === normNomeOriginal || nUser.includes(normNomeOriginal) || normNomeOriginal.includes(nUser);
+                });
+
                 if (match) {
-                    row[rgColIndex] = match.rg || match.document || "Encontrado, mas sem RG";
+                    const rgValue = match.rg || match.document;
+                    row[rgColIndex] = rgValue ? rgValue : "Encontrado, mas sem RG";
+                    console.log(`   ✅ [${i}/${data.length-1}] ${nomeParaBusca} -> ${row[rgColIndex]}`);
                 } else {
                     row[rgColIndex] = "Não localizado";
+                    console.log(`   ❌ [${i}/${data.length-1}] ${nomeParaBusca} -> Não localizado`);
                 }
-            } catch (err) {
+            } catch (err: any) {
+                console.error(`   🛑 Erro na linha ${i} (${nomeParaBusca}):`, err.message);
                 row[rgColIndex] = "Erro na busca";
             }
             
-            // Pequeno delay para evitar sobrecarga na API se forem muitos registros
-            if (data.length > 50) await new Promise(r => setTimeout(r, 100));
+            // Throttling ligeiramente ajustado
+            if (i % 20 === 0) await new Promise(r => setTimeout(r, 50));
         }
+
+        console.log("✨ Enriquecimento concluído com sucesso via Painel.");
 
         // 4. Devolver arquivo atualizado
         const newWorksheet = XLSX.utils.aoa_to_sheet(data);
@@ -113,7 +147,7 @@ export async function POST(req: NextRequest) {
         return new NextResponse(excelBuffer, {
             status: 200,
             headers: {
-                'Content-Disposition': `attachment; filename="enriquecido_${file.name.replace('.csv', '').replace('.xlsx', '')}.xlsx"`,
+                'Content-Disposition': `attachment; filename="enriquecido_RGs_${new Date().getTime()}.xlsx"`,
                 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             },
         });
