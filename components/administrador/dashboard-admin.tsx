@@ -15,7 +15,8 @@ import GraficoProdutividadeUsuarios from "./grafico-produtividade-usuarios"
 import PageHeader from "@/components/page-header"
 import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
-import { Power, Play, Pause } from "lucide-react"
+import { Power, Play, Pause, FileSpreadsheet, Search, Loader2, Activity } from "lucide-react"
+import { useRef } from "react"
 
 export default function DashboardAdmin() {
   const [solicitacoes, setSolicitacoes] = useState<any[]>([])
@@ -37,10 +38,12 @@ export default function DashboardAdmin() {
   const [carregandoRobo, setCarregandoRobo] = useState(false)
   const [historicoRobo, setHistoricoRobo] = useState<any[]>([])
   const [carregandoHistorico, setCarregandoHistorico] = useState(false)
-
   // 📅 NOVOS ESTADOS PARA FILTRO DE DATA
   const [dataInicial, setDataInicial] = useState<string>("")
   const [dataFinal, setDataFinal] = useState<string>("")
+  const [loadingAcao, setLoadingAcao] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [currentAction, setCurrentAction] = useState<string | null>(null)
 
   useEffect(() => {
     const buscarDados = async () => {
@@ -336,8 +339,64 @@ export default function DashboardAdmin() {
     )
   }
 
+  const handleAcaoAutomacao = (id: string) => {
+    setCurrentAction(id)
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !currentAction) return
+
+    setLoadingAcao(currentAction)
+    const toastId = toast.loading(currentAction === "convert-csv" ? "Convertendo arquivo..." : "Buscando RGs no sistema...")
+
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+
+      const endpoint = currentAction === "convert-csv" ? "/api/admin/convert-csv" : "/api/admin/enrich-rgs"
+      const response = await fetch(endpoint, {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Erro no processamento")
+      }
+
+      // Download do arquivo retornado
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = response.headers.get("Content-Disposition")?.split("filename=")[1]?.replace(/"/g, "") || "resultado.xlsx"
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+      toast.success("Missão cumprida com sucesso!", { id: toastId })
+    } catch (error: any) {
+      console.error(error)
+      toast.error(`Falha: ${error.message}`, { id: toastId })
+    } finally {
+      setLoadingAcao(null)
+      setCurrentAction(null)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
+  }
+
   return (
     <div className="space-y-6 pt-2">
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        accept={currentAction === "convert-csv" ? ".csv" : ".csv,.xlsx"}
+        onChange={handleFileChange}
+      />
 
       {/* Filtros */}
       <Card className="border-slate-200 bg-slate-50">
@@ -622,6 +681,45 @@ export default function DashboardAdmin() {
                 </tbody>
               </table>
             </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Ferramentas de Automação (Missões Especiais) */}
+      <div className="grid grid-cols-1 gap-6">
+        <Card className="border-2 border-red-200 bg-red-50/10">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-bold text-red-800 flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Ferramentas de Automação (Missões Especiais)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-4 pt-2">
+            <Button 
+                variant="outline" 
+                className="bg-white border-red-200 hover:bg-red-50 text-red-700 h-auto py-3 px-6 flex flex-col items-start gap-1 min-w-[200px]"
+                disabled={loadingAcao !== null}
+                onClick={() => handleAcaoAutomacao("convert-csv")}
+            >
+              <div className="flex items-center gap-2 font-bold">
+                {loadingAcao === "convert-csv" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+                1. Converte .csv em Excel
+              </div>
+              <span className="text-[10px] text-red-600 font-normal">Limpa acentos, nomes e colunas</span>
+            </Button>
+
+            <Button 
+                variant="outline" 
+                className="bg-white border-red-200 hover:bg-red-50 text-red-700 h-auto py-3 px-6 flex flex-col items-start gap-1 min-w-[200px]"
+                disabled={loadingAcao !== null}
+                onClick={() => handleAcaoAutomacao("enrich-rgs")}
+            >
+              <div className="flex items-center gap-2 font-bold">
+                {loadingAcao === "enrich-rgs" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                2. Localizar RGs aqui
+              </div>
+              <span className="text-[10px] text-red-600 font-normal">Busca RGs no ID Control via Planilha</span>
+            </Button>
           </CardContent>
         </Card>
       </div>
