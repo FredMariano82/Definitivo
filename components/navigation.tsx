@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "../contexts/auth-context"
-import { CheckCircle, FileText, Users, BarChart3, HeadphonesIcon, Crown, DollarSign } from "lucide-react"
+import { CheckCircle, FileText, Users, BarChart3, HeadphonesIcon, Crown, DollarSign, Crosshair } from "lucide-react"
 import { getSolicitacoesByDepartamento } from "../services/solicitacoes-service"
 import { getLiberacaoStatus } from "./ui/status-badges"
 import { converterDataBrParaDate, getCurrentDate } from "../utils/date-helpers"
@@ -177,6 +177,12 @@ export default function Navigation() {
             className: getButtonClass("/admin/produtividade"),
           },
           {
+            href: "/op/tatico",
+            label: "Painel Tático",
+            icon: Crosshair,
+            className: getButtonClass("/op/tatico"),
+          },
+          {
             href: "/op/painel",
             label: "Gestão Operacional",
             icon: Users,
@@ -263,6 +269,12 @@ export default function Navigation() {
             label: "Upload Histórico",
             icon: Users,
             className: getButtonClass("/admin/upload"),
+          },
+          {
+            href: "/op/tatico",
+            label: "Painel Tático",
+            icon: Crosshair,
+            className: getButtonClass("/op/tatico"),
           },
           {
             href: "/op/painel",

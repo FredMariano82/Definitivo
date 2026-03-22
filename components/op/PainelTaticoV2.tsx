@@ -19,6 +19,7 @@ import {
     sortableKeyboardCoordinates, 
     verticalListSortingStrategy 
 } from "@dnd-kit/sortable"
+import { format, parseISO, differenceInSeconds } from 'date-fns'
 import { OpServiceV2, OpEquipe } from "@/services/op-service-v2"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -49,7 +50,8 @@ import {
     ArrowRightLeft,
     Monitor,
     User,
-    ShieldCheck as ShieldIcon
+    ShieldCheck as ShieldIcon,
+    Sun
 } from "lucide-react"
 
 import { useDraggable } from "@dnd-kit/core"
@@ -65,6 +67,16 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog"
 
+const styles = `
+@keyframes pulsate-suggested {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+  50% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+.pulsate-suggested {
+  animation: pulsate-suggested 2s infinite;
+}
+`
 
 function DraggableProfessional({ profissional, status, onCheckOut }: { profissional: OpEquipe, status: 'service' | 'off' | 'event', onCheckOut?: (id: string) => void }) {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -187,7 +199,7 @@ function DroppableZone({ id, title, icon: Icon, professionals, capacity, colorCl
                                 <span className="text-[9px] font-black uppercase tracking-tighter text-slate-400">Arraste para alocar</span>
                             </div>
                         ) : (
-                            professionals.map((p: any) => (
+                            professionals.map((p: OpEquipe) => (
                                 <DraggableProfessional 
                                     key={p.id} 
                                     profissional={p} 
@@ -203,7 +215,7 @@ function DroppableZone({ id, title, icon: Icon, professionals, capacity, colorCl
     )
 }
 
-function PauseBanner({ title, color, icon: Icon, time, professionals, onStartPause }: any) {
+function PauseBanner({ title, color, icon: Icon, time, professionals, equipe, onStartPause }: any) {
     const { isOver, setNodeRef } = useDroppable({
         id: `pause-${title.toLowerCase()}`,
         data: { type: 'pause', pauseType: title }
@@ -236,12 +248,12 @@ function PauseBanner({ title, color, icon: Icon, time, professionals, onStartPau
             </div>
 
             <div className="mt-4 space-y-2">
-                {professionals.map((p: any) => {
-                    const profData = equipe.find(e => e.id === p.id) || { id: p.id, nome_completo: p.nome, funcao: 'Pausa', tipo_servico: p.tipo_servico }
+                {professionals.map((p: { id: string; nome: string; type: string; seconds: number; timeLeft: string; }) => {
+                    const profData: OpEquipe = equipe.find((e: OpEquipe) => e.id === p.id) || { id: p.id, nome_completo: p.nome, funcao: 'Pausa', tipo_servico: '' }
                     return (
                         <div key={p.id} className="relative group">
                             <DraggableProfessional 
-                                profissional={profData as any} 
+                                profissional={profData} 
                                 status="event"
                             />
                             {/* Overlay do Timer para não quebrar a padronização mas manter a informação */}
@@ -276,7 +288,7 @@ function DroppableSidebarArea({ id, reservaAguardando, handleCheckOut, searchTer
                 Efetivo em Reserva
             </h3>
             <div className="grid gap-2">
-                {reservaAguardando.map((p: any) => (
+                {reservaAguardando.map((p: OpEquipe) => (
                     <DraggableProfessional key={p.id} profissional={p} status="service" onCheckOut={handleCheckOut} />
                 ))}
                 {reservaAguardando.length === 0 && !searchTerm && (
@@ -309,14 +321,19 @@ export default function PainelTaticoV2() {
     const [loading, setLoading] = useState(true)
     const [lockedPostos, setLockedPostos] = useState<string[]>([])
     const [pausasAtivas, setPausasAtivas] = useState<any[]>([])
+    const [turnoAtivo, setTurnoAtivo] = useState<'Dia' | 'Noite'>(() => {
+        const hora = new Date().getHours()
+        return (hora >= 6 && hora < 18) ? 'Dia' : 'Noite'
+    })
+    const [guiaTurno, setGuiaTurno] = useState<any[]>([])
     const [activeId, setActiveId] = useState<string | null>(null)
     const [searchTerm, setSearchTerm] = useState("")
 
     // Estado para o Modal de Rendição
     const [rendicaoData, setRendicaoData] = useState<{
         aberto: boolean,
-        profissionalEntrando: any,
-        profissionalSaindo: any,
+        profissionalEntrando: OpEquipe | null,
+        profissionalSaindo: OpEquipe | null,
         targetPostoId: string,
         targetType: 'fixed' | 'event'
     }>({
@@ -342,18 +359,37 @@ export default function PainelTaticoV2() {
         setLoading(true)
         try {
             const hojeStr = new Date().toLocaleDateString('en-CA')
-            const [eqData, postData, evData, alocData, escData] = await Promise.all([
+            const [eqData, postData, evData, alocData, escData, pausaData] = await Promise.all([
                 OpServiceV2.getEquipe(),
                 OpServiceV2.getPostos(),
                 OpServiceV2.getEventosAtivosKanban(),
                 OpServiceV2.getAlocacoesAtuais(),
-                OpServiceV2.getEscalasPeriodo(hojeStr, hojeStr)
+                OpServiceV2.getEscalasPeriodo(hojeStr, hojeStr),
+                OpServiceV2.getActivePauses()
             ])
             setEquipe(eqData)
             setPostos(postData)
             setEventos(evData)
             setAlocacoes(alocData)
             setEscalasHoje(escData)
+
+            // Sincronizar Pausas Ativas do Banco para o Estado local
+            const pAtivas = (pausaData || []).map((p: { colaborador_id: string; data_inicio: string; segundos_duracao: number; tipo_pausa: string; }) => {
+                const prof = eqData.find((e: OpEquipe) => e.id === p.colaborador_id)
+                const inicio = parseISO(p.data_inicio)
+                const agora = new Date()
+                const decorrido = differenceInSeconds(agora, inicio)
+                const restante = Math.max(0, p.segundos_duracao - decorrido)
+                
+                return {
+                    id: p.colaborador_id,
+                    nome: prof?.nome_completo || 'Desconhecido', // Fallback for name
+                    type: p.tipo_pausa,
+                    seconds: restante,
+                    timeLeft: `${Math.floor(restante/60)}:${(restante%60).toString().padStart(2, '0')}`
+                }
+            })
+            setPausasAtivas(pAtivas)
         } catch (error) {
             console.error("Erro ao carregar dados táticos:", error)
         } finally {
@@ -361,9 +397,30 @@ export default function PainelTaticoV2() {
         }
     }
 
+    const fetchGuia = async () => {
+        try {
+            const data = await OpServiceV2.getShiftGuide(turnoAtivo)
+            setGuiaTurno(data)
+        } catch (error) {
+            console.error("Erro ao carregar guia de turno:", error)
+        }
+    }
+
     useEffect(() => {
-        fetchData()
-        
+        const prepare = async () => {
+            await fetchData()
+            await fetchGuia()
+            // Garantir que o RENDICIONISTA exista logo no início
+            try {
+                await OpServiceV2.ensurePostoExists('RENDICIONISTA')
+            } catch (e) {
+                console.warn("Nao foi possivel pre-criar RENDICIONISTA")
+            }
+        }
+        prepare()
+    }, [turnoAtivo])
+
+    useEffect(() => {
         // Mock de timers de pausa para a interface
         const interval = setInterval(() => {
             setPausasAtivas(prev => prev.map(p => ({
@@ -402,16 +459,20 @@ export default function PainelTaticoV2() {
             return
         }
         if (type === 'fixed' || type === 'event') {
+            const postoAlvo = postos.find(p => p.id === targetId || p.nome_posto?.trim().toUpperCase() === 'RENDICIONISTA')
+            const isRendicionista = postoAlvo?.nome_posto?.trim().toUpperCase() === 'RENDICIONISTA'
             const profsNoPosto = alocacoes.filter(a => a.posto_id === targetId)
-            if (profsNoPosto.length > 0) {
+            
+            // Aborda rendição apenas se não for rendicionista E já houver alguém
+            if (!isRendicionista && profsNoPosto.length > 0) {
                 const entrando = equipe.find(p => p.id === profissionalId)
                 const saindoId = profsNoPosto[0].colaborador_id
                 const saindo = equipe.find(p => p.id === saindoId)
                 
                 setRendicaoData({
                     aberto: true,
-                    profissionalEntrando: entrando,
-                    profissionalSaindo: saindo,
+                    profissionalEntrando: entrando || null,
+                    profissionalSaindo: saindo || null,
                     targetPostoId: targetId,
                     targetType: type
                 })
@@ -420,19 +481,25 @@ export default function PainelTaticoV2() {
         }
 
         try {
-            if (targetId === 'pool') {
-                await OpServiceV2.salvarAlocacao(profissionalId, null)
-                setPausasAtivas(prev => prev.filter(p => p.id !== profissionalId))
-            } 
-            else if (type === 'pause') {
-                const prof = equipe.find(p => p.id === profissionalId)
-                const times: any = { 'Café': 15, 'Refeição': 60, 'Janta': 30, 'Ceia': 60 }
+            // AUTOCURA: Se for rendicionista mas o ID não for UUID, resolve agora
+            let finalTargetId = targetId
+            if (targetId === 'rendicionista' || (targetId && targetId.length < 30)) {
+                // Tenta resolver por nome se não parecer um UUID
+                const pNome = (targetId === 'rendicionista' || targetId?.trim().toUpperCase() === 'RENDICIONISTA') 
+                    ? 'RENDICIONISTA' 
+                    : over.data.current?.title
+                
+                if (pNome) {
+                    finalTargetId = await OpServiceV2.ensurePostoExists(pNome)
+                }
+            }
+
+            if (type === 'pause') {
+                const prof = equipe.find((p: OpEquipe) => p.id === profissionalId)
+                const times: { [key: string]: number } = { 'Café': 15, 'Refeição': 60, 'Janta': 30, 'Ceia': 60 }
                 const mins = times[pauseType] || 15
                 
-                setPausasAtivas(prev => [
-                    ...prev.filter(p => p.id !== profissionalId),
-                    { id: profissionalId, nome: prof?.nome_completo, type: pauseType, seconds: mins * 60, timeLeft: `${mins}:00` }
-                ])
+                await OpServiceV2.startPause(profissionalId, pauseType, mins * 60)
                 await OpServiceV2.salvarAlocacao(profissionalId, null) 
             }
             else if (type === 'event') {
@@ -441,10 +508,12 @@ export default function PainelTaticoV2() {
                     await OpServiceV2.salvarAlocacao(profissionalId, evento.posto_id)
                 }
             } else {
-                await OpServiceV2.salvarAlocacao(profissionalId, targetId)
+                await OpServiceV2.salvarAlocacao(profissionalId, finalTargetId)
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error("Erro ao salvar alocação:", err)
+            // Log detalhado para o desenvolvedor ver o erro do banco no console
+            if (err.message) console.error("Detalhes do erro:", err.message)
         }
         
         await fetchData()
@@ -453,6 +522,11 @@ export default function PainelTaticoV2() {
     const confirmarRendicao = async (destinoSaindo: string) => {
         const { profissionalEntrando, profissionalSaindo, targetPostoId } = rendicaoData
         
+        if (!profissionalEntrando || !profissionalSaindo) {
+            console.error("Dados de rendição incompletos.")
+            return
+        }
+
         try {
             // 1. Aloca o novo profissional no posto
             await OpServiceV2.salvarAlocacao(profissionalEntrando.id, targetPostoId)
@@ -461,15 +535,14 @@ export default function PainelTaticoV2() {
             if (destinoSaindo === 'Reserva') {
                 await OpServiceV2.salvarAlocacao(profissionalSaindo.id, null)
             } else {
-                // Inicia pausa
-                const times: any = { 'Café': 15, 'Refeição': 60, 'Janta': 30, 'Ceia': 60 }
+                // Inicia pausa (Café, Refeição, etc.)
+                const times: { [key: string]: number } = { 'Café': 15, 'Refeição': 60, 'Janta': 30, 'Ceia': 60 }
                 const mins = times[destinoSaindo] || 15
                 
-                setPausasAtivas(prev => [
-                    ...prev.filter(p => p.id !== profissionalSaindo.id),
-                    { id: profissionalSaindo.id, nome: profissionalSaindo.nome_completo, type: destinoSaindo, seconds: mins * 60, timeLeft: `${mins}:00` }
-                ])
+                // IMPORTANTE: Primeiro remove a alocação (que encerra pausas antigas)
+                // e DEPOIS inicia a nova pausa.
                 await OpServiceV2.salvarAlocacao(profissionalSaindo.id, null)
+                await OpServiceV2.startPause(profissionalSaindo.id, destinoSaindo, mins * 60)
             }
         } catch (err) {
             console.error("Erro na rendição:", err)
@@ -491,7 +564,7 @@ export default function PainelTaticoV2() {
     }
 
     const getStatusParaProfissional = (id: string) => {
-        const prof = equipe.find(p => p.id === id)
+        const prof = equipe.find((p: OpEquipe) => p.id === id)
         if (!prof) return 'off'
 
         const estaAlocado = alocacoes.find(a => a.colaborador_id === id)
@@ -540,6 +613,7 @@ export default function PainelTaticoV2() {
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
         >
+            <style>{styles}</style>
             <div className="flex flex-col md:flex-row gap-8 min-h-[800px] bg-slate-50/50 p-2 rounded-3xl">
                 
                 {/* COLUNA LATERAL - GLASSMorphism SIDEBAR */}
@@ -556,6 +630,24 @@ export default function PainelTaticoV2() {
                                 </Badge>
                             </CardTitle>
                             
+                            {/* Shift Toggle */}
+                            <div className="flex items-center gap-6 mt-4">
+                                <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
+                                    <button 
+                                        onClick={() => setTurnoAtivo('Dia')}
+                                        className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${turnoAtivo === 'Dia' ? 'bg-white text-amber-600 shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'}`}
+                                    >
+                                        <Sun className="h-4 w-4" /> DIA
+                                    </button>
+                                    <button 
+                                        onClick={() => setTurnoAtivo('Noite')}
+                                        className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${turnoAtivo === 'Noite' ? 'bg-slate-900 text-blue-400 shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'}`}
+                                    >
+                                        <Moon className="h-4 w-4" /> NOITE
+                                    </button>
+                                </div>
+                            </div>
+
                             {/* Busca */}
                             <div className="mt-4 relative">
                                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -590,13 +682,54 @@ export default function PainelTaticoV2() {
                             </h2>
                         </header>
 
+                        {/* BARRA DE GUIA OPERACIONAL */}
+                        <div className="mb-8 overflow-x-auto pb-4 no-scrollbar">
+                            <div className="flex gap-4 min-w-max px-4">
+                                {guiaTurno.map((item, idx) => {
+                                    const isCurrent = () => {
+                                        const agora = new Date()
+                                        const horaMini = parseInt(item.horario_alvo.split(':')[0])
+                                        const minMini = parseInt(item.horario_alvo.split(':')[1])
+                                        const hItem = new Date()
+                                        hItem.setHours(horaMini, minMini, 0)
+                                        
+                                        // Se estamos dentro de 60 min após o horário alvo, é "atual"
+                                        const diff = (agora.getTime() - hItem.getTime()) / (1000 * 60)
+                                        return diff >= 0 && diff < 60
+                                    }
+
+                                    const active = isCurrent()
+                                    
+                                    return (
+                                        <div 
+                                            key={idx} 
+                                            className={`
+                                                flex flex-col p-4 rounded-3xl border transition-all duration-300 min-w-[280px]
+                                                ${active ? `bg-${item.cor_alerta}-50 border-${item.cor_alerta}-200 ring-2 ring-${item.cor_alerta}-400/20 scale-105 z-10 shadow-xl` : 'bg-white border-slate-100 opacity-60 grayscale hover:grayscale-0 hover:opacity-100'}
+                                            `}
+                                        >
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${active ? `bg-${item.cor_alerta}-200 text-${item.cor_alerta}-800` : 'bg-slate-100 text-slate-500'}`}>
+                                                    {item.horario_alvo.substring(0, 5)}
+                                                </span>
+                                                {active && <div className={`h-2 w-2 rounded-full bg-${item.cor_alerta}-500 animate-pulse`} />}
+                                            </div>
+                                            <h3 className="text-sm font-black text-slate-900 mb-1">{item.titulo}</h3>
+                                            <p className="text-[11px] text-slate-600 leading-relaxed">{item.instrucao}</p>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                            <PauseBanner 
+                             <PauseBanner 
                                 title="Café" 
                                 color="amber" 
                                 icon={Coffee} 
                                 time={15} 
                                 professionals={pausasAtivas.filter(p => p.type === 'Café')} 
+                                equipe={equipe}
                             />
                             <PauseBanner 
                                 title="Refeição" 
@@ -604,6 +737,7 @@ export default function PainelTaticoV2() {
                                 icon={Utensils} 
                                 time={60} 
                                 professionals={pausasAtivas.filter(p => p.type === 'Refeição')} 
+                                equipe={equipe}
                             />
                             <PauseBanner 
                                 title="Janta" 
@@ -611,6 +745,7 @@ export default function PainelTaticoV2() {
                                 icon={Moon} 
                                 time={30} 
                                 professionals={pausasAtivas.filter(p => p.type === 'Janta')} 
+                                equipe={equipe}
                             />
                             <PauseBanner 
                                 title="Ceia" 
@@ -618,6 +753,7 @@ export default function PainelTaticoV2() {
                                 icon={Sunrise} 
                                 time={60} 
                                 professionals={pausasAtivas.filter(p => p.type === 'Ceia')} 
+                                equipe={equipe}
                             />
                         </div>
                     </section>
@@ -636,23 +772,30 @@ export default function PainelTaticoV2() {
                         </header>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {/* POSTO RENDICIONISTA FIXO */}
-                            <DroppableZone 
-                                id="rendicionista" 
-                                title="RENDICIONISTA" 
-                                icon={Users} 
-                                professionals={getProfisNoPosto('rendicionista')} 
-                                capacidade={99} 
-                                colorClass="text-blue-600 bg-blue-600" 
-                                type="fixed" 
-                                onRemoveProfessional={async (id: string) => {
-                                    await OpServiceV2.salvarAlocacao(id, null)
-                                    await fetchData()
-                                }}
-                            />
+                            {/* POSTO RENDICIONISTA DINÂMICO */}
+                            {(postos || []).length > 0 && (() => {
+                                const postoRend = postos.find(p => p.nome_posto?.trim().toUpperCase() === 'RENDICIONISTA')
+                                const rendId = postoRend?.id || 'rendicionista'
+                                return (
+                                    <DroppableZone 
+                                        id={rendId} 
+                                        title="RENDICIONISTA" 
+                                        icon={Users} 
+                                        professionals={getProfisNoPosto(rendId)} 
+                                        capacidade={99} 
+                                        colorClass="text-blue-600 bg-blue-600" 
+                                        type="fixed" 
+                                        onRemoveProfessional={async (id: string) => {
+                                            await OpServiceV2.salvarAlocacao(id, null)
+                                            await fetchData()
+                                        }}
+                                    />
+                                )
+                            })()}
 
+                            {/* MAPA DE TODOS OS OUTROS POSTOS */}
                             {postos
-                                .filter(p => !p.nome_posto.includes(':'))
+                                .filter(p => !p.nome_posto?.includes(':') && p.nome_posto?.trim().toUpperCase() !== 'RENDICIONISTA')
                                 .sort((a, b) => {
                                     const ordem = ['42', '41', '25 - Alceu (1)', '25 - Alceu (2)', '25 - Alceu (3)', '56', '57', '51', '43', '44']
                                     const getIndex = (name: string) => {
@@ -667,6 +810,15 @@ export default function PainelTaticoV2() {
                                     if (posto.nome_posto.startsWith('25')) borderColor = 'text-rose-500 bg-rose-500'
                                     if (posto.nome_posto.startsWith('5')) borderColor = 'text-orange-500 bg-orange-500'
                                     
+                                    const isSuggested = guiaTurno.some(g => {
+                                        const agora = new Date()
+                                        const hItem = new Date()
+                                        const [h, m] = g.horario_alvo.split(':')
+                                        hItem.setHours(parseInt(h), parseInt(m), 0)
+                                        const diff = (agora.getTime() - hItem.getTime()) / (1000 * 60)
+                                        return diff >= 0 && diff < 60 && g.postos_sugeridos.includes(posto.nome_posto)
+                                    })
+
                                     return (
                                         <DroppableZone 
                                             key={posto.id} 
@@ -674,8 +826,8 @@ export default function PainelTaticoV2() {
                                             title={posto.nome_posto} 
                                             icon={MapPin} 
                                             professionals={getProfisNoPosto(posto.id)}
-                                            capacity={posto.capacidade || 1}
-                                            colorClass={borderColor}
+                                            capacity={posto.capacity || 1}
+                                            colorClass={isSuggested ? 'text-amber-500 bg-amber-500 ring-4 ring-amber-400/40 scale-105 z-10 pulsate-suggested' : borderColor}
                                             type="fixed"
                                             isLocked={lockedPostos.includes(posto.id)}
                                             onToggleLock={toggleLock}
@@ -726,6 +878,8 @@ export default function PainelTaticoV2() {
             {/* MODAL DE RENDIÇÃO INTELIGENTE */}
             <Dialog open={rendicaoData.aberto} onOpenChange={(open) => !open && setRendicaoData(prev => ({ ...prev, aberto: false }))}>
                 <DialogContent className="max-w-md bg-slate-900 border-slate-800 text-white rounded-[32px] overflow-hidden p-0 shadow-2xl">
+                    <DialogTitle className="sr-only">Rendição de Posto</DialogTitle>
+                    <DialogDescription className="sr-only">Modal para decidir o destino do profissional que está sendo rendido.</DialogDescription>
                     <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-8 text-center relative overflow-hidden">
                         <ArrowRightLeft className="h-16 w-16 text-white/20 absolute -right-4 -top-4 rotate-12" />
                         <div className="relative z-10 flex flex-col items-center">

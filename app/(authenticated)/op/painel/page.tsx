@@ -6,6 +6,8 @@ import GestaoEquipeV2 from "@/components/op/GestaoEquipeV2"
 import DashboardOperacional from "@/components/op/DashboardOperacional"
 import ConfiguracoesOperacionais from "@/components/op/ConfiguracoesOperacionais"
 import GestaoEventos from "@/components/op/GestaoEventos"
+import PainelTaticoV2 from "@/components/op/PainelTaticoV2"
+import { Crosshair } from "lucide-react"
 
 export default function PainelOperacional() {
   return (
