@@ -1,19 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
 import * as XLSX from "xlsx"
 
-// Função para formatar nomes para Title Case
+// Função para formatar nomes para Title Case preservando acentos e lidando com preposições
 function toTitleCase(str: string) {
   if (!str) return ""
+  const prepositions = ["da", "de", "do", "das", "dos", "e"]
   return str
     .toLowerCase()
     .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word, index) => {
+      // Se for preposição no meio do nome, mantém minúscula
+      if (prepositions.includes(word) && index !== 0) {
+        return word
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1)
+    })
     .join(" ")
-}
-
-// Função para remover acentos básicos (opcional, mas útil para normalização)
-function removeAccents(str: string) {
-  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 }
 
 // Função para somar 6 meses com segurança
@@ -62,8 +64,45 @@ export async function POST(req: NextRequest) {
 
     const buffer = await file.arrayBuffer()
     const workbook = XLSX.read(buffer, { type: "buffer", cellDates: false })
-    const sheetName = workbook.SheetNames[0]
-    const worksheet = workbook.Sheets[sheetName]
+    
+    // HEURÍSTICA À PROVA DE FALHAS PARA ENCONTRAR A ABA CORRETA
+    let targetSheetName = workbook.SheetNames[0];
+    let maxScore = -1;
+    let maxRows = -1;
+
+    for (const name of workbook.SheetNames) {
+        const sheet = workbook.Sheets[name];
+        const jsonPreview = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+        
+        let score = 0;
+        const rowCount = jsonPreview.length;
+        
+        // Analisa as primeiras 10 linhas em busca de palavras-chave típicas de cabeçalho
+        const rowsToCheck = Math.min(10, rowCount);
+        for (let i = 0; i < rowsToCheck; i++) {
+            const row: any = jsonPreview[i];
+            if (Array.isArray(row)) {
+                const rowStr = row.join(" ").toLowerCase();
+                if (rowStr.includes("checagem")) score += 10;
+                if (rowStr.includes("nome")) score += 5;
+                if (rowStr.includes("rg") || rowStr.includes("cpf")) score += 5;
+                if (rowStr.includes("prestador") || rowStr.includes("colaborador")) score += 5;
+            }
+        }
+
+        // Se encontrou palavras-chave, prefere esta aba
+        if (score > maxScore) {
+            maxScore = score;
+            targetSheetName = name;
+        } 
+        // Desempate: se nenhuma tem palavras-chave (score 0), pega a que tem mais linhas
+        else if (score === 0 && maxScore === 0 && rowCount > maxRows) {
+            maxRows = rowCount;
+            targetSheetName = name;
+        }
+    }
+
+    const worksheet = workbook.Sheets[targetSheetName]
 
     // Converter para JSON para facilitar manipulação
     // Defino defval como vazio para evitar campos undefined
@@ -74,7 +113,7 @@ export async function POST(req: NextRequest) {
       const newRow: any = {}
 
       // Iterar por todas as chaves (colunas)
-      Object.keys(row).forEach((key, index) => {
+      Object.keys(row).forEach((key) => {
         let val = row[key]
 
         // 1. Limpar formatação e nomes (Assumindo que nomes estão em colunas com 'nome' ou similar)
@@ -87,11 +126,8 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // 2. Ajustar Data na Coluna D (Index 3 no Excel clássico, mas no JSON depende do header)
-        // Se não houver header, o xlsx usa chaves como 'A', 'B', 'C', 'D' se configurado.
-        // Como sheet_to_json usa a primeira linha como header, vamos procurar pela 4ª chave
-        const colKeys = Object.keys(row)
-        if (key === colKeys[3] || key === "D") {
+        // 2. Ajustar Data na Coluna de Checagem independentemente da posição
+        if (key.toLowerCase().includes("checagem")) {
             val = add6Months(val)
         }
 

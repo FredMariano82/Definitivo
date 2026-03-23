@@ -87,14 +87,15 @@ export async function POST(req: NextRequest) {
     // Mapa ID Control
     const mapaID = new Map()
     dataID.forEach((row: any) => {
-      let nome = "", dIni = "", dFin = ""
+      let nome = "", dIni = "", dFin = "", rg = ""
       Object.keys(row).forEach(key => {
         const kn = normalizar(key)
         if ((kn.includes("nome") || kn.includes("usuario") || kn.includes("prest")) && !nome) nome = row[key]
         if (kn.includes("data") && kn.includes("ini")) dIni = row[key]
         if (kn.includes("data") && kn.includes("fin")) dFin = row[key]
+        if (kn.includes("rg") || kn.includes("doc")) rg = row[key]
       })
-      if (nome) mapaID.set(normalizar(nome), { dIni, dFin })
+      if (nome) mapaID.set(normalizar(nome), { dIni, dFin, rg })
     })
 
     // Processamento da ADM: Cruzamento + Soma de 6 Meses
@@ -119,6 +120,7 @@ export async function POST(req: NextRequest) {
         if (match) {
           if (match.dIni) row["DATA INICIAL"] = match.dIni
           if (match.dFin) row["DATA FINAL"] = match.dFin
+          if (match.rg) row["RG ID CONTROL"] = match.rg
         }
       }
       return row

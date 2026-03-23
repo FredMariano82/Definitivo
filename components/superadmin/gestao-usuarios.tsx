@@ -42,6 +42,16 @@ import { AuthService } from "@/services/auth-service"
 import type { Usuario } from "@/types"
 import { useAuth } from "@/contexts/auth-context"
 
+const DEPARTAMENTOS_LISTA = [
+  "After School", "Agenda", "Atelie de Artes", "Banco Safra", "CHAVERIM",
+  "CK", "Compras", "Comunicação", "Concessões", "Cultura Judaica", "Danças",
+  "Daniel Whatsap", "Espaço Bebê", "Grandes Festas", "Esportivo",
+  "Festival Carmel", "Hebraikeinu", "Hadventure", "Informatica",
+  "Brinquedoteca", "Juventude", "Marketing", "Maternal", "Musica",
+  "Depto.Médico", "Patrimônio", "Presidência", "RH", "Segurança",
+  "Renovação", "Social", "60 Mais", "Teatro"
+].sort()
+
 export default function GestaoUsuarios() {
     const { usuario: currentUser } = useAuth()
     const [usuarios, setUsuarios] = useState<Usuario[]>([])
@@ -257,7 +267,16 @@ export default function GestaoUsuarios() {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="depto">Setor / Departamento</Label>
-                                <Input id="depto" placeholder="Ex: RH" value={formData.departamento} onChange={e => setFormData({ ...formData, departamento: e.target.value })} />
+                                <Select value={formData.departamento} onValueChange={(v: string) => setFormData({ ...formData, departamento: v })}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Selecione o Departamento" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {DEPARTAMENTOS_LISTA.map((d) => (
+                                            <SelectItem key={d} value={d}>{d}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="perfil">Perfil no Sistema</Label>

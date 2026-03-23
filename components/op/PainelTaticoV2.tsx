@@ -499,8 +499,10 @@ export default function PainelTaticoV2() {
                 const times: { [key: string]: number } = { 'Café': 15, 'Refeição': 60, 'Janta': 30, 'Ceia': 60 }
                 const mins = times[pauseType] || 15
                 
+                // Primeiro libera da alocação (que limpa pausas antigas)
+                await OpServiceV2.salvarAlocacao(profissionalId, null)
+                // Depois inicia a nova pausa
                 await OpServiceV2.startPause(profissionalId, pauseType, mins * 60)
-                await OpServiceV2.salvarAlocacao(profissionalId, null) 
             }
             else if (type === 'event') {
                 const evento = eventos.find(e => e.id === targetId)
