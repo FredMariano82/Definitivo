@@ -178,9 +178,16 @@ async function despacharParaIDControl() {
             try {
                 const sol = prestador.solicitacoes || {};
                 
+                // 🛑 TRAVA DE SEGURANÇA: Só prosseguir se as datas REALMENTE existirem (evita o erro de data provisória)
+                if (!sol.data_inicial || !sol.data_final || !prestador.checagem_valida_ate) {
+                    console.log(`⚠️ PULO DE SEGURANÇA: ${prestador.nome} ainda não foi enriquecido via Botão BD (Datas faltando). Ignorando...`);
+                    index++;
+                    continue;
+                }
+
                 // Vigência (Com fallback para datas padrão se sol for vazio)
-                const dIni = sol.data_inicial || "2026-03-20";
-                const dFim = sol.data_final || "2026-12-31";
+                const dIni = sol.data_inicial;
+                const dFim = sol.data_final;
 
                 const formatarDataLocal = (iso) => {
                     const [y, m, d] = iso.split('-');

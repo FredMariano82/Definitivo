@@ -81,8 +81,8 @@ export class SolicitacoesService {
               finalidade: dados.finalidade,
               local: dados.local,
               empresa: dados.empresa,
-              data_inicial: dados.dataInicial && dados.dataInicial.trim() !== "" ? dados.dataInicial.trim() : agoraISO,
-              data_final: dados.dataFinal && dados.dataFinal.trim() !== "" ? dados.dataFinal.trim() : agoraISO,
+              data_inicial: dados.dataInicial && dados.dataInicial.trim() !== "" ? dados.dataInicial.trim() : null,
+              data_final: dados.dataFinal && dados.dataFinal.trim() !== "" ? dados.dataFinal.trim() : null,
               status_geral: (dados.modoAprovacaoDireta === "solo_checagem" || dados.modoAprovacaoDireta === "lib_checagem_ok") ? "aprovado" : "pendente",
               custo_checagem: dados.tipoSolicitacao === "checagem_liberacao" ? dados.prestadores.length * 20 : 0,
               economia_gerada: 0,
@@ -116,12 +116,12 @@ export class SolicitacoesService {
           liberacaoStatus = "ok"
         } else if (dados.modoAprovacaoDireta === "solo_checagem") {
           checagemStatus = "aprovado"
-          validadeAte = dados.dataInicial ? validadeChecagemISO : null
+          validadeAte = (dados.dataInicial && dados.dataInicial.trim() !== "") ? validadeChecagemISO : null
           dataAvaliacao = agoraISO
         } else if (dados.modoAprovacaoDireta === "lib_checagem_ok") {
           liberacaoStatus = "ok"
           checagemStatus = "aprovado"
-          validadeAte = dados.dataInicial ? validadeChecagemISO : null
+          validadeAte = (dados.dataInicial && dados.dataInicial.trim() !== "") ? validadeChecagemISO : null
           dataAvaliacao = agoraISO
         }
 
