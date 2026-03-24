@@ -11,6 +11,45 @@ function normalizar(str: any) {
     .trim()
 }
 
+function limparRG(str: any) {
+  if (!str) return ""
+  return String(str).replace(/\D/g, "")
+}
+
+function formatarData(data: any) {
+  if (!data) return ""
+  
+  // Se já for string, tenta truncar o horário imediatamente
+  if (typeof data === 'string') {
+    const apenasData = data.split(/[ T]/)[0]
+    // Se estiver no formato DD/MM/YYYY, retorna direto
+    const partes = apenasData.split('/')
+    if (partes.length === 3 && partes[2].length === 4) return apenasData
+  }
+
+  try {
+    let d: Date
+    if (data instanceof Date) {
+      d = data
+    } else {
+      d = new Date(data)
+    }
+    
+    if (isNaN(d.getTime())) {
+      if (typeof data === 'string') return data.split(/[ T]/)[0]
+      return data
+    }
+
+    const dia = String(d.getDate()).padStart(2, '0')
+    const mes = String(d.getMonth() + 1).padStart(2, '0')
+    const ano = d.getFullYear()
+    return `${dia}/${mes}/${ano}`
+  } catch (e) {
+    if (typeof data === 'string') return data.split(/[ T]/)[0]
+    return data
+  }
+}
+
 function somar6Meses(dataOrigem: any) {
   if (!dataOrigem) return ""
   try {
@@ -35,11 +74,7 @@ function somar6Meses(dataOrigem: any) {
     const novaData = new Date(dataObj)
     novaData.setMonth(novaData.getMonth() + 6)
     
-    // Formatar como DD/MM/YYYY para manter o padrão visual do usuário
-    const dia = String(novaData.getDate()).padStart(2, '0')
-    const mes = String(novaData.getMonth() + 1).padStart(2, '0')
-    const ano = novaData.getFullYear()
-    return `${dia}/${mes}/${ano}`
+    return formatarData(novaData)
   } catch (e) {
     return dataOrigem
   }
@@ -84,23 +119,26 @@ export async function POST(req: NextRequest) {
     else if (temDatasID(n2) && !temDatasID(n1)) { dataID = data2; dataADM = data1 }
     else { dataADM = data1; dataID = data2 }
 
-    // Mapa ID Control
+    // Mapa ID Control (Normaliza RG aqui também para garantir match se necessário no futuro)
     const mapaID = new Map()
     dataID.forEach((row: any) => {
-      let nome = "", dIni = "", dFin = "", rg = ""
+      let nome = "", dIni = "", dFin = "", rg = "", checagem = ""
       Object.keys(row).forEach(key => {
         const kn = normalizar(key)
         if ((kn.includes("nome") || kn.includes("usuario") || kn.includes("prest")) && !nome) nome = row[key]
         if (kn.includes("data") && kn.includes("ini")) dIni = row[key]
         if (kn.includes("data") && kn.includes("fin")) dFin = row[key]
-        if (kn.includes("rg") || kn.includes("doc")) rg = row[key]
+        if (kn.includes("rg") || kn.includes("doc")) rg = limparRG(row[key])
+        if (kn.includes("checagem")) checagem = row[key] // não formata ainda, só repassa
       })
-      if (nome) mapaID.set(normalizar(nome), { dIni, dFin, rg })
+      if (nome) mapaID.set(normalizar(nome), { dIni, dFin, rg, checagem })
     })
 
-    // Processamento da ADM: Cruzamento + Soma de 6 Meses
+    // Processamento da ADM: Cruzamento + Limpeza RG + Regra de Fallback
     const resultado = dataADM.map((row: any) => {
       let nomeADM = ""
+      let rgOriginalLimpo = ""
+
       Object.keys(row).forEach(key => {
         if (typeof row[key] === 'string') row[key] = row[key].trim()
         const kn = normalizar(key)
@@ -108,21 +146,38 @@ export async function POST(req: NextRequest) {
         // 1. Identificar Nome
         if ((kn.includes("nome") || kn.includes("prest") || kn.includes("usuario")) && !nomeADM) nomeADM = row[key]
         
-        // 2. SE FOR COLUNA CHECAGEM, SOMAR 6 MESES
+        // 2. Limpar Coluna RG
+        if (kn === "rg" || kn === "documento") {
+            row[key] = limparRG(row[key])
+            rgOriginalLimpo = row[key]
+        }
+
+        // 3. Formatar Datas Nativas (Limpar sujeira sem adicionar 6 meses)
         if (kn === "checagem") {
-            row[key] = somar6Meses(row[key])
+            row[key] = formatarData(row[key])
         }
       })
 
-      // 3. Cruzar com ID CONTROL
+      // 4. Cruzar com ID CONTROL
       if (nomeADM) {
         const match = mapaID.get(normalizar(nomeADM))
         if (match) {
-          if (match.dIni) row["DATA INICIAL"] = match.dIni
-          if (match.dFin) row["DATA FINAL"] = match.dFin
-          if (match.rg) row["RG ID CONTROL"] = match.rg
+          if (match.dIni) row["DATA INICIAL"] = formatarData(match.dIni)
+          if (match.dFin) row["DATA FINAL"] = formatarData(match.dFin)
+          if (match.checagem) row["CHECAGEM"] = formatarData(match.checagem)
+          row["RG ID CONTROL"] = match.rg || rgOriginalLimpo
+        } else {
+          // Se não houve match, a coluna RG ID CONTROL deve receber o RG original limpo
+          row["RG ID CONTROL"] = rgOriginalLimpo
         }
+      } else {
+        // Se nem nome tem, garante que pelo menos o RG original vá se existir
+        row["RG ID CONTROL"] = rgOriginalLimpo
       }
+
+      // Garantir que se RG ID CONTROL ainda estiver vazio por algum motivo, receba o original
+      if (!row["RG ID CONTROL"]) row["RG ID CONTROL"] = rgOriginalLimpo
+
       return row
     })
 

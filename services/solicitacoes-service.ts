@@ -65,6 +65,7 @@ export class SolicitacoesService {
       const isUrgente = dados.dataInicial === hojeFormatado
 
       // 🎯 CRIAR SOLICITAÇÃO
+      const agoraISO = agora.toISOString().split("T")[0]
       const { data: solicitacao, error: solicitacaoError } = (await Promise.race([
         supabase
           .from("solicitacoes")
@@ -74,14 +75,14 @@ export class SolicitacoesService {
               solicitante: dados.solicitante,
               departamento: dados.departamento,
               usuario_id: dados.usuarioId,
-              data_solicitacao: dados.dataSolicitacao || agora.toISOString().split("T")[0],
-              hora_solicitacao: dados.horaSolicitacao || agora.toTimeString().split(" ")[0],
+              data_solicitacao: dados.dataSolicitacao && dados.dataSolicitacao.trim() !== "" ? dados.dataSolicitacao.trim() : agora.toISOString().split("T")[0],
+              hora_solicitacao: dados.horaSolicitacao && dados.horaSolicitacao.trim() !== "" && dados.horaSolicitacao !== ":00" ? dados.horaSolicitacao.trim() : agora.toTimeString().split(" ")[0],
               tipo_solicitacao: dados.tipoSolicitacao,
               finalidade: dados.finalidade,
               local: dados.local,
               empresa: dados.empresa,
-              data_inicial: dados.dataInicial,
-              data_final: dados.dataFinal,
+              data_inicial: dados.dataInicial && dados.dataInicial.trim() !== "" ? dados.dataInicial.trim() : agoraISO,
+              data_final: dados.dataFinal && dados.dataFinal.trim() !== "" ? dados.dataFinal.trim() : agoraISO,
               status_geral: (dados.modoAprovacaoDireta === "solo_checagem" || dados.modoAprovacaoDireta === "lib_checagem_ok") ? "aprovado" : "pendente",
               custo_checagem: dados.tipoSolicitacao === "checagem_liberacao" ? dados.prestadores.length * 20 : 0,
               economia_gerada: 0,
@@ -98,7 +99,6 @@ export class SolicitacoesService {
       }
 
       // 🎯 CRIAR PRESTADORES COM STATUS BASEADO NO MODO DE APROVAÇÃO DIRETA
-      const agoraISO = new Date().toISOString().split("T")[0]
       const validadeChecagem = new Date()
       validadeChecagem.setMonth(validadeChecagem.getMonth() + 6)
       const validadeChecagemISO = validadeChecagem.toISOString().split("T")[0]
@@ -116,12 +116,12 @@ export class SolicitacoesService {
           liberacaoStatus = "ok"
         } else if (dados.modoAprovacaoDireta === "solo_checagem") {
           checagemStatus = "aprovado"
-          validadeAte = validadeChecagemISO
+          validadeAte = dados.dataInicial ? validadeChecagemISO : null
           dataAvaliacao = agoraISO
         } else if (dados.modoAprovacaoDireta === "lib_checagem_ok") {
           liberacaoStatus = "ok"
           checagemStatus = "aprovado"
-          validadeAte = validadeChecagemISO
+          validadeAte = dados.dataInicial ? validadeChecagemISO : null
           dataAvaliacao = agoraISO
         }
 

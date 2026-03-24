@@ -1,0 +1,42 @@
+{
+  "prestadores": [
+    "id",
+    "solicitacao_id",
+    "nome",
+    "doc1",
+    "doc2",
+    "empresa",
+    "checagem",
+    "checagem_valida_ate",
+    "liberacao",
+    "observacoes",
+    "aprovado_por",
+    "data_avaliacao",
+    "justificativa",
+    "criado_em",
+    "integrado_id_control",
+    "id_control_id",
+    "data_integracao"
+  ],
+  "solicitacoes": [
+    "id",
+    "numero",
+    "solicitante",
+    "departamento",
+    "usuario_id",
+    "data_solicitacao",
+    "hora_solicitacao",
+    "tipo_solicitacao",
+    "finalidade",
+    "local",
+    "empresa",
+    "data_inicial",
+    "data_final",
+    "status_geral",
+    "observacoes_gerais",
+    "economia",
+    "custo_checagem",
+    "economia_gerada",
+    "criado_em"
+  ]
+}

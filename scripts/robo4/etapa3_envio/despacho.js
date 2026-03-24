@@ -252,6 +252,15 @@ async function despacharParaIDControl() {
                         const idGerado = serverUser.idDevice || serverUser.id;
                         console.log(`🟩 SUCESSO: Cadastro atualizado (Link: ${idGerado})`);
                         await supabase.from('prestadores').update({ id_control_id: String(idGerado), data_integracao: new Date().toISOString() }).eq('id', prestador.id);
+                        
+                        // FALTAVA ISTO NA ATUALIZAÇÃO! AGORA GRAVA NO HISTÓRICO.
+                        addLogToHistory({
+                            nome: prestador.nome,
+                            doc: prestador.doc1,
+                            status: 'sucesso',
+                            id_control: idGerado,
+                            mensagem: 'Atualizado (Vigência/Campos) com sucesso'
+                        });
                     }
                 } else {
                     console.log(`🆕 Criando novo cadastro no ID Control...`);
@@ -312,13 +321,32 @@ async function despacharParaIDControl() {
     }
 }
 
-despacharParaIDControl()
-    .then(() => console.log("🏁 Execução encerrada normalmente."))
-    .catch(err => {
-        console.error("💥 ERRO FATAL NA EXECUÇÃO:", err.message);
-        // Tentar abrir o cadeado se deu erro fora do try principal
-        if (fs.existsSync(LOCK_FILE)) {
-            fs.unlinkSync(LOCK_FILE);
-            console.log("🔓 Cadeado aberto (após erro fatal).");
-        }
+const INTERVALO_MS = 60 * 1000; // 1 minuto configurado como padrão
+
+async function iniciarPulmao() {
+    console.log(`\n[PULMAO ATIVADO] O Robo4 agora esta em modo de escuta continua.`);
+    console.log(`[RELOGIO] Verificando a fila automaticamente a cada ${INTERVALO_MS / 1000} segundos...`);
+    console.log(`[CONTROLE] Use o botao no Dashboard (SuperAdmin) para pausar ou ligar o robo.\n`);
+
+    // Primeira execução imediata ao dar o comando
+    await despacharParaIDControl().catch(err => {
+        console.error("[ERRO FATAL NA PRIMEIRA EXECUCAO]:", err.message);
+        if (fs.existsSync(LOCK_FILE)) fs.unlinkSync(LOCK_FILE);
     });
+
+    // Loop contínuo a cada X segundos
+    setInterval(async () => {
+        // Só tenta rodar se o cadeado estiver aberto
+        if (!fs.existsSync(LOCK_FILE)) {
+            await despacharParaIDControl().catch(err => {
+                console.error("[ERRO FATAL NO CICLO]:", err.message);
+                if (fs.existsSync(LOCK_FILE)) fs.unlinkSync(LOCK_FILE);
+            });
+        } else {
+            console.log("[PULMAO IGNORADO] O cadeado esta fechado. O Robo ainda esta trabalhando na fila anterior.");
+        }
+    }, INTERVALO_MS);
+}
+
+// Inicia o processo que nunca morre
+iniciarPulmao();

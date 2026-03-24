@@ -1,0 +1,16 @@
+{
+  "headers": [
+    "NOME",
+    "RG",
+    "CHECAGEM",
+    "DATA INICIAL",
+    "DATA FINAL"
+  ],
+  "primeira_linha": [
+    "Joaquim Paiva Pinto",
+    "7196499",
+    "30/09/2026",
+    "30/09/2025",
+    "30/03/2026"
+  ]
+}

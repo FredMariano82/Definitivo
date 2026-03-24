@@ -228,8 +228,10 @@ export default function NovaSolicitacaoAdmin({
 
     if (!empresa.trim() && modoEmpresa !== "especifica") return "Empresa prestadora é obrigatória"
 
-    if (!dataInicial) return "Data inicial é obrigatória"
-    if (!dataFinal) return "Data final é obrigatória"
+    if (usuario?.perfil !== "superadmin") {
+      if (!dataInicial) return "Data inicial é obrigatória"
+      if (!dataFinal) return "Data final é obrigatória"
+    }
 
     for (const prestador of prestadores) {
       if (!prestador.nome.trim()) {
@@ -248,7 +250,7 @@ export default function NovaSolicitacaoAdmin({
       }
     }
 
-    if (new Date(dataFinal) < new Date(dataInicial)) {
+    if (dataInicial && dataFinal && new Date(dataFinal) < new Date(dataInicial)) {
       return "Data final deve ser posterior à data inicial"
     }
 
@@ -256,7 +258,7 @@ export default function NovaSolicitacaoAdmin({
     const hojeLocal = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate())
     const hojeFormatado = `${hojeLocal.getFullYear()}-${String(hojeLocal.getMonth() + 1).padStart(2, "0")}-${String(hojeLocal.getDate()).padStart(2, "0")}`
 
-    if (dataInicial === hojeFormatado && !prosseguirUrgente) {
+    if (dataInicial && dataInicial === hojeFormatado && !prosseguirUrgente) {
       return "Confirme se deseja prosseguir com a solicitação urgente ou corrija a data inicial"
     }
 
@@ -460,6 +462,13 @@ export default function NovaSolicitacaoAdmin({
   const tipoSolicitacao = "checagem_liberacao" // ← ADM: Fixo como checagem + liberação
 
   const verificarDataUrgente = (data: string) => {
+    if (!data) {
+      setAlertaDataUrgente("")
+      setMostrarOpcoesPrazo(false)
+      setProsseguirUrgente(false)
+      return
+    }
+
     const dataSelecionada = new Date(data)
     const dataAtual = new Date()
     const diferencaEmDias = (dataSelecionada.getTime() - dataAtual.getTime()) / (1000 * 3600 * 24)
@@ -727,7 +736,7 @@ export default function NovaSolicitacaoAdmin({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="dataInicial" className="text-sm font-medium text-slate-700">
-                    Data Inicial *
+                    Data Inicial {usuario?.perfil !== "superadmin" && "*"}
                   </Label>
                   <Input
                     type="date"
@@ -742,7 +751,7 @@ export default function NovaSolicitacaoAdmin({
                 </div>
                 <div>
                   <Label htmlFor="dataFinal" className="text-sm font-medium text-slate-700">
-                    Data Final *
+                    Data Final {usuario?.perfil !== "superadmin" && "*"}
                   </Label>
                   <Input
                     type="date"

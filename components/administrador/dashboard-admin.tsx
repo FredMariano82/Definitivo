@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { TrendingUp, FileText, DollarSign, AlertTriangle, Filter, X, Play, Pause, FileSpreadsheet, Search, Loader2, Activity, GitMerge } from "lucide-react"
+import { TrendingUp, FileText, DollarSign, AlertTriangle, Filter, X, Play, Pause, FileSpreadsheet, Search, Loader2, Activity, GitMerge, Database } from "lucide-react"
 import { getAllSolicitacoes } from "../../services/solicitacoes-service"
 import RelatorioModal from "./relatorio-modal"
 import { EconomiasService, type EconomiaMetricas } from "../../services/economias-service"
@@ -15,8 +15,10 @@ import GraficoProdutividadeUsuarios from "./grafico-produtividade-usuarios"
 import PageHeader from "@/components/page-header"
 import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
+import { useAuth } from "../../contexts/auth-context"
 
 export default function DashboardAdmin() {
+  const { usuario } = useAuth()
   const [solicitacoes, setSolicitacoes] = useState<any[]>([])
   const [filtroSolicitante, setFiltroSolicitante] = useState<string>("todos")
   const [filtroTipo, setFiltroTipo] = useState<string>("todos")
@@ -39,14 +41,85 @@ export default function DashboardAdmin() {
     const buscarDados = async () => {
       try {
         setCarregando(true)
-        const dados = await getAllSolicitacoes()
+        const [dados, economia] = await Promise.all([
+          getAllSolicitacoes(),
+          EconomiasService.buscarMetricasEconomia({ solicitante: filtroSolicitante !== "todos" ? filtroSolicitante : undefined })
+        ])
         setSolicitacoes(dados)
-        const economia = await EconomiasService.buscarMetricasEconomia({ solicitante: filtroSolicitante !== "todos" ? filtroSolicitante : undefined })
         setMetricasEconomia(economia)
-      } catch (e) { console.error(e) } finally { setCarregando(false) }
+      } catch (e) { 
+        console.error(e) 
+      } finally { 
+        setCarregando(false) 
+      }
     }
     buscarDados()
   }, [filtroSolicitante])
+
+  // Efeito específico para o Robo4 (Apenas SuperAdmin)
+  useEffect(() => {
+    if (usuario?.perfil === "superadmin") {
+      const inicializarRobo = async () => {
+        try {
+          const [statusRes, historyRes] = await Promise.all([
+            fetch('/api/robo-control'),
+            fetch('/api/robo-history')
+          ])
+          
+          if (statusRes.ok) {
+            const status = await statusRes.json()
+            setRoboAtivo(status.active)
+          }
+          
+          if (historyRes.ok) {
+            const history = await historyRes.json()
+            setHistoricoRobo(history)
+          }
+        } catch (e) {
+          console.error("Erro ao inicializar Robo4:", e)
+        }
+      }
+      inicializarRobo()
+      const interval = setInterval(inicializarRobo, 5000) // Poll history every 5s
+      return () => clearInterval(interval)
+    }
+  }, [usuario])
+
+  const handleToggleRobo = async (checked: boolean) => {
+    setCarregandoRobo(true)
+    try {
+      const res = await fetch('/api/robo-control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: checked })
+      })
+      
+      if (res.ok) {
+        setRoboAtivo(checked)
+        toast.success(`Robo4 ${checked ? 'ativado' : 'desativado'} com sucesso`)
+      } else {
+        throw new Error("Falha na API")
+      }
+    } catch (e) {
+      toast.error("Erro ao controlar Robo4")
+    } finally {
+      setCarregandoRobo(false)
+    }
+  }
+
+  const handleLimparHistorico = async () => {
+    if (!confirm("Tem certeza que deseja limpar o histórico?")) return
+    
+    try {
+      const res = await fetch('/api/robo-history', { method: 'DELETE' })
+      if (res.ok) {
+        setHistoricoRobo([])
+        toast.success("Histórico limpo")
+      }
+    } catch (e) {
+      toast.error("Erro ao limpar histórico")
+    }
+  }
 
   const handleAcaoAutomacao = (id: string) => {
     setCurrentAction(id)
@@ -85,17 +158,21 @@ export default function DashboardAdmin() {
       const response = await fetch(`/api/admin/${currentAction}`, { method: "POST", body: formData })
       if (!response.ok) throw new Error("Erro")
 
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = "resultado.xlsx"
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-
-      toast.success("Sucesso!", { id: toastId })
+      if (currentAction === "import-db") {
+        const result = await response.json()
+        toast.success(result.message || "Importação concluída!", { id: toastId, duration: 8000 })
+      } else {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = "resultado.xlsx"
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+        toast.success("Sucesso!", { id: toastId })
+      }
     } catch (e) { toast.error("Erro", { id: toastId }) } finally {
       setLoadingAcao(null); setCurrentAction(null); setFirstFile(null); setPassoMerge(1)
       if (fileInputRef.current) fileInputRef.current.value = ""
@@ -126,23 +203,81 @@ export default function DashboardAdmin() {
       <Card className="border-2 border-red-200 bg-red-50/10">
         <CardHeader><CardTitle className="text-red-800 flex items-center gap-2 font-bold"><Activity className="h-5 w-5" /> Automações de Planilha</CardTitle></CardHeader>
         <CardContent className="flex flex-wrap gap-4">
-          {["convert-csv", "enrich-rgs", "adjust-vencimento", "merge-datas"].map(id => (
-            <Button key={id} variant="outline" className={`bg-white border-red-200 text-red-700 h-auto py-3 px-6 flex flex-col items-start min-w-[200px] ${id === "merge-datas" && passoMerge === 2 ? "border-yellow-500 bg-yellow-50" : ""}`} onClick={() => handleAcaoAutomacao(id)}>
+          {["convert-csv", "enrich-rgs", "adjust-vencimento", "merge-datas", "import-db"].map(id => (
+            <Button key={id} variant="outline" className={`bg-white border-red-200 text-red-700 h-auto py-3 px-6 flex flex-col items-start min-w-[200px] ${id === "merge-datas" && passoMerge === 2 ? "border-yellow-500 bg-yellow-50" : id === "import-db" ? "border-emerald-500 bg-emerald-50 text-emerald-800" : ""}`} onClick={() => handleAcaoAutomacao(id)}>
               <div className="flex items-center gap-2 font-bold">
                 {loadingAcao === id ? <Loader2 className="animate-spin h-4 w-4" /> : 
-                 id === "merge-datas" && passoMerge === 2 ? <GitMerge className="text-yellow-600 animate-pulse h-4 w-4" /> : <FileSpreadsheet className="h-4 w-4" />}
+                 id === "merge-datas" && passoMerge === 2 ? <GitMerge className="text-yellow-600 animate-pulse h-4 w-4" /> : 
+                 id === "import-db" ? <Database className="h-4 w-4 text-emerald-600" /> : <FileSpreadsheet className="h-4 w-4" />}
                 {id === "merge-datas" && passoMerge === 2 ? "👉 CLIQUE P/ PLANILHA 2" : 
-                 id === "convert-csv" ? "1. CSV em Excel" : id === "enrich-rgs" ? "2. Localizar RGs" : id === "adjust-vencimento" ? "3. +6 Meses" : "4. Cruzar ADM + ID"}
+                 id === "convert-csv" ? "1. CSV em Excel" : id === "enrich-rgs" ? "2. Localizar RGs" : id === "adjust-vencimento" ? "3. +6 Meses" : id === "merge-datas" ? "4. Cruzar ADM + ID" : "5. Subir para BD"}
               </div>
-              <span className="text-[10px] text-red-600">
-                {id === "merge-datas" && passoMerge === 2 ? "Agora a ID CONTROL" : "Clique p/ Selecionar"}
+              <span className={`text-[10px] ${id === "import-db" ? "text-emerald-600" : "text-red-600"}`}>
+                {id === "merge-datas" && passoMerge === 2 ? "Agora a ID CONTROL" : id === "import-db" ? "Gravar no Supabase" : "Clique p/ Selecionar"}
               </span>
             </Button>
           ))}
         </CardContent>
       </Card>
 
-      <GraficoProdutividadeUsuarios solicitacoes={solicitacoes} />
+      {usuario?.perfil === "superadmin" && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="border-2 border-blue-200 bg-blue-50/10">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <div className="space-y-1">
+                <CardTitle className="text-blue-800 flex items-center gap-2 font-bold">
+                  <Activity className="h-5 w-5" /> Controle do Robo4
+                </CardTitle>
+                <p className="text-xs text-blue-600">Status atual: {roboAtivo ? "Ativo" : "Inativo"}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {carregandoRobo && <Loader2 className="h-4 w-4 animate-spin text-blue-600" />}
+                <Switch 
+                  checked={roboAtivo} 
+                  onCheckedChange={handleToggleRobo} 
+                  disabled={carregandoRobo}
+                />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4 p-4 bg-white rounded-lg border border-blue-100 italic text-sm text-blue-700">
+                {roboAtivo ? (
+                  <><Play className="h-5 w-5 text-green-500 fill-current" /> O Robô está monitorando novas solicitações...</>
+                ) : (
+                  <><Pause className="h-5 w-5 text-red-500 fill-current" /> O Robô está em pausa.</>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-2 border-slate-200 bg-white">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-slate-800 flex items-center gap-2 font-bold text-sm">
+                <FileText className="h-5 w-5" /> Histórico do Robô
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={handleLimparHistorico} className="text-xs text-slate-500 hover:text-red-600">
+                Limpar
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[120px] overflow-y-auto space-y-2 pr-2 text-[11px] font-mono">
+                {historicoRobo.length === 0 ? (
+                  <div className="text-slate-400 text-center py-8">Nenhum evento registrado</div>
+                ) : (
+                  historicoRobo.map((item, i) => (
+                    <div key={i} className="flex gap-2 border-b border-slate-50 pb-1">
+                      <span className="text-slate-400 shrink-0">[{item.timestamp}]</span>
+                      <span className={item.type === 'error' ? 'text-red-500' : 'text-slate-700'}>{item.message}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <GraficoProdutividadeUsuarios />
     </div>
   )
 }
