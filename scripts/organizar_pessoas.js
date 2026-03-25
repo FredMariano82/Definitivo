@@ -3,8 +3,8 @@ const path = require('path');
 const XLSX = require('xlsx');
 const Papa = require('papaparse');
 
-const inputPath = 'C:\\Users\\fredm\\Downloads\\Pessoas_202569_0842.csv';
-const outputPath = 'C:\\Users\\fredm\\Downloads\\Pessoas_Organizado_Final.xlsx';
+const inputPath = 'C:\\Users\\fredm\\Downloads\\CRUZAR ID CONTROL.csv';
+const outputPath = 'C:\\Users\\fredm\\Downloads\\CRUZAR ID CONTROL.xlsx';
 
 console.log('🚀 Iniciando conversão de CSV para Excel...');
 console.log(`📂 Arquivo de entrada: ${inputPath}`);

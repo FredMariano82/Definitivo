@@ -1,10 +1,10 @@
 const XLSX = require('xlsx');
 const path = require('path');
 
-const scratchDir = 'C:\\Users\\central_seguranca\\.gemini\\antigravity\\scratch';
-const admPath = path.join(scratchDir, 'Planilha ADM.xlsx');
-const idPath = path.join(scratchDir, 'Planilha ID CONTROL.xlsx');
-const outputPath = path.join(scratchDir, 'Planilha ADM_Sincronizada_Manual_v2.xlsx');
+const downloadDir = 'C:\\Users\\fredm\\Downloads';
+const admPath = path.join(downloadDir, 'CRUZAR ADM.xlsx');
+const idPath = path.join(downloadDir, 'CRUZAR ID CONTROL.xlsx'); // Também pode ser .csv se ajustado
+const outputPath = path.join(downloadDir, 'RESULTADO CRUZAMENTO.xlsx');
 
 function normalizar(str) {
   return String(str || "")
