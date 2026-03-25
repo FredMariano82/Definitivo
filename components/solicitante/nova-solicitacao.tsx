@@ -18,6 +18,7 @@ import UploadListaExcel from "./upload-lista-excel"
 import UploadFotoLista from "./upload-foto-lista"
 import ModalPreviaSolicitacao from "./modal-previa-solicitacao"
 import FinalidadeSolicitacao from "./finalidade-solicitacao"
+import { AutocompleteRG } from "@/components/ui/autocomplete-rg"
 
 export interface NovaSolicitacaoProps {
   dadosPrePreenchidos?: {
@@ -825,15 +826,36 @@ export default function NovaSolicitacao({
                     <div key={prestador.id} className="space-y-3">
                       {/* Grid com 5 colunas - ORDEM: Doc1, Doc2, Nome, Empresa */}
                       <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
-                        {/* Doc1 */}
-                        <div>
+                        {/* Doc1 (Autocomplete) */}
+                        <div className="md:col-span-1">
                           <Label className="text-sm font-medium text-slate-700">Doc1 (RG, etc)</Label>
-                          <Input
+                          <AutocompleteRG
                             value={prestador.doc1}
-                            onChange={(e) => atualizarPrestador(prestador.id, "doc1", e.target.value)}
-                            onBlur={() => validarAoSairDoCampo(prestador.id)}
+                            onChange={(valor) => atualizarPrestador(prestador.id, "doc1", valor)}
+                            onSelect={(sugestao) => {
+                              console.log("🎯 Solicitante - Sugestão selecionada:", sugestao)
+                              const novosPrestadores = prestadores.map((p) =>
+                                p.id === prestador.id
+                                  ? {
+                                      ...p,
+                                      doc1: sugestao.doc1,
+                                      nome: sugestao.nome,
+                                      empresa: sugestao.empresa || p.empresa,
+                                      validado: true,
+                                      encontrado: true,
+                                    }
+                                  : p,
+                              )
+                              setPrestadores(novosPrestadores)
+
+                              // Se selecionou empresa, ajustar modo
+                              if (sugestao.empresa && modoEmpresa !== "especifica") {
+                                setModoEmpresa("especifica")
+                                setEmpresa("")
+                              }
+                            }}
                             placeholder="RG, etc"
-                            className="border-slate-300 focus:border-slate-600 focus:ring-slate-600"
+                            disabled={carregando}
                           />
                         </div>
 

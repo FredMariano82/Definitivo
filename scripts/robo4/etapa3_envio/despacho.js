@@ -59,32 +59,35 @@ function wait(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function construirPayloadUniversal(prestador) {
-    const payload = {
-        name: prestador.nome,
-        rg: (prestador.doc1 || "").replace(/[^0-9]/g, ""),
-        document: `RG: ${(prestador.doc1 || "").replace(/[^0-9]/g, "")}`,
-        cpf: (prestador.doc2 || "").replace(/[^0-9]/g, ""),
-        comments: `checagem válida até ${formatDateOnly(prestador.checagem_valida_ate)}`,
-        idType: 0,
-        idArea: 0,
-        registration: "",
-        inativo: false,
-        canUseFacial: true,
-        admin: false,
-        deleted: false,
-        groups: [],
-        groupsList: [],
-        userGroupsList: [],
-        cards: [],
-        credits: [],
-        templates: [],
-        templatesList: [],
-        templatesPanic: [],
-        templatesPanicList: [],
-        rulesList: [],
-        customFields: {}
-    };
+function construirPayloadUniversal(prestador, serverUser = null) {
+    // Template Robusto (DNA do Marcus) que preserva metadados da API
+    const rawUserPayloadInfo = `{"Ativacao":"22/02/2026 00:00","Validade":"30/06/2026 23:59","admin":false,"admissao":"","admissionDate":"","allowParkingSpotCompany":null,"availableCompanies":null,"availableGroupsVisitorsList":null,"availableResponsibles":null,"bairro":"","barras":"","blackList":false,"bornDate":"","canUseFacial":true,"cards":[],"cargo":"","cep":"","cidade":"","comments":"","contingency":true,"cpf":"","deleted":false,"document":"","dtAdmissao":"","dtNascimento":"","email":"","emailAcesso":"","endereco":"","estadoCivil":"","expireOnDateLimit":true,"foto":null,"fotoDoc":null,"groups":[],"groupsList":[],"idArea":1,"idDevice":0,"idResponsavel":null,"idType":0,"inativo":false,"mae":"","nacionalidade":"","name":"","nascimento":null,"naturalidade":"","objectGuid":null,"pai":"","password":"","phone":"","photoDeleted":false,"photoIdFaceState":0,"photoTimestamp":0,"pis":0,"pisAnterior":0,"ramal":"","registration":"","responsavelNome":null,"rg":"","selectedGroupsVisitorsList":null,"selectedIdGroupsVisitorsList":null,"selectedIdResponsible":null,"selectedIdVisitedCompany":null,"selectedNameResponsible":null,"selectedResponsible":null,"selectedVisitedCompany":null,"senha":0,"sexo":"","shelfLife":"","shelfStartLife":"","telefone":"","templates":[],"templatesImages":[],"templatesList":[],"templatesPanic":[],"templatesPanicImages":[],"templatesPanicList":[],"userGroupsList":[],"veiculo_cor":null,"veiculo_marca":null,"veiculo_modelo":null,"veiculo_placa":null,"visitorCompany":null,"credits":[],"rulesList":[],"password_confirmation":"","shelfLifeDate":"","shelfStartLifeDate":"","customFields":{}}`;
+
+    const payload = JSON.parse(rawUserPayloadInfo);
+
+    // Mapeamento dos Dados Básicos
+    payload.name = prestador.nome;
+    payload.rg = (prestador.doc1 || "").replace(/[^0-9]/g, "");
+    payload.document = `RG: ${payload.rg}`;
+    payload.cpf = (prestador.doc2 || "").replace(/[^0-9]/g, "");
+    payload.comments = `checagem válida até ${formatDateOnly(prestador.checagem_valida_ate)}`;
+    
+    // Preservação de Dados Existentes (O Segredo da Inteligência)
+    if (serverUser) {
+        payload.id = serverUser.id;
+        payload.idDevice = serverUser.idDevice;
+        payload.foto = serverUser.foto || null;
+        payload.fotoDoc = serverUser.fotoDoc || null;
+        payload.photoTimestamp = serverUser.photoTimestamp || 0;
+        payload.photoIdFaceState = serverUser.photoIdFaceState || 0;
+        payload.objectGuid = serverUser.objectGuid || null;
+        payload.registration = serverUser.registration || "";
+        // Manter biometria se existir
+        payload.templates = serverUser.templates || [];
+        payload.templatesImages = serverUser.templatesImages || [];
+        payload.templatesList = serverUser.templatesList || [];
+    }
+
     return payload;
 }
 
@@ -248,11 +251,43 @@ async function despacharParaIDControl() {
                         continue;
                     }
 
-                    console.log(`🔄 Atualizando cadastro existente (ID: ${serverUser.id})...`);
+                    console.log(`🔄 MODO INTELIGENTE: Solicitando cadastro completo do ID Control para preservação...`);
+                    const userFullRes = await fetch(`${ID_CONTROL_URL}/api/user/${serverUser.id}`, {
+                        method: "GET",
+                        headers: { "Authorization": `Bearer ${accessToken}` }
+                    });
+                    
+                    let fullData = serverUser;
+                    if (userFullRes.ok) {
+                        fullData = await userFullRes.json();
+                        console.log(`📥 Dados carregados: Foto (${fullData.foto ? 'SIM' : 'NÃO'}) | Biometria (${fullData.templates?.length || 0})`);
+                    }
+
+                    const finalPayload = { 
+                        ...construirPayloadUniversal(prestador, fullData), 
+                        expireOnDateLimit: true,
+                        shelfStartLife: `${dataIni} 00:00`,
+                        shelfStartLifeDate: dataIni,
+                        shelfLife: `${dataFim} 23:59`,
+                        shelfLifeDate: dataFim,
+                        groups: idsGrupos,
+                        userGroupsList: idsGrupos.map(gid => ({ idGroup: gid, idUser: serverUser.id, isVisitor: 0 }))
+                    };
+
+                    // MODO DRY RUN (SIMULAÇÃO)
+                    if (process.env.DRY_RUN === "true") {
+                        console.log("🧪 [SIMULAÇÃO] JSON que seria enviado (PUT):");
+                        console.log(JSON.stringify(finalPayload, null, 2));
+                        console.log("🧪 [SIMULAÇÃO] Fim do payload. Nenhum dado foi enviado à catraca.");
+                        index++;
+                        continue;
+                    }
+
+                    console.log(`🔄 Atualizando cadastro existente (ID: ${serverUser.id}) com preservação total...`);
                     const res = await fetch(`${ID_CONTROL_URL}/api/user/`, {
                         method: "PUT",
                         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
-                        body: JSON.stringify({ ...payloadCentral, id: serverUser.id, idDevice: serverUser.idDevice })
+                        body: JSON.stringify(finalPayload)
                     });
 
                     if (res.ok) {

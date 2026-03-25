@@ -11,10 +11,6 @@ function toTitleCase(str: string) {
     }).join(' ');
 }
 
-function removeAccents(str: string) {
-    if (typeof str !== 'string') return str;
-    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, "");
-}
 
 export async function POST(req: NextRequest) {
     try {
@@ -26,9 +22,27 @@ export async function POST(req: NextRequest) {
         }
 
         const buffer = await file.arrayBuffer();
-        // Ler como Latin1 para evitar problemas de acento do CSV (comum em arquivos brasileiros)
-        const decoder = new TextDecoder('iso-8859-1');
-        const content = decoder.decode(buffer);
+        
+        // --- LÓGICA DE DETECÇÃO AUTOMÁTICA DE ENCODING ---
+        // 1. Tentar ler como UTF-8
+        let decoder = new TextDecoder('utf-8', { fatal: true });
+        let content = "";
+        
+        try {
+            content = decoder.decode(buffer);
+        } catch (e) {
+            // 2. Se falhar (caracteres inválidos para UTF-8), usar ISO-8859-1 (Latin1)
+            console.log("⚠️ Encoding UTF-8 falhou, tentando ISO-8859-1...");
+            decoder = new TextDecoder('iso-8859-1');
+            content = decoder.decode(buffer);
+        }
+
+        // Se o conteúdo ainda contiver caracteres de erro , tentar o fallback mesmo sem erro fatal
+        if (content.includes('\uFFFD')) {
+            console.log("⚠️ Caractere de erro  detectado em UTF-8, forçando ISO-8859-1...");
+            decoder = new TextDecoder('iso-8859-1');
+            content = decoder.decode(buffer);
+        }
 
         // Parser simples de CSV (considerando vírgula como delimitador padrão)
         const lines = content.split(/\r?\n/);
@@ -60,10 +74,9 @@ export async function POST(req: NextRequest) {
             } else {
                 // Formatação para as linhas de dados
                 const formattedRow = row.map((cell, cellIndex) => {
-                    // Se for a coluna de nome (ajustar conforme o CSV real, geralmente coluna 2 ou 3)
-                    // No script anterior era cols[2] (índice 2)
-                    if (cellIndex === 2 || cellIndex === 0) { // Tentativa heurística
-                         return toTitleCase(removeAccents(cell.trim()));
+                    // Se for a coluna de nome (heurística para colunas textuais longas)
+                    if (cell.trim().length > 3 && !cell.includes('@') && isNaN(Number(cell))) {
+                         return toTitleCase(cell.trim());
                     }
                     return cell.trim().replace(/"/g, '');
                 });

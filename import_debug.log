@@ -1,23 +1,23 @@
 {
-  "timestamp": "2026-03-24T07:11:17.375Z",
+  "timestamp": "2026-03-25T11:15:43.643Z",
   "env": {
     "hasUrl": true,
     "hasKey": true,
     "hasAnon": true
   },
-  "totalLinhas": 1,
+  "totalLinhas": 1717,
   "colunas": [
     "NOME",
     "RG",
-    "CHECAGEM",
-    "DATA INICIAL ",
-    "DATA FINAL"
+    "DATA INICIAL",
+    "DATA FINAL",
+    "CHECAGEM"
   ],
   "primeiraLinha": {
-    "NOME": "Danilo Santana Soares",
-    "RG": "560325952",
-    "CHECAGEM": "02/06/2026",
-    "DATA INICIAL ": "29/12/2025",
-    "DATA FINAL": "30/06/2026"
+    "NOME": "Gabriel Henrique dos Santos",
+    "RG": "608362827",
+    "DATA INICIAL": "01/10/2025",
+    "DATA FINAL": "01/04/2026",
+    "CHECAGEM": "01/04/2026"
   }
 }

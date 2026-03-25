@@ -1,0 +1,7 @@
+{
+  "timestamp": "2026-03-25T11:14:02.700Z",
+  "message": "there is no unique or exclusion constraint matching the ON CONFLICT specification",
+  "details": "Sem detalhes",
+  "hint": "Sem dicas",
+  "code": "42P10"
+}

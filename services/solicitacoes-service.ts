@@ -17,6 +17,7 @@ export class SolicitacoesService {
     dataSolicitacao?: string
     horaSolicitacao?: string
     modoAprovacaoDireta?: "padrao" | "solo_liberacao" | "solo_checagem" | "lib_checagem_ok"
+    modoBiblioteca?: boolean
   }): Promise<{ sucesso: boolean; erro: string; solicitacao?: Solicitacao }> {
     try {
       console.log("📝 PRODUÇÃO REAL: Criando nova solicitação...")
@@ -62,7 +63,7 @@ export class SolicitacoesService {
       const agora = new Date()
       const hojeLocal = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate())
       const hojeFormatado = `${hojeLocal.getFullYear()}-${String(hojeLocal.getMonth() + 1).padStart(2, "0")}-${String(hojeLocal.getDate()).padStart(2, "0")}`
-      const isUrgente = dados.dataInicial === hojeFormatado
+      const isUrgente = dados.dataInicial === hojeFormatado && !dados.modoBiblioteca
 
       // 🎯 CRIAR SOLICITAÇÃO
       const agoraISO = agora.toISOString().split("T")[0]
@@ -83,8 +84,8 @@ export class SolicitacoesService {
               empresa: dados.empresa,
               data_inicial: dados.dataInicial && dados.dataInicial.trim() !== "" ? dados.dataInicial.trim() : null,
               data_final: dados.dataFinal && dados.dataFinal.trim() !== "" ? dados.dataFinal.trim() : null,
-              status_geral: (dados.modoAprovacaoDireta === "solo_checagem" || dados.modoAprovacaoDireta === "lib_checagem_ok") ? "aprovado" : "pendente",
-              custo_checagem: dados.tipoSolicitacao === "checagem_liberacao" ? dados.prestadores.length * 20 : 0,
+              status_geral: dados.modoBiblioteca ? "base" : ((dados.modoAprovacaoDireta === "solo_checagem" || dados.modoAprovacaoDireta === "lib_checagem_ok") ? "aprovado" : "pendente"),
+              custo_checagem: (dados.tipoSolicitacao === "checagem_liberacao" && !dados.modoBiblioteca) ? dados.prestadores.length * 20 : 0,
               economia_gerada: 0,
             },
           ])
@@ -112,7 +113,10 @@ export class SolicitacoesService {
         let validadeAte = null
         let dataAvaliacao = null
 
-        if (dados.modoAprovacaoDireta === "solo_liberacao") {
+        if (dados.modoBiblioteca) {
+          checagemStatus = "base"
+          liberacaoStatus = "pendente"
+        } else if (dados.modoAprovacaoDireta === "solo_liberacao") {
           liberacaoStatus = "ok"
         } else if (dados.modoAprovacaoDireta === "solo_checagem") {
           checagemStatus = "aprovado"
@@ -135,7 +139,7 @@ export class SolicitacoesService {
           liberacao: liberacaoStatus,
           checagem_valida_ate: validadeAte,
           data_avaliacao: dataAvaliacao,
-          aprovado_por: dataAvaliacao ? "SuperAdmin (Direto)" : null,
+          aprovado_por: dados.modoBiblioteca ? "Sistema (Biblioteca)" : (dataAvaliacao ? "SuperAdmin (Direto)" : null),
         }
       })
 
@@ -446,6 +450,8 @@ export class SolicitacoesService {
         novoStatus = "aprovado"
       } else if (statusList.every((s) => s === "reprovado")) {
         novoStatus = "reprovado"
+      } else if (statusList.every((s) => s === "base")) {
+        novoStatus = "base"
       } else if (statusList.some((s) => s === "aprovado") && statusList.some((s) => s === "reprovado")) {
         novoStatus = "parcial"
       } else {

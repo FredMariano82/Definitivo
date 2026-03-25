@@ -98,108 +98,139 @@ export async function POST(req: Request) {
     };
     fs.writeFileSync(path.join(process.cwd(), 'import_debug.log'), JSON.stringify(debugInfo, null, 2));
 
-    let totalImportados = 0;
-    let totalErros = 0;
+    const prestadoresParaUpsert: any[] = [];
+    let ignorados = 0;
 
     for (const linha of jsonData as any[]) {
-      try {
-        // Detecção flexível de colunas
-        const colNome = buscarColuna(linha, ["nome", "prest", "usuario"]);
-        const colRG = buscarColuna(linha, ["rg", "doc", "documento"]) || buscarColuna(linha, ["rg id control"]);
-        const colDataIni = buscarColuna(linha, ["inicial", "inicio", "ini"]);
-        const colDataFim = buscarColuna(linha, ["final", "fim", "fin"]);
-        const colChecagem = buscarColuna(linha, ["checa"]);
+      const colNome = buscarColuna(linha, ["nome", "prest", "usuario"]);
+      const colRG = buscarColuna(linha, ["rg", "doc", "documento"]) || buscarColuna(linha, ["rg id control"]);
+      const colEmpresa = buscarColuna(linha, ["empresa", "cia", "corp"]);
+      const colChecagem = buscarColuna(linha, ["checa"]);
 
-        const nome = colNome ? linha[colNome]?.toString().trim() : "";
-        const rgRaw = colRG ? linha[colRG]?.toString().trim() : "";
-        const rgLimpo = rgRaw.replace(/[^0-9a-zA-Z]/g, "").toUpperCase();
-        
-        if (!nome || !rgLimpo) {
-          totalErros++;
-          continue; 
-        }
+      const nome = colNome ? linha[colNome]?.toString().trim() : "";
+      const rgRaw = colRG ? linha[colRG]?.toString().trim() : "";
+      const rgLimpo = rgRaw.replace(/[^0-9a-zA-Z]/g, "").toUpperCase();
+      const empresa = colEmpresa ? linha[colEmpresa]?.toString().trim() : "";
+      const dataChecagem = colChecagem ? formatarDataDoExcel(linha[colChecagem]) : null;
 
-        // 1. EXTRAÇÃO DE DATAS DA PLANILHA
-        const dataIni = colDataIni ? formatarDataDoExcel(linha[colDataIni]) : null;
-        const dataFim = colDataFim ? formatarDataDoExcel(linha[colDataFim]) : null;
-        const dataChecagem = colChecagem ? formatarDataDoExcel(linha[colChecagem]) : null;
-
-        if (!dataIni && !dataFim && !dataChecagem) {
-          totalErros++;
-          continue; // Nada a atualizar
-        }
-
-        // 2. BUSCA DO PRESTADOR PELO NOME
-        const nomeTratado = normalizar(nome);
-        const partesNome = nomeTratado.split(' ');
-        const primeiroNome = partesNome[0];
-        const ultimoNome = partesNome.length > 1 ? partesNome[partesNome.length - 1] : '';
-        const searchPattern = ultimoNome ? `%${primeiroNome}%${ultimoNome}%` : `%${primeiroNome}%`;
-
-        const { data: prestadoresBusca, error: errBusca } = await supabase
-          .from('prestadores')
-          .select('id, nome, solicitacao_id')
-          .ilike('nome', searchPattern)
-          .order('criado_em', { ascending: false })
-          .limit(1);
-
-        if (errBusca || !prestadoresBusca || prestadoresBusca.length === 0) {
-          totalErros++;
-          continue; // Prestador não encontrado
-        }
-
-        const prestador = prestadoresBusca[0];
-
-        // 3. ATUALIZAÇÃO DA CHECAGEM NO PRESTADOR (FILHO)
-        if (dataChecagem) {
-          const { error: errUpdPrest } = await supabase
-            .from('prestadores')
-            .update({ 
-               checagem_valida_ate: dataChecagem,
-               checagem: 'aprovado'
-            })
-            .eq('id', prestador.id);
-          
-          if (errUpdPrest) throw errUpdPrest;
-        }
-
-        // 4. ATUALIZAÇÃO DE DATA INICIAL E FINAL NA SOLICITAÇÃO (PAI)
-        if (prestador.solicitacao_id && (dataIni || dataFim)) {
-          const payloadUpdate: any = {};
-          if (dataIni) payloadUpdate.data_inicial = dataIni;
-          if (dataFim) payloadUpdate.data_final = dataFim;
-
-          const { error: errUpdSol } = await supabase
-            .from('solicitacoes')
-            .update(payloadUpdate)
-            .eq('id', prestador.solicitacao_id);
-            
-          if (errUpdSol) throw errUpdSol;
-        }
-
-        totalImportados++;
-        
-      } catch (err: any) {
-        console.error("Erro na linha:", err);
-        totalErros++;
-        // Log do erro específico no arquivo
-        const debugWithError = {
-          ...debugInfo,
-          errorNoLoop: err.message || err,
-          stack: err.stack
-        };
-        fs.writeFileSync(path.join(process.cwd(), 'import_debug.log'), JSON.stringify(debugWithError, null, 2));
+      if (!nome || !rgLimpo) {
+        ignorados++;
+        continue;
       }
+
+      prestadoresParaUpsert.push({
+        doc1: rgLimpo,
+        nome: nome,
+        empresa: empresa,
+        checagem_valida_ate: dataChecagem,
+        checagem: dataChecagem ? 'aprovado' : 'base',
+        data_avaliacao: dataChecagem ? new Date().toISOString() : null,
+        aprovado_por: dataChecagem ? "Importação (Excel)" : null,
+        liberacao: 'pendente'
+      });
+    }
+
+    console.log(`🚀 Buscando ADMIN responsável para o vínculo...`);
+
+    // 🎯 PASSO 1: BUSCAR UM USUÁRIO ADMIN PARA SER O "DONO" DA CARGA
+    const { data: usuarioAdmin, error: errorUser } = await supabase
+      .from('usuarios')
+      .select('id')
+      .or('perfil.eq.superadmin,perfil.eq.admin')
+      .limit(1)
+      .single();
+
+    if (errorUser || !usuarioAdmin) {
+      console.error("❌ Erro ao localizar administrador para o vínculo:", errorUser);
+      throw new Error("Não foi possível localizar um administrador responsável para a carga massiva.");
+    }
+
+    const idAdmin = usuarioAdmin.id;
+
+    // 🎯 NOVO: EXTRAIR DATAS DA PRIMEIRA LINHA VÁLIDA PARA A SOLICITAÇÃO MESTRE
+    const colIni = buscarColuna(jsonData[0], ["inicial", "inicio", "ini"]);
+    const colFim = buscarColuna(jsonData[0], ["final", "fim", "fin"]);
+    
+    const dataIniExtraida = colIni ? formatarDataDoExcel(jsonData[0][colIni]) : null;
+    const dataFimExtraida = colFim ? formatarDataDoExcel(jsonData[0][colFim]) : null;
+    const hojeISO = new Date().toISOString().split('T')[0];
+
+    console.log(`🚀 Criando SOLICITAÇÃO MESTRE (Dono: ${idAdmin}) para o Lote de ${prestadoresParaUpsert.length} nomes...`);
+
+    // 🎯 PASSO 2: CRIAR SOLICITAÇÃO MESTRE (CONTÊINER) COM AS DATAS DO EXCEL
+    const { data: solMestre, error: errorSol } = await supabase
+      .from('solicitacoes')
+      .insert({
+        numero: `LIB-${new Date().getFullYear()}-${Math.floor(Math.random() * 900000) + 100000}`,
+        solicitante: "Processamento Automático (Botão 5)",
+        departamento: "ADM",
+        usuario_id: idAdmin,
+        data_solicitacao: hojeISO,
+        hora_solicitacao: new Date().toTimeString().split(' ')[0],
+        tipo_solicitacao: "checagem_liberacao",
+        finalidade: "obra",
+        local: "Cadastro de Biblioteca (Massa)",
+        empresa: "MÚLTIPLAS EMPRESAS",
+        data_inicial: dataIniExtraida || hojeISO, // 📅 Tenta pegar do Excel, se não tiver usa HOJE
+        data_final: dataFimExtraida || new Date(new Date().setMonth(new Date().getMonth() + 6)).toISOString().split('T')[0], // 📅 Se não tiver, usa +6 meses
+        status_geral: "base",
+        custo_checagem: 0,
+        economia_gerada: 0
+      })
+      .select()
+      .single();
+
+    if (errorSol) {
+      console.error("❌ Erro ao criar Solicitação Mestre:", errorSol);
+      throw errorSol;
+    }
+
+    const idSolicitacaoMestre = solMestre.id;
+
+    // 🎯 PASO 2: VINCULAR PRESTADORES À SOLICITAÇÃO MESTRE
+    const prestadoresComChave = prestadoresParaUpsert.map(p => ({
+      ...p,
+      solicitacao_id: idSolicitacaoMestre
+    }));
+
+    console.log(`🚀 Iniciando INSERT de ${prestadoresComChave.length} registros com CHAVE ${idSolicitacaoMestre}...`);
+
+    // 🔥 REMOVIDO ON CONFLICT PORQUE O BANCO NÃO TEM INDEX UNIQUE NO DOC1
+    const { data: upsertResult, error: upsertError } = await supabase
+      .from('prestadores')
+      .insert(prestadoresComChave);
+
+    if (upsertError) {
+      console.error("❌ Erro no UPSERT em lote:", upsertError);
+      throw upsertError;
     }
 
     return NextResponse.json({ 
       success: true, 
-      message: `Importação Concluída: ${totalImportados} linhas importadas, ${totalErros} erros (linhas em branco/inválidas).`,
-      importados: totalImportados
+      message: `Importação Concluída! ${prestadoresComChave.length} nomes vinculados à solicitação ${solMestre.numero}.`,
+      importados: prestadoresComChave.length,
+      solicitacao: solMestre.numero
     });
 
   } catch (error: any) {
-    console.error("Erro geral no import-db:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("💥 ERRO GERAL NO IMPORT-DB:", error);
+    
+    // Log detalhado para o arquivo na raiz
+    const errorLog = {
+      timestamp: new Date().toISOString(),
+      message: error.message || error,
+      details: error.details || "Sem detalhes",
+      hint: error.hint || "Sem dicas",
+      code: error.code || "Sem código",
+      stack: error.stack
+    };
+    
+    try {
+      require('fs').writeFileSync('import_error_detail.log', JSON.stringify(errorLog, null, 2));
+    } catch (e) {
+      console.error("Falha ao gravar arquivo de log:", e);
+    }
+
+    return NextResponse.json({ error: error.message, details: error.details }, { status: 500 });
   }
 }

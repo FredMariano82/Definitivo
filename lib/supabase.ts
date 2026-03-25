@@ -31,6 +31,3 @@ console.log("✅ Criando cliente Supabase com:", {
 })
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-// Teste de conexão
-console.log("🔄 Testando conexão Supabase...")

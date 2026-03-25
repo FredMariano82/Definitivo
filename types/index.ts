@@ -7,7 +7,7 @@ export interface Usuario {
   perfil: "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte" | "superadmin"
 }
 
-export type StatusChecagem = "pendente" | "aprovada" | "reprovada" | "vencida" | "excecao" | "erro_rg" | "aprovado" | "reprovado" | "revisar"
+export type StatusChecagem = "pendente" | "aprovada" | "reprovada" | "vencida" | "excecao" | "erro_rg" | "aprovado" | "reprovado" | "revisar" | "base"
 export type StatusLiberacao = "pendente" | "urgente" | "vencida" | "Ok" | "Não Ok" | "ok" | "negada"
 
 // Atualizar a interface PrestadorAvaliacao
@@ -55,7 +55,7 @@ export interface Solicitacao {
   prestadores: PrestadorAvaliacao[]
   dataInicial: string
   dataFinal: string
-  statusGeral: "pendente" | "aprovado" | "reprovado" | "parcial"
+  statusGeral: "pendente" | "aprovado" | "reprovado" | "parcial" | "base"
   observacoesGerais?: string
   economia?: "sustentavel" | "dispendioso" | "economico" | null
   custoChecagem: number

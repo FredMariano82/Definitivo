@@ -34,18 +34,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (usuarioSalvo) {
           const usuarioObj = JSON.parse(usuarioSalvo)
           console.log("🔍 Verificando usuário salvo:", usuarioObj)
-          // Verificar se o usuário ainda existe no banco
-          const usuarioAtualizado = await AuthService.buscarUsuarioPorId(usuarioObj.id)
-          if (usuarioAtualizado) {
-            console.log("✅ Usuário ainda válido:", usuarioAtualizado)
-            setUsuario(usuarioAtualizado)
-          } else {
-            console.log("❌ Usuário não existe mais, fazendo logout")
+          
+          // Timeout de 5 segundos para a verificação do usuário
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Timeout na verificação de auth")), 5000)
+          )
+
+          try {
+            const usuarioAtualizado = await Promise.race([
+              AuthService.buscarUsuarioPorId(usuarioObj.id),
+              timeoutPromise
+            ]) as Usuario | null
+
+            if (usuarioAtualizado) {
+              console.log("✅ Usuário ainda válido:", usuarioAtualizado)
+              setUsuario(usuarioAtualizado)
+            } else {
+              console.log("❌ Usuário não existe no novo projeto, limpando sessão")
+              localStorage.removeItem("usuario")
+            }
+          } catch (e) {
+            console.warn("⚠️ Falha na verificação de rede/ID, forçando tela de login:", e)
             localStorage.removeItem("usuario")
           }
         }
       } catch (error) {
-        console.error("💥 Erro ao verificar autenticação:", error)
+        console.error("💥 Erro crítico ao verificar autenticação:", error)
         localStorage.removeItem("usuario")
       } finally {
         setIsLoading(false)

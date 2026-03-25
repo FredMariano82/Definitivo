@@ -255,10 +255,15 @@ export class PrestadoresService {
       return "reprovado"
     }
 
-    // 🎯 TERCEIRO: Verificar se é EXCEÇÃO
+    // 🎯 TERCEIRO: Verificar se é EXCEÇÃO ou BASE
     if (prestador.checagem === "excecao") {
       console.log(`✅ Status EXCEÇÃO detectado`)
       return "excecao"
+    }
+
+    if (prestador.checagem === "base") {
+      console.log(`📚 Status BASE detectado (apenas cadastro)`)
+      return "sem_historico"
     }
 
     // QUARTO: Se não é aprovado, não tem histórico válido
@@ -284,5 +289,28 @@ export class PrestadoresService {
 
     console.log(`✅ Checagem válida`)
     return "valido"
+  }
+
+  // 🎯 NOVO: Buscar sugestões de prestadores por RG (Autocomplete)
+  static async buscarSugestoesPorRG(termo: string): Promise<Array<{ nome: string; doc1: string; empresa: string }>> {
+    if (!termo || termo.length < 3) return []
+
+    const termoLimpo = termo.replace(/\D/g, "")
+    if (termoLimpo.length < 3) return []
+
+    try {
+      console.log(`🔍 Sugestões - Buscando por RG: "${termoLimpo}"`)
+      const { data, error } = await supabase
+        .from("prestadores")
+        .select("nome, doc1, empresa")
+        .ilike("doc1", `%${termoLimpo}%`)
+        .limit(10)
+
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      console.error("❌ Erro ao buscar sugestões:", error)
+      return []
+    }
   }
 }

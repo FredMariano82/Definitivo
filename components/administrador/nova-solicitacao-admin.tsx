@@ -19,6 +19,10 @@ import UploadListaExcel from "../solicitante/upload-lista-excel"
 import UploadFotoLista from "../solicitante/upload-foto-lista"
 import ModalPreviaSolicitacao from "../solicitante/modal-previa-solicitacao"
 import UploadHistoricoExcel from "./upload-historico-excel"
+import { Switch } from "@/components/ui/switch"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Library } from "lucide-react"
+import { AutocompleteRG } from "@/components/ui/autocomplete-rg"
 
 interface NovaSolicitacaoAdminProps {
   dadosPrePreenchidos?: {
@@ -86,6 +90,9 @@ export default function NovaSolicitacaoAdmin({
   // 🎯 DATA E HORA MANUAIS (EXCLUSIVO SUPERADMIN)
   const [dataSolicitacaoManual, setDataSolicitacaoManual] = useState(new Date().toISOString().split("T")[0])
   const [horaSolicitacaoManual, setHoraSolicitacaoManual] = useState(new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }))
+
+  // 🎯 MODO BIBLIOTECA (APENAS CADASTRO)
+  const [modoBiblioteca, setModoBiblioteca] = useState(false)
 
   const dadosAutomaticos = {
     solicitante: nomesolicitante,
@@ -226,9 +233,10 @@ export default function NovaSolicitacaoAdmin({
     if (!departamentoSolicitante.trim()) return "Departamento é obrigatório"
     if (!local.trim()) return "Local / Evento é obrigatório"
 
-    if (!empresa.trim() && modoEmpresa !== "especifica") return "Empresa prestadora é obrigatória"
+    if (!empresa.trim() && modoEmpresa !== "especifica" && !modoBiblioteca) return "Empresa prestadora é obrigatória"
 
-    if (usuario?.perfil !== "superadmin") {
+    // Ignorar validação de datas se estiver no modo biblioteca
+    if (usuario?.perfil !== "superadmin" && !modoBiblioteca) {
       if (!dataInicial) return "Data inicial é obrigatória"
       if (!dataFinal) return "Data final é obrigatória"
     }
@@ -319,11 +327,12 @@ export default function NovaSolicitacaoAdmin({
         local,
         empresa: empresaSolicitacao,
         prestadores: prestadoresComEmpresa,
-        dataInicial: dataInicial,
-        dataFinal: dataFinal,
+        dataInicial: modoBiblioteca ? "" : dataInicial,
+        dataFinal: modoBiblioteca ? "" : dataFinal,
         dataSolicitacao: usuario?.perfil === "superadmin" ? dataSolicitacaoManual : undefined,
         horaSolicitacao: usuario?.perfil === "superadmin" ? `${horaSolicitacaoManual}:00` : undefined,
-        modoAprovacaoDireta: usuario?.perfil === "superadmin" ? modoAprovacaoDireta : "padrao",
+        modoAprovacaoDireta: modoBiblioteca ? "padrao" : (usuario?.perfil === "superadmin" ? modoAprovacaoDireta : "padrao"),
+        modoBiblioteca: modoBiblioteca,
       })
 
       if (sucessoEnvio && solicitacao) {
@@ -525,8 +534,30 @@ export default function NovaSolicitacaoAdmin({
       {tipoSolicitacao && (
         <Card className="shadow-lg border-0">
           <CardHeader className="pb-6">
-            <CardTitle className="text-2xl font-bold text-slate-800 text-center">Nova Solicitação de Acesso</CardTitle>
-            <div className="w-24 h-1 bg-blue-600 mx-auto rounded-full"></div>
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex-1">
+                <CardTitle className="text-2xl font-bold text-slate-800 text-center md:text-left">Nova Solicitação de Acesso</CardTitle>
+                <div className="w-24 h-1 bg-blue-600 mx-auto md:mx-0 rounded-full"></div>
+              </div>
+
+              {/* 🎯 SWITCH MODO BIBLIOTECA */}
+              <div className={`flex items-center space-x-3 p-3 rounded-lg border-2 transition-all ${modoBiblioteca ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
+                <div className={`p-2 rounded-full ${modoBiblioteca ? 'bg-amber-100 text-amber-600' : 'bg-slate-200 text-slate-500'}`}>
+                  <Library className="h-5 w-5" />
+                </div>
+                <div className="flex flex-col">
+                  <span className={`text-sm font-bold leading-none ${modoBiblioteca ? 'text-amber-700' : 'text-slate-700'}`}>
+                    Modo Biblioteca
+                  </span>
+                  <span className="text-[10px] text-slate-500 mt-1">Apenas alimentar base de dados</span>
+                </div>
+                <Switch 
+                  checked={modoBiblioteca} 
+                  onCheckedChange={setModoBiblioteca}
+                  className="data-[state=checked]:bg-amber-500"
+                />
+              </div>
+            </div>
           </CardHeader>
 
           <CardContent>
@@ -661,15 +692,34 @@ export default function NovaSolicitacaoAdmin({
                     <div key={prestador.id} className="space-y-3">
                       {/* Grid com 5 colunas - ORDEM: Doc1, Doc2, Nome, Empresa */}
                       <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
-                        {/* Doc1 */}
-                        <div>
+                        {/* Doc1 (Autocomplete) */}
+                        <div className="md:col-span-1">
                           <Label className="text-sm font-medium text-slate-700">Doc1 (RG, etc)</Label>
-                          <Input
+                          <AutocompleteRG
                             value={prestador.doc1}
-                            onChange={(e) => atualizarPrestador(prestador.id, "doc1", e.target.value)}
-                            onBlur={() => validarAoSairDoCampo(prestador.id)}
+                            onChange={(valor) => atualizarPrestador(prestador.id, "doc1", valor)}
+                            onSelect={(sugestao) => {
+                              console.log("🎯 ADM - Sugestão selecionada:", sugestao)
+                              const novosPrestadores = prestadores.map((p) =>
+                                p.id === prestador.id
+                                  ? {
+                                      ...p,
+                                      doc1: sugestao.doc1,
+                                      nome: sugestao.nome,
+                                      empresa: sugestao.empresa || p.empresa,
+                                    }
+                                  : p,
+                              )
+                              setPrestadores(novosPrestadores)
+
+                              // Se selecionou empresa, ajustar modo
+                              if (sugestao.empresa && modoEmpresa !== "especifica") {
+                                setModoEmpresa("especifica")
+                                setEmpresa("")
+                              }
+                            }}
                             placeholder="RG, etc"
-                            className="border-slate-300 focus:border-blue-600 focus:ring-blue-600"
+                            disabled={carregando}
                           />
                         </div>
 
