@@ -1,0 +1,51 @@
+﻿[dotenv@17.3.1] injecting env (2) from .env.local -- tip: ÔÜí´©Å secrets for agents: https://dotenvx.com/as2
+Autenticando...
+node : (node:17480) 
+Warning: Setting the NO
+DE_TLS_REJECT_UNAUTHORI
+ZED environment 
+variable to '0' makes 
+TLS connections and 
+HTTPS requests 
+insecure by disabling 
+certificate 
+verification.
+No linha:1 caractere:1
++ node scripts/robo4/et
+apa3_envio/listar_grupo
+s.js > 
+scripts/robo4/etap ...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: ((node:17480)    
+ Wa...e verificatio    
+n.:String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+(Use `node 
+--trace-warnings ...` 
+to show where the 
+warning was created)
+Buscando lista de grupos...
+
+--- LISTA DE GRUPOS ENCONTRADOS ---
+TypeError: 
+grupos.forEach is not 
+a function
+    at listarGrupos (C:
+\Users\central_seguranc
+a\.gemini\antigravity\s
+cratch\Definitivo\scrip
+ts\robo4\etapa3_envio\l
+istar_grupos.js:32:12)
+    at process.processT
+icksAndRejections (node
+:internal/process/task_
+queues:103:5)

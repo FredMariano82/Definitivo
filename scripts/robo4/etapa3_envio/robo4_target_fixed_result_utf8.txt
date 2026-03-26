@@ -1,0 +1,160 @@
+﻿[dotenv@17.3.1] injecting env (3) from ..\..\..\.env.local -- tip: ÔÜí´©Å secrets for agents: https://dotenvx.com/as2
+==================================================
+­ƒñû ROBO 4: PASSO 3 - MODO LOOP ROBUSTO
+==================================================
+Buscando fila de aprovados pendentes...
+node : (node:22648) 
+Warning: Setting the NO
+DE_TLS_REJECT_UNAUTHORI
+ZED environment 
+variable to '0' makes 
+TLS connections and 
+HTTPS requests 
+insecure by disabling 
+certificate 
+verification.
+No linha:1 caractere:1
++ node despacho.js > ro
+bo4_target_fixed_result
+.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: ((node:22648)    
+ Wa...e verificatio    
+n.:String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+(Use `node 
+--trace-warnings ...` 
+to show where the 
+warning was created)
+­ƒôí FILA ENCONTRADA: [1] registros.
+
+­ƒæñ [1/1] PROCESSANDO: Marcus Vinicius Mariano
+­ƒöä MODO INTELIGENTE: Solicitando cadastro completo para preserva├º├úo...
+­ƒôñ PAYLOAD ESPELHO FINAL (PUT): {
+  "Ativacao": "29/03/2026 00:00",
+  "Validade": "01/04/2026 23:59",
+  "admin": false,
+  "admissao": null,
+  "admissionDate": "",
+  "allowParkingSpotCompany": null,
+  "availableCompanies": null,
+  "availableGroupsVisitorsList": null,
+  "availableResponsibles": null,
+  "bairro": "",
+  "barras": "",
+  "blackList": false,
+  "bornDate": null,
+  "canUseFacial": true,
+  "cards": [],
+  "cargo": "Op. Monitoramento",
+  "cep": "",
+  "cidade": "",
+  "comments": "checagem v├ílida at├® 26/09/2026",
+  "contingency": true,
+  "cpf": "",
+  "dataLastLog": "/Date(1774470964000-0300)/",
+  "dateLimit": "/Date(1775185139000-0300)/",
+  "dateStartLimit": "/Date(1774753200000-0300)/",
+  "deleted": false,
+  "document": "RG: 56996",
+  "dtAdmissao": "",
+  "dtNascimento": "",
+  "email": "",
+  "emailAcesso": "",
+  "endereco": "",
+  "estadoCivil": "",
+  "expireOnDateLimit": true,
+  "foto": "ABSENT",
+  "fotoDoc": null,
+  "groups": [],
+  "groupsList": [],
+  "id": 10026960,
+  "idArea": 1,
+  "idDevice": 10023166,
+  "idResponsavel": null,
+  "idType": 0,
+  "inativo": false,
+  "mae": "",
+  "nacionalidade": "",
+  "name": "Marcus Vinicius Mariano",
+  "nascimento": null,
+  "naturalidade": "",
+  "objectGuid": null,
+  "pai": "",
+  "password": "",
+  "phone": "",
+  "photoDeleted": false,
+  "photoIdFaceState": 1,
+  "photoTimestamp": 1774488786,
+  "pis": 0,
+  "pisAnterior": 0,
+  "ramal": "",
+  "registration": "20184397",
+  "responsavelNome": null,
+  "rg": "56996",
+  "selectedGroupsVisitorsList": null,
+  "selectedIdGroupsVisitorsList": null,
+  "selectedIdResponsible": null,
+  "selectedIdVisitedCompany": null,
+  "selectedNameResponsible": null,
+  "selectedResponsible": null,
+  "selectedVisitedCompany": null,
+  "senha": 0,
+  "sexo": "Masculino",
+  "shelfLife": "01/04/2026 23:59",
+  "shelfStartLife": "29/03/2026 00:00",
+  "telefone": "",
+  "templates": [],
+  "templatesImages": [],
+  "templatesList": [],
+  "templatesPanic": [],
+  "templatesPanicImages": [],
+  "templatesPanicList": [],
+  "timeOfRegistration": "/Date(1774499948000-0300)/",
+  "userGroupsList": [],
+  "veiculo_cor": null,
+  "veiculo_marca": null,
+  "veiculo_modelo": null,
+  "veiculo_placa": null,
+  "visitorCompany": null,
+  "credits": [],
+  "rulesList": [],
+  "shelfStartLifeDate": "29/03/2026",
+  "shelfLifeDate": "01/04/2026",
+  "dateStartLimitDate": "29/03/2026",
+  "dateLimitDate": "01/04/2026",
+  "customFields": []
+}
+­ƒöä Atualizando via Protocolo de Espelhamento de Alta Fidelidade (ID: 10026960)...
+ÔØî FALHA PUT: 400 {"co
+de":400,"error":"RG 
+j├í cadastrado em 
+outro 
+usu├írio","stack":"   
+em ControliD.iDSecure.d
+b.Users.Validate(DbConn
+ection db)\r\n   em Con
+troliD.iDSecure.db.DAL.
+Save[T](DbConnection 
+cnT, T obj, Int64 
+idOperator, Boolean 
+lTry, Boolean 
+isPathUpdate)\r\n   em 
+ControliD.iDSecure.db.D
+AL.Save[T](T obj, 
+Int64 idOperator, 
+Boolean lTry, Boolean 
+isPathUpdate)\r\n   em 
+ControliD.iDSecure.db.D
+ALWebAPI`1.Save(T 
+obj)"}
+
+Ô£à CICLO FINALIZADO!

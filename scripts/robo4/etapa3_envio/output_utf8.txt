@@ -1,9 +1,9 @@
-﻿[dotenv@17.3.1] injecting env (2) from ..\..\..\.env.local -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+﻿[dotenv@17.3.1] injecting env (2) from ..\..\..\.env.local -- tip: ­ƒöÉ prevent committing .env to code: https://dotenvx.com/precommit
 ==================================================
-🤖 ROBO 4: PASSO 3 - SINCRONIZAÇÃO DE DATAS
+­ƒñû ROBO 4: PASSO 3 - SINCRONIZA├ç├âO DE DATAS
 ==================================================
-Buscando próximo prestador aprovado sem vínculo...
-node : (node:20504) 
+Buscando pr├│ximo prestador aprovado sem v├¡nculo...
+node : (node:6028) 
 Warning: Setting the NO
 DE_TLS_REJECT_UNAUTHORI
 ZED environment 
@@ -15,15 +15,14 @@ certificate
 verification.
 No linha:1 caractere:1
 + node despacho.js > 
-output_teste.txt 2>&1 
-; Get-Content 
-output_teste.t ...
+output.log 2>&1 ; cat 
+output.log
 + ~~~~~~~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~
     + CategoryInfo     
          : NotSpecifi  
-  ed: ((node:20504)    
- Wa...e verificatio    
+  ed: ((node:6028) W   
+ ar...e verificatio    
 n.:String) [], Rem    
 oteException
     + FullyQualifiedEr 
@@ -35,17 +34,17 @@ oteException
 to show where the 
 warning was created)
 
-🎯 ALVO ENCONTRADO: [Thiago Barros]
-🔗 Link Supabase: 08373550-64a5-45ff-8766-b0331ba3321e
-📅 VIGÊNCIA: 28/02/2026 até 31/10/2026
+­ƒÄ» ALVO ENCONTRADO: [Thiago Barros]
+­ƒöù Link Supabase: 08373550-64a5-45ff-8766-b0331ba3321e
+­ƒôà VIG├èNCIA: 28/02/2026 at├® 31/10/2026
 Buscando lista de grupos oficial do ID Control...
-📊 Carregados 439 grupos do servidor.
-🏢 GRUPOS LOCALIZADOS: Empresa(Ambiente=2003) | Depto(Segurança=1104)
-Verificando existência no ID Control com query expandida...
+­ƒôè Carregados 439 grupos do servidor.
+­ƒÅó GRUPOS LOCALIZADOS: Empresa(Ambiente=2003) | Depto(Seguran├ºa=1104)
+Verificando exist├¬ncia no ID Control...
 
-🔍 Validando documentos para o ID Control Técnico: 10024272
-✔️ Match Sucesso (Regra RG): O RG do ID Control está vazio ou é igual ao do Supabase.
-🔄 Liberado para Atualização. Aplicando Carga Total...
-🟩 SUCESSO: Cadastro atualizado totalmente (Datas + Grupos)!
+­ƒöì Validando documentos para o ID Control T├®cnico: 10024266
+Ô£ö´©Å Match Sucesso (Regra RG): O RG do ID Control est├í vazio ou ├® igual ao do Supabase.
+­ƒöä Liberado para Atualiza├º├úo. Aplicando Carga Total...
+­ƒƒ® SUCESSO: Cadastro atualizado totalmente (Datas + Grupos)!
 
-✅ PROCESSO FINALIZADO!
+Ô£à PROCESSO FINALIZADO!

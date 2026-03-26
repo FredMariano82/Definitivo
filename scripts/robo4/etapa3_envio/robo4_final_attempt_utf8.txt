@@ -1,0 +1,279 @@
+﻿[dotenv@17.3.1] injecting env (3) from ..\..\..\.env.local -- tip: ÔÜÖ´©Å  write to custom object with { processEnv: myObject }
+==================================================
+­ƒñû ROBO 4: PASSO 3 - MODO LOOP ROBUSTO
+==================================================
+Buscando fila de aprovados pendentes...
+node : (node:12420) 
+Warning: Setting the NO
+DE_TLS_REJECT_UNAUTHORI
+ZED environment 
+variable to '0' makes 
+TLS connections and 
+HTTPS requests 
+insecure by disabling 
+certificate 
+verification.
+No linha:1 caractere:1
++ node despacho.js > ro
+bo4_final_attempt.txt 
+2>&1
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: ((node:12420)    
+ Wa...e verificatio    
+n.:String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+(Use `node 
+--trace-warnings ...` 
+to show where the 
+warning was created)
+­ƒôí FILA ENCONTRADA: [1] registros.
+
+­ƒæñ [1/1] PROCESSANDO: Marcus Vinicius Mariano
+­ƒöä MODO INTELIGENTE: Solicitando cadastro completo para preserva├º├úo...
+­ƒôñ PAYLOAD FINAL (PUT): {
+  "Ativacao": "29/03/2026 00:00",
+  "Validade": "01/04/2026 23:59",
+  "admin": false,
+  "admissao": "",
+  "admissionDate": "",
+  "allowParkingSpotCompany": null,
+  "availableCompanies": null,
+  "availableGroupsVisitorsList": null,
+  "availableResponsibles": null,
+  "bairro": "",
+  "barras": "",
+  "blackList": false,
+  "bornDate": "",
+  "canUseFacial": true,
+  "cards": [],
+  "cargo": "",
+  "cep": "",
+  "cidade": "",
+  "comments": "checagem v├ílida at├® 26/09/2026",
+  "contingency": false,
+  "cpf": "",
+  "dateLimit": "/Date(1782874799000-0300)/",
+  "dateStartLimit": "/Date(1772161200000-0300)/",
+  "deleted": false,
+  "document": "RG: 56996",
+  "dtAdmissao": "",
+  "dtNascimento": "",
+  "email": "",
+  "emailAcesso": "",
+  "endereco": "",
+  "estadoCivil": "",
+  "expireOnDateLimit": true,
+  "foto": "PRESENT",
+  "fotoDoc": null,
+  "groups": [
+    2039,
+    1104
+  ],
+  "groupsList": [
+    {
+      "contingency": false,
+      "controlVisitors": false,
+      "disableADE": false,
+      "id": 2039,
+      "id2": 0,
+      "idType": 2,
+      "maxTimeInside": 0,
+      "maxVisitors": 0,
+      "nPeople": 0,
+      "nUsers": 0,
+      "nVisitors": 0,
+      "name": "Hagan├í",
+      "qtyTotalSpots": 0,
+      "users": null,
+      "usersList": null
+    },
+    {
+      "contingency": false,
+      "controlVisitors": false,
+      "disableADE": false,
+      "id": 1104,
+      "id2": null,
+      "idType": 0,
+      "maxTimeInside": null,
+      "maxVisitors": 0,
+      "nPeople": 0,
+      "nUsers": 0,
+      "nVisitors": 0,
+      "name": "Seguran├ºa",
+      "qtyTotalSpots": 0,
+      "users": null,
+      "usersList": null
+    }
+  ],
+  "id": 10024265,
+  "idArea": 0,
+  "idDevice": 10023166,
+  "idResponsavel": null,
+  "idType": 0,
+  "inativo": false,
+  "mae": "",
+  "nacionalidade": "",
+  "name": "Marcus Vinicius Mariano",
+  "nascimento": null,
+  "naturalidade": "",
+  "objectGuid": null,
+  "pai": "",
+  "password": "",
+  "phone": "",
+  "photoDeleted": false,
+  "photoIdFaceState": 1,
+  "photoTimestamp": 1774352445,
+  "pis": 0,
+  "pisAnterior": 0,
+  "ramal": "",
+  "registration": "20184397",
+  "responsavelNome": null,
+  "rg": "56996",
+  "selectedGroupsVisitorsList": null,
+  "selectedIdGroupsVisitorsList": null,
+  "selectedIdResponsible": null,
+  "selectedIdVisitedCompany": null,
+  "selectedNameResponsible": null,
+  "selectedResponsible": null,
+  "selectedVisitedCompany": null,
+  "senha": 0,
+  "sexo": "",
+  "shelfLife": "01/04/2026 23:59",
+  "shelfStartLife": "29/03/2026 00:00",
+  "telefone": "",
+  "templates": [],
+  "templatesImages": [],
+  "templatesList": [],
+  "templatesPanic": [],
+  "templatesPanicImages": [],
+  "templatesPanicList": [],
+  "userGroupsList": [
+    {
+      "id": 171624,
+      "idGroup": 2039,
+      "idUser": 10024265,
+      "isVisitor": 0
+    },
+    {
+      "id": 171625,
+      "idGroup": 1104,
+      "idUser": 10024265,
+      "isVisitor": 0
+    }
+  ],
+  "veiculo_cor": null,
+  "veiculo_marca": null,
+  "veiculo_modelo": null,
+  "veiculo_placa": null,
+  "visitorCompany": null,
+  "credits": [],
+  "rulesList": [],
+  "password_confirmation": "",
+  "shelfLifeDate": "01/04/2026",
+  "shelfStartLifeDate": "29/03/2026",
+  "customFields": []
+}
+­ƒöä Atualizando cadastro existente (ID: 10024265) via PUT /api/user/ (Protocolo Refinado)...
+ÔØî FALHA PUT: 400 
+<?xml version="1.0" 
+encoding="utf-8"?>
+<!DOCTYPE html PUBLIC 
+"-//W3C//DTD XHTML 1.0 
+Transitional//EN" "http
+://www.w3.org/TR/xhtml1
+/DTD/xhtml1-transitiona
+l.dtd">
+<html xmlns="http://www
+.w3.org/1999/xhtml">
+  <head>
+    <title>Erro de 
+Solicita├º├úo</title>
+
+Ô£à CICLO FINALIZADO!
+    <style>BODY { 
+color: #000000; 
+background-color: 
+white; font-family: 
+Verdana; margin-left: 
+0px; margin-top: 0px; 
+} #content { 
+margin-left: 30px; 
+font-size: .70em; 
+padding-bottom: 2em; } 
+A:link { color: 
+#336699; font-weight: 
+bold; text-decoration: 
+underline; } A:visited 
+{ color: #6699cc; 
+font-weight: bold; 
+text-decoration: 
+underline; } A:active 
+{ color: #336699; 
+font-weight: bold; 
+text-decoration: 
+underline; } .heading1 
+{ background-color: 
+#003366; 
+border-bottom: #336699 
+6px solid; color: 
+#ffffff; font-family: 
+Tahoma; font-size: 
+26px; font-weight: 
+normal;margin: 0em 0em 
+10px -20px; 
+padding-bottom: 8px; 
+padding-left: 
+30px;padding-top: 
+16px;} pre { 
+font-size:small; 
+background-color: 
+#e5e5cc; padding: 5px; 
+font-family: Courier 
+New; margin-top: 0px; 
+border: 1px #f0f0e0 
+solid; white-space: 
+pre-wrap; white-space: 
+-pre-wrap; word-wrap: 
+break-word; } table { 
+border-collapse: 
+collapse; 
+border-spacing: 0px; 
+font-family: Verdana;} 
+table th { 
+border-right: 2px 
+white solid; 
+border-bottom: 2px 
+white solid; 
+font-weight: bold; 
+background-color: 
+#cecf9c;} table td { 
+border-right: 2px 
+white solid; 
+border-bottom: 2px 
+white solid; 
+background-color: 
+#e5e5cc;}</style>
+  </head>
+  <body>
+    <div id="content">
+      <p 
+class="heading1">Erro 
+de Solicita├º├úo</p>
+      <p>O servidor 
+encontrou um erro ao 
+processar a 
+solicita├º├úo. 
+Consulte os logs do 
+servidor para obter 
+mais detalhes.</p>
+    </div>
+  </body>
+</html>

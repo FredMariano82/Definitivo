@@ -1,0 +1,142 @@
+﻿[dotenv@17.3.1] injecting env (2) from .env.local -- tip: ­ƒöÉ encrypt with Dotenvx: https://dotenvx.com
+­ƒÜÇ Monitor em modo MANUAL. Aguardando execu├º├úo...
+­ƒöì Iniciando Ciclo de Sincroniza├º├úo...
+node : (node:23848) 
+Warning: Setting the NO
+DE_TLS_REJECT_UNAUTHORI
+ZED environment 
+variable to '0' makes 
+TLS connections and 
+HTTPS requests 
+insecure by disabling 
+certificate 
+verification.
+No linha:1 caractere:1
++ node scripts/robo1/sy
+nc-id-control.js > 
+sync_output.txt 2>&1; 
+Get-Con ...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: ((node:23848)    
+ Wa...e verificatio    
+n.:String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+(Use `node 
+--trace-warnings ...` 
+to show where the 
+warning was created)
+   ­ƒôí Carregando lista de grupos da ID Control...
+   ­ƒôª 438 grupos carregados.
+   ­ƒôí [SEGURAN├çA] Baixando lista completa de usu├írios para o Cache...
+DEBUG Pendentes: [
+  {
+    "id": "ee3b1458-336b-485e-9ece-76b02cd56f3b",
+    "nome": "Pedro Alvarez",
+    "doc1": "888888",
+    "liberacao": "ok",
+    "observacoes": null,
+    "empresa": "Hagan├í",
+    "solicitacao_id": "e6889fec-c9aa-458c-ad5c-dba3de78585c",
+    "solicitacoes": {
+      "data_final": "2026-02-28",
+      "data_inicial": "2026-02-27",
+      "departamento": "Seguran├ºa"
+    }
+  }
+]
+­ƒôª Processando 1 novos...
+­ƒöä Prestador: Pedro Alvarez (888888)
+   ­ƒöÄ BUSCANDO IDENTIDADE (RG: 888888)...
+   ­ƒöä N├úo est├í no cache. Tentando busca viva na API...
+   ­ƒåò N├úo encontrado. Criando novo...
+   ­ƒÅù´©Å Processando grupos para: [Hagan├í] e [Seguran├ºa]
+   ­ƒôà Datas: [27/02/2026 00:00] -> [28/02/2026 00:00] | Obs: []
+   ­ƒôñ Enviando (POST)...
+   Payload: {
+  "name": "Pedro Alvarez",
+  "rg": "888888",
+  "document": "RG: 888888",
+  "shelfStartLife": "27/02/2026 00:00",
+  "shelfLife": "28/02/2026 00:00",
+  "shelfStartLifeDate": "27/02/2026",
+  "shelfLifeDate": "28/02/2026",
+  "groups": [
+    2039,
+    1104
+  ],
+  "userGroupsList": [
+    {
+      "idGroup": 2039,
+      "idUser": 0,
+      "isVisitor": 0
+    },
+    {
+      "idGroup": 1104,
+      "idUser": 0,
+      "isVisitor": 0
+    }
+  ],
+  "comments": "",
+  "customFields": {
+    "Empresa": "Hagan├í",
+    "Departamento": "Seguran├ºa"
+  },
+  "deleted": false,
+  "inactive": false,
+  "active": true
+}
+   ­ƒöä ALERTA: RG j├í cadastrado na ID Control! Tentando recuperar o ID original para vincular...
+   ÔØî N├úo foi poss├¡vel recuperar o ID (busca falhou ou usu├írio n├úo encontrado).
+   ÔØî Falha API 
+(Body): {"code":400,"er
+ror":"RG j├í 
+cadastrado em outro 
+usu├írio","stack":"   
+em ControliD.iDSecure.d
+b.Users.Validate(DbConn
+ection db)\r\n   em Con
+troliD.iDSecure.db.DAL.
+Save[T](DbConnection 
+cnT, T obj, Int64 
+idOperator, Boolean 
+lTry, Boolean 
+isPathUpdate)\r\n   em 
+ControliD.iDSecure.db.D
+AL.Save[T](T obj, 
+Int64 idOperator, 
+Boolean lTry, Boolean 
+isPathUpdate)\r\n   em 
+ControliD.iDSecure.db.D
+ALWebAPI`1.Insert(T 
+obj)"}
+   ­ƒÜ¿ Conflito de RG persistente ou nomes divergentes.
+   ÔØî Falha: 400 - {"c
+ode":400,"error":"RG 
+j├í cadastrado em 
+outro 
+usu├írio","stack":"   
+em ControliD.iDSecure.d
+b.Users.Validate(DbConn
+ection db)\r\n   em Con
+troliD.iDSecure.db.DAL.
+Save[T](DbConnection 
+cnT, T obj, Int64 
+idOperator, Boolean 
+lTry, Boolean 
+isPathUpdate)\r\n   em 
+ControliD.iDSecure.db.D
+AL.Save[T](T obj, 
+Int64 idOperator, 
+Boolean lTry, Boolean 
+isPathUpdate)\r\n   em 
+ControliD.iDSecure.db.D
+ALWebAPI`1.Insert(T 
+obj)"}

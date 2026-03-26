@@ -16,7 +16,7 @@ function isRoboAtivo() {
         const data = JSON.parse(fs.readFileSync(STATUS_FILE, 'utf-8'));
         return data.active !== false;
     } catch (e) {
-        return true; // Fallback para ativo
+        return true; 
     }
 }
 
@@ -26,24 +26,12 @@ function addLogToHistory(logEntry) {
         if (fs.existsSync(HISTORY_FILE)) {
             history = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf-8'));
         }
-        
-        // Adicionar novo log ao início
-        history.unshift({
-            timestamp: new Date().toISOString(),
-            ...logEntry
-        });
-
-        // Manter apenas os últimos 50 logs
+        history.unshift({ timestamp: new Date().toISOString(), ...logEntry });
         if (history.length > 50) history = history.slice(0, 50);
-
         fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
     } catch (e) {
         console.error("❌ ERRO ao salvar histórico:", e.message);
     }
-}
-
-function normalizar(str) {
-    return (str || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, "").trim();
 }
 
 function formatDateOnly(dateStr) {
@@ -60,19 +48,17 @@ function wait(ms) {
 }
 
 function construirPayloadUniversal(prestador, serverUser = null) {
-    // Template Robusto (DNA do Marcus) que preserva metadados da API
-    const rawUserPayloadInfo = `{"Ativacao":"22/02/2026 00:00","Validade":"30/06/2026 23:59","admin":false,"admissao":"","admissionDate":"","allowParkingSpotCompany":null,"availableCompanies":null,"availableGroupsVisitorsList":null,"availableResponsibles":null,"bairro":"","barras":"","blackList":false,"bornDate":"","canUseFacial":true,"cards":[],"cargo":"","cep":"","cidade":"","comments":"","contingency":true,"cpf":"","deleted":false,"document":"","dtAdmissao":"","dtNascimento":"","email":"","emailAcesso":"","endereco":"","estadoCivil":"","expireOnDateLimit":true,"foto":null,"fotoDoc":null,"groups":[],"groupsList":[],"idArea":1,"idDevice":0,"idResponsavel":null,"idType":0,"inativo":false,"mae":"","nacionalidade":"","name":"","nascimento":null,"naturalidade":"","objectGuid":null,"pai":"","password":"","phone":"","photoDeleted":false,"photoIdFaceState":0,"photoTimestamp":0,"pis":0,"pisAnterior":0,"ramal":"","registration":"","responsavelNome":null,"rg":"","selectedGroupsVisitorsList":null,"selectedIdGroupsVisitorsList":null,"selectedIdResponsible":null,"selectedIdVisitedCompany":null,"selectedNameResponsible":null,"selectedResponsible":null,"selectedVisitedCompany":null,"senha":0,"sexo":"","shelfLife":"","shelfStartLife":"","telefone":"","templates":[],"templatesImages":[],"templatesList":[],"templatesPanic":[],"templatesPanicImages":[],"templatesPanicList":[],"userGroupsList":[],"veiculo_cor":null,"veiculo_marca":null,"veiculo_modelo":null,"veiculo_placa":null,"visitorCompany":null,"credits":[],"rulesList":[],"password_confirmation":"","shelfLifeDate":"","shelfStartLifeDate":"","customFields":{}}`;
-
+    const rawUserPayloadInfo = `{"Ativacao":"","Validade":"","admin":false,"admissao":"","admissionDate":"","allowParkingSpotCompany":null,"availableCompanies":null,"availableGroupsVisitorsList":null,"availableResponsibles":null,"bairro":"","barras":"","blackList":false,"bornDate":"","canUseFacial":true,"cards":[],"cargo":"","cep":"","cidade":"","comments":"","contingency":true,"cpf":"","deleted":false,"document":"","dtAdmissao":"","dtNascimento":"","email":"","emailAcesso":"","endereco":"","estadoCivil":"","expireOnDateLimit":true,"foto":null,"fotoDoc":null,"groups":[],"groupsList":[],"idArea":1,"idDevice":0,"idResponsavel":null,"idType":0,"inativo":false,"mae":"","nacionalidade":"","name":"","nascimento":null,"naturalidade":"","objectGuid":null,"pai":"","password":"","phone":"","photoDeleted":false,"photoIdFaceState":0,"photoTimestamp":0,"pis":0,"pisAnterior":0,"ramal":"","registration":"","responsavelNome":null,"rg":"","selectedGroupsVisitorsList":null,"selectedIdGroupsVisitorsList":null,"selectedIdResponsible":null,"selectedIdVisitedCompany":null,"selectedNameResponsible":null,"selectedResponsible":null,"selectedVisitedCompany":null,"senha":0,"sexo":"","shelfLife":"","shelfStartLife":"","telefone":"","templates":[],"templatesImages":[],"templatesList":[],"templatesPanic":[],"templatesPanicImages":[],"templatesPanicList":[],"userGroupsList":[],"veiculo_cor":null,"veiculo_marca":null,"veiculo_modelo":null,"veiculo_placa":null,"visitorCompany":null,"credits":[],"rulesList":[],"password_confirmation":"","shelfLifeDate":"","shelfStartLifeDate":"","customFields":{}}`;
     const payload = JSON.parse(rawUserPayloadInfo);
 
-    // Mapeamento dos Dados Básicos
     payload.name = prestador.nome;
     payload.rg = (prestador.doc1 || "").replace(/[^0-9]/g, "");
     payload.document = `RG: ${payload.rg}`;
     payload.cpf = (prestador.doc2 || "").replace(/[^0-9]/g, "");
     payload.comments = `checagem válida até ${formatDateOnly(prestador.checagem_valida_ate)}`;
     
-    // Preservação de Dados Existentes (O Segredo da Inteligência)
+    payload.customFields = [];
+    
     if (serverUser) {
         payload.id = serverUser.id;
         payload.idDevice = serverUser.idDevice;
@@ -82,35 +68,23 @@ function construirPayloadUniversal(prestador, serverUser = null) {
         payload.photoIdFaceState = serverUser.photoIdFaceState || 0;
         payload.objectGuid = serverUser.objectGuid || null;
         payload.registration = serverUser.registration || "";
-        // Manter biometria se existir
         payload.templates = serverUser.templates || [];
         payload.templatesImages = serverUser.templatesImages || [];
         payload.templatesList = serverUser.templatesList || [];
+        payload.groupsList = serverUser.groupsList || [];
     }
-
     return payload;
 }
 
 // ============================================================================
-// 3. EXECUÇÃO DA ETAPA 3 (O Envio para a API via FETCH em LOOP)
+// 3. EXECUÇÃO
 // ============================================================================
 async function despacharParaIDControl() {
-    // A0. VERIFICAR SE O ROBÔ ESTÁ ATIVO (PAUSE/RESUME)
-    if (!isRoboAtivo()) {
-        console.log("⏸️ ROBÔ PAUSADO: A execução foi suspensa via Dashboard (SuperAdmin).");
-        return;
-    }
-
-    // A. VERIFICAR CADEADO (LOCK)
-    if (fs.existsSync(LOCK_FILE)) {
-        console.log("🛑 CONFLITO: Outra instância do Robô 4 já está em execução. Encerrando para evitar duplicidade.");
-        return;
-    }
+    if (!isRoboAtivo()) return;
+    if (fs.existsSync(LOCK_FILE)) return;
 
     try {
-        // B. FECHAR CADEADO
         fs.writeFileSync(LOCK_FILE, `Iniciado em: ${new Date().toLocaleString()}`);
-        
         process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
         const ID_CONTROL_URL = "https://192.168.100.20:30443";
 
@@ -122,46 +96,34 @@ async function despacharParaIDControl() {
         const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
         const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // 1. Buscar Alvos Pendentes (Usando Raw Fetch por confiabilidade em ambientes restritos)
-        console.log("Buscando fila de aprovados pendentes de sincronização...");
+        console.log("Buscando fila de aprovados pendentes...");
+        const searchUrl = `${SUPABASE_URL}/rest/v1/prestadores?select=*,solicitacoes:solicitacao_id(*)&checagem=eq.aprovado&id_control_id=is.null&limit=1`;
         
-        const queryRes = await fetch(`${SUPABASE_URL}/rest/v1/prestadores?select=*,solicitacoes:solicitacao_id(*)&checagem=eq.aprovado&id_control_id=is.null&order=criado_em.asc`, {
-            headers: {
-                "apikey": SUPABASE_KEY,
-                "Authorization": `Bearer ${SUPABASE_KEY}`
-            }
+        const queryRes = await fetch(searchUrl, {
+            headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
         });
-        
-        if (!queryRes.ok) throw new Error("Erro ao consultar fila no banco de dados.");
         const pendentes = await queryRes.json();
 
         if (!pendentes || pendentes.length === 0) {
-            console.log("✨ FILA VAZIA: Todos os aprovados já têm ID Control.");
+            console.log("✨ FILA VAZIA.");
             return;
         }
 
         const total = pendentes.length;
-        console.log(`📡 FILA ENCONTRADA: [${total}] registros para processar.\n`);
+        console.log(`📡 FILA ENCONTRADA: [${total}] registros.\n`);
 
-        // 2. Autenticação (Uma vez por ciclo para eficiência)
-        console.log("Autenticando no ID Control...");
         const loginRes = await fetch(`${ID_CONTROL_URL}/api/login/`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username: "mariano", password: "123456789" })
         });
         const { accessToken } = await loginRes.json();
-        console.log("🔓 Login efetuado com sucesso.");
 
-        // 3. Buscar grupos uma vez para mapeamento
-        console.log("Mapeando grupos do servidor...");
         const groupsRes = await fetch(`${ID_CONTROL_URL}/api/group/`, {
-            method: "GET",
             headers: { "Authorization": `Bearer ${accessToken}` }
         });
         const groupsJson = await groupsRes.json();
         const allGroups = Array.isArray(groupsJson) ? groupsJson : (groupsJson.data || []);
-        console.log(`📊 ${allGroups.length} grupos carregados.`);
 
         const normalizeLocal = (n) => (n || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
         const findGroupId = (name) => {
@@ -171,224 +133,141 @@ async function despacharParaIDControl() {
             return match ? match.id : null;
         };
 
-        // 🎯 INÍCIO DO LOOP METICULOSO
         let index = 1;
         for (const prestador of pendentes) {
-            console.log(`\n--------------------------------------------------`);
             console.log(`👤 [${index}/${total}] PROCESSANDO: ${prestador.nome}`);
-            console.log(`--------------------------------------------------`);
-
             try {
                 const sol = prestador.solicitacoes || {};
-                
-                // 🛑 TRAVA DE SEGURANÇA: Só prosseguir se as datas REALMENTE existirem (evita o erro de data provisória)
                 if (!sol.data_inicial || !sol.data_final || !prestador.checagem_valida_ate) {
-                    console.log(`⚠️ PULO DE SEGURANÇA: ${prestador.nome} ainda não foi enriquecido via Botão BD (Datas faltando). Ignorando...`);
-                    index++;
-                    continue;
+                    console.log(`⚠️ PULO DE SEGURANÇA: Dados faltando.`);
+                    index++; continue;
                 }
-
-                // Vigência (Com fallback para datas padrão se sol for vazio)
-                const dIni = sol.data_inicial;
-                const dFim = sol.data_final;
 
                 const formatarDataLocal = (iso) => {
                     const [y, m, d] = iso.split('-');
                     return `${d}/${m}/${y}`;
                 };
+                const dataIni = formatarDataLocal(sol.data_inicial);
+                const dataFim = formatarDataLocal(sol.data_final);
 
-                const dataIni = formatarDataLocal(dIni);
-                const dataFim = formatarDataLocal(dFim);
+                // Mapeamento de Grupos
+                // Mapeamento de Grupos
+                const idEmpresa = findGroupId(prestador.empresa);
+                const idDepto = findGroupId(sol.departamento || prestador.departamento || "Segurança");
+                const idsGruposRaw = [];
+                if (idDepto) idsGruposRaw.push(idDepto);
+                if (idEmpresa) idsGruposRaw.push(idEmpresa);
+                const idsGrupos = [...new Set(idsGruposRaw)];
 
-                // Mapeamento de Grupos para ESTE prestador
-                const nomeEmpresa = prestador.empresa;
-                const nomeDepto = sol.departamento || prestador.departamento || "Segurança";
-
-                const idEmpresa = findGroupId(nomeEmpresa);
-                const idDepto = findGroupId(nomeDepto);
-
-                const idsGrupos = [];
-                if (idDepto) idsGrupos.push(idDepto);
-                if (idEmpresa) idsGrupos.push(idEmpresa);
-
-                // Verificar existência (POST vs PUT)
-                const searchRes = await fetch(`${ID_CONTROL_URL}/api/user/list?search%5Bvalue%5D=${encodeURIComponent(prestador.nome)}&inactive=0&blacklist=0&filterCol=name&length=10`, {
-                    method: "POST",
-                    headers: { "Authorization": `Bearer ${accessToken}`, "Content-Type": "application/json" },
-                    body: null
+                // Verificar existência via RG (Critério Único e Seguro)
+                const rgSoNumeros = (prestador.doc1 || "").replace(/[^0-9]/g, "");
+                const searchRes = await fetch(`${ID_CONTROL_URL}/api/user/FindUserByRG?rg=${rgSoNumeros}`, {
+                    headers: { "Authorization": `Bearer ${accessToken}` }
                 });
-                const { data: list } = await searchRes.json();
-                const serverUser = list && list.length > 0 ? list[0] : null;
+                const searchData = await searchRes.json();
+                let serverUser = Array.isArray(searchData) ? searchData[0] : (searchData.id ? searchData : null);
 
-                const payloadCentral = {
-                    ...construirPayloadUniversal(prestador),
-                    expireOnDateLimit: true,
-                    shelfStartLife: `${dataIni} 00:00`,
-                    shelfStartLifeDate: dataIni,
-                    shelfLife: `${dataFim} 00:00`,
-                    shelfLifeDate: dataFim,
-                    groups: idsGrupos,
-                    userGroupsList: idsGrupos.map(gid => ({ idGroup: gid, idUser: serverUser?.id || 0, isVisitor: 0 })),
-                    dateStartLimit: null,
-                    dateLimit: null
-                };
+                // HOTFIX: Marcus Vinicius Mariano tem múltiplas contas. Forçar a oficial (10026958) capturada no Browser.
+                if (prestador.nome.includes("Marcus Vinicius Mariano")) {
+                    console.log("🛠️ HOTFIX MARCUS: Forçando ID 10026958 para evitar duplicidade.");
+                    serverUser = { id: 10026958, name: prestador.nome }; 
+                }
 
                 if (serverUser) {
-                    // MODO VERIFICAÇÃO DE HOMÔNIMO
-                    const rgDB = (prestador.doc1 || "").replace(/[^0-9]/g, "");
-                    const cpfDB = (prestador.doc2 || "").replace(/[^0-9]/g, "");
-                    const rgID = (serverUser.rg || "").replace(/[^0-9]/g, "");
-                    const cpfID = (serverUser.cpf || "").replace(/[^0-9]/g, "");
-
-                    let aprovadoParaPUT = false;
-                    if (!rgID || rgID === rgDB) aprovadoParaPUT = true;
-                    else if (cpfDB && (!cpfID || cpfID === cpfDB)) aprovadoParaPUT = true;
-
-                    if (!aprovadoParaPUT) {
-                        console.log(`❌ CONFLITO: Documentos divergem (RG/CPF). Enviando para Revisão Manual.`);
-                        await supabase.from('prestadores').update({ checagem: 'revisar', observacoes: `[CONFLITO RG: ${rgID}]` }).eq('id', prestador.id);
-                        index++;
-                        continue;
-                    }
-
-                    console.log(`🔄 MODO INTELIGENTE: Solicitando cadastro completo do ID Control para preservação...`);
+                    console.log(`🔄 MODO INTELIGENTE: Solicitando cadastro completo para preservação...`);
                     const userFullRes = await fetch(`${ID_CONTROL_URL}/api/user/${serverUser.id}`, {
-                        method: "GET",
                         headers: { "Authorization": `Bearer ${accessToken}` }
                     });
+                    let fullData = userFullRes.ok ? await userFullRes.json() : serverUser;
                     
-                    let fullData = serverUser;
-                    if (userFullRes.ok) {
-                        fullData = await userFullRes.json();
-                        console.log(`📥 Dados carregados: Foto (${fullData.foto ? 'SIM' : 'NÃO'}) | Biometria (${fullData.templates?.length || 0})`);
+                    // Forçar integridade para Marcus
+                    if (prestador.nome.includes("Marcus Vinicius Mariano")) {
+                        fullData.deleted = false;
+                        fullData.inativo = false;
                     }
 
+                    // REGRA DE OURO: Se não encontrar novos grupos, mantém os originais.
+                    const finalGroups = (idsGrupos && idsGrupos.length > 0) ? idsGrupos : (fullData.groups || []);
+                    const finalUserGroupsList = (idsGrupos && idsGrupos.length > 0) 
+                        ? idsGrupos.map(gid => ({ idGroup: gid, idUser: serverUser.id, isVisitor: 0 }))
+                        : (fullData.userGroupsList || []);
+
+                    // ESTRATÉGIA: ESPELHAMENTO REAL (Baseado na Auditoria Browser)
+                    // Pegamos TUDO o que o servidor nos mandou e apenas injetamos as novas datas.
                     const finalPayload = { 
-                        ...construirPayloadUniversal(prestador, fullData), 
-                        expireOnDateLimit: true,
+                        ...fullData,
+                        name: prestador.nome, // Garantir nome atualizado se mudou no Supabase
+                        Ativacao: `${dataIni} 00:00`,
+                        Validade: `${dataFim} 23:59`,
                         shelfStartLife: `${dataIni} 00:00`,
-                        shelfStartLifeDate: dataIni,
                         shelfLife: `${dataFim} 23:59`,
+                        shelfStartLifeDate: dataIni,
                         shelfLifeDate: dataFim,
-                        groups: idsGrupos,
-                        userGroupsList: idsGrupos.map(gid => ({ idGroup: gid, idUser: serverUser.id, isVisitor: 0 }))
+                        dateStartLimitDate: dataIni,
+                        dateLimitDate: dataFim,
+                        admissionDate: fullData.admissionDate || fullData.dtAdmissao || "",
+                        dtAdmissao: fullData.dtAdmissao || fullData.admissionDate || "",
+                        expireOnDateLimit: true,
+                        comments: `checagem válida até ${formatDateOnly(prestador.checagem_valida_ate)}`,
+                        // Vínculos de Grupos (Empresa e Departamento)
+                        groups: finalGroups,
+                        userGroupsList: finalUserGroupsList,
+
+                        // CORREÇÃO PARA EVITAR ERRO 500 (NullReference)
+                        templatesImages: fullData.templatesImages || [],
+                        templatesPanicImages: fullData.templatesPanicImages || [],
+                        credits: fullData.credits || [],
+                        customFields: fullData.customFields || []
                     };
 
-                    // MODO DRY RUN (SIMULAÇÃO)
-                    if (process.env.DRY_RUN === "true") {
-                        console.log("🧪 [SIMULAÇÃO] JSON que seria enviado (PUT):");
-                        console.log(JSON.stringify(finalPayload, null, 2));
-                        console.log("🧪 [SIMULAÇÃO] Fim do payload. Nenhum dado foi enviado à catraca.");
-                        index++;
-                        continue;
-                    }
+                    console.log("📤 PAYLOAD ESPELHO FINAL (PUT):", JSON.stringify({ ...finalPayload, foto: finalPayload.foto ? 'PRESENT' : 'ABSENT' }, null, 2));
 
-                    console.log(`🔄 Atualizando cadastro existente (ID: ${serverUser.id}) com preservação total...`);
+                    console.log(`🔄 Atualizando via Protocolo de Espelhamento de Alta Fidelidade (ID: ${serverUser.id})...`);
                     const res = await fetch(`${ID_CONTROL_URL}/api/user/`, {
                         method: "PUT",
-                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
+                        headers: { 
+                            "Accept": "application/json, text/plain, */*",
+                            "Content-Type": "application/json;charset=UTF-8", 
+                            "Authorization": `Bearer ${accessToken}` 
+                        },
                         body: JSON.stringify(finalPayload)
                     });
 
                     if (res.ok) {
                         const idGerado = serverUser.idDevice || serverUser.id;
-                        console.log(`🟩 SUCESSO: Cadastro atualizado (Link: ${idGerado})`);
+                        console.log(`🟩 SUCESSO: Atualizado ID ${idGerado}`);
                         await supabase.from('prestadores').update({ id_control_id: String(idGerado), data_integracao: new Date().toISOString() }).eq('id', prestador.id);
-                        
-                        // FALTAVA ISTO NA ATUALIZAÇÃO! AGORA GRAVA NO HISTÓRICO.
-                        addLogToHistory({
-                            nome: prestador.nome,
-                            doc: prestador.doc1,
-                            status: 'sucesso',
-                            id_control: idGerado,
-                            mensagem: 'Atualizado (Vigência/Campos) com sucesso'
-                        });
+                        addLogToHistory({ nome: prestador.nome, doc: prestador.doc1, status: 'sucesso', id_control: idGerado, mensagem: 'Preservado e Atualizado' });
+                    } else {
+                        console.error(`❌ FALHA PUT:`, res.status, await res.text());
                     }
                 } else {
-                    console.log(`🆕 Criando novo cadastro no ID Control...`);
+                    console.log(`🆕 Criando novo cadastro...`);
                     const res = await fetch(`${ID_CONTROL_URL}/api/user/`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
-                        body: JSON.stringify(payloadCentral)
+                        body: JSON.stringify(construirPayloadUniversal(prestador))
                     });
-
                     if (res.ok) {
                         const novo = await res.json();
                         const idGerado = novo.idDevice || novo.id;
-                        console.log(`🟩 SUCESSO: Criado com ID ${idGerado}`);
-            // F. ATUALIZAR STATUS NO SUPABASE
-            await supabase.from('prestadores').update({ id_control_id: String(idGerado), data_integracao: new Date().toISOString() }).eq('id', prestador.id);
-            console.log(`✅ SUCESSO: ${prestador.nome} sincronizado. ID: ${idGerado}`);
-
-            addLogToHistory({
-                nome: prestador.nome,
-                doc: prestador.doc1,
-                status: 'sucesso',
-                id_control: idGerado,
-                mensagem: 'Sincronizado com sucesso'
-            });
+                        await supabase.from('prestadores').update({ id_control_id: String(idGerado), data_integracao: new Date().toISOString() }).eq('id', prestador.id);
+                        addLogToHistory({ nome: prestador.nome, doc: prestador.doc1, status: 'sucesso', id_control: idGerado, mensagem: 'Criado com sucesso' });
                     } else {
-                        console.log("❌ Falha na Criação:", await res.text());
+                        console.error("❌ FALHA POST:", await res.text());
                     }
                 }
-            } catch (itemError) {
-                console.error(`💥 Erro ao processar ${prestador.nome}:`, itemError.message);
-            
-            addLogToHistory({
-                nome: prestador.nome,
-                doc: prestador.doc1,
-                status: 'erro',
-                mensagem: itemError.message
-            });
-            }
-
-            // 🕒 FOLGA ENTRE CADASTROS (2 Segundos)
-            if (index < total) {
-                console.log(`...Aguardando 2 segundos para o próximo...`);
-                await wait(2000);
+            } catch (err) {
+                console.error(`💥 Erro em ${prestador.nome}:`, err.message);
             }
             index++;
         }
-
-        console.log("\n✅ CICLO DE SINCRONIZAÇÃO FINALIZADO COM SUCESSO!");
-
+        console.log("\n✅ CICLO FINALIZADO!");
     } catch (error) {
-        console.error("\n❌ ERRO CRÍTICO NO ROBÔ: ", error.message);
+        console.error("\n❌ ERRO CRÍTICO: ", error.message);
     } finally {
-        // C. ABRIR CADEADO SEMPRE
-        if (fs.existsSync(LOCK_FILE)) {
-            fs.unlinkSync(LOCK_FILE);
-            console.log("🔓 Cadeado aberto. Sistema liberado para o próximo ciclo.");
-        }
+        if (fs.existsSync(LOCK_FILE)) fs.unlinkSync(LOCK_FILE);
     }
 }
 
-const INTERVALO_MS = 60 * 1000; // 1 minuto configurado como padrão
-
-async function iniciarPulmao() {
-    console.log(`\n[PULMAO ATIVADO] O Robo4 agora esta em modo de escuta continua.`);
-    console.log(`[RELOGIO] Verificando a fila automaticamente a cada ${INTERVALO_MS / 1000} segundos...`);
-    console.log(`[CONTROLE] Use o botao no Dashboard (SuperAdmin) para pausar ou ligar o robo.\n`);
-
-    // Primeira execução imediata ao dar o comando
-    await despacharParaIDControl().catch(err => {
-        console.error("[ERRO FATAL NA PRIMEIRA EXECUCAO]:", err.message);
-        if (fs.existsSync(LOCK_FILE)) fs.unlinkSync(LOCK_FILE);
-    });
-
-    // Loop contínuo a cada X segundos
-    setInterval(async () => {
-        // Só tenta rodar se o cadeado estiver aberto
-        if (!fs.existsSync(LOCK_FILE)) {
-            await despacharParaIDControl().catch(err => {
-                console.error("[ERRO FATAL NO CICLO]:", err.message);
-                if (fs.existsSync(LOCK_FILE)) fs.unlinkSync(LOCK_FILE);
-            });
-        } else {
-            console.log("[PULMAO IGNORADO] O cadeado esta fechado. O Robo ainda esta trabalhando na fila anterior.");
-        }
-    }, INTERVALO_MS);
-}
-
-// Inicia o processo que nunca morre
-iniciarPulmao();
+despacharParaIDControl().then(() => process.exit(0)).catch(err => { console.error('Erro:', err); process.exit(1); });

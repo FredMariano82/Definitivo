@@ -1,8 +1,39 @@
-﻿[dotenv@17.3.1] injecting env (2) from ..\..\..\.env.local -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+﻿[dotenv@17.3.1] injecting env (2) from ..\..\..\.env.local -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
 ==================================================
 🤖 ROBO 4: PASSO 3 - SINCRONIZAÇÃO DE DATAS
 ==================================================
 Buscando próximo prestador aprovado sem vínculo...
+node : (node:20504) 
+Warning: Setting the NO
+DE_TLS_REJECT_UNAUTHORI
+ZED environment 
+variable to '0' makes 
+TLS connections and 
+HTTPS requests 
+insecure by disabling 
+certificate 
+verification.
+No linha:1 caractere:1
++ node despacho.js > 
+output_teste.txt 2>&1 
+; Get-Content 
+output_teste.t ...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: ((node:20504)    
+ Wa...e verificatio    
+n.:String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+(Use `node 
+--trace-warnings ...` 
+to show where the 
+warning was created)
 
 🎯 ALVO ENCONTRADO: [Thiago Barros]
 🔗 Link Supabase: 08373550-64a5-45ff-8766-b0331ba3321e
@@ -10,9 +41,9 @@ Buscando próximo prestador aprovado sem vínculo...
 Buscando lista de grupos oficial do ID Control...
 📊 Carregados 439 grupos do servidor.
 🏢 GRUPOS LOCALIZADOS: Empresa(Ambiente=2003) | Depto(Segurança=1104)
-Verificando existência no ID Control...
+Verificando existência no ID Control com query expandida...
 
-🔍 Validando documentos para o ID Control Técnico: 10024270
+🔍 Validando documentos para o ID Control Técnico: 10024272
 ✔️ Match Sucesso (Regra RG): O RG do ID Control está vazio ou é igual ao do Supabase.
 🔄 Liberado para Atualização. Aplicando Carga Total...
 🟩 SUCESSO: Cadastro atualizado totalmente (Datas + Grupos)!
