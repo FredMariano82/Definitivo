@@ -10,7 +10,7 @@ WHERE id IN (
         SELECT id,
                ROW_NUMBER() OVER (
                    PARTITION BY doc1 
-                   ORDER BY created_at ASC 
+                   ORDER BY (CASE WHEN checagem = 'aprovada' AND liberacao = 'ok' THEN 0 ELSE 1 END) ASC, criado_em ASC 
                ) as num_linha
         FROM prestadores
     ) t

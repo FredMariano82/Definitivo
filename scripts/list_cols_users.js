@@ -1,0 +1,15 @@
+const path = require('path')
+require('dotenv').config({ path: path.resolve(__dirname, '../.env.local') })
+const { createClient } = require('@supabase/supabase-js')
+
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+
+async function check() {
+    const { data: cols, error } = await supabase.from('usuarios').select('*').limit(1)
+    if (cols && cols.length > 0) {
+        Object.keys(cols[0]).forEach(k => console.log(k));
+    } else {
+        console.log("Tabela 'usuarios' vazia ou erro.");
+    }
+}
+check()
