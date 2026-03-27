@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import Header from "@/components/header"
@@ -13,6 +13,7 @@ export default function AuthenticatedLayout({
     children: React.ReactNode
 }) {
     const { usuario, isLoading } = useAuth()
+    const [isCollapsed, setIsCollapsed] = useState(false)
     const router = useRouter()
 
     useEffect(() => {
@@ -36,10 +37,10 @@ export default function AuthenticatedLayout({
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col">
-            <Header />
+            <Header isCollapsed={isCollapsed} onToggle={() => setIsCollapsed(!isCollapsed)} />
             <div className="flex flex-1">
-                <Navigation />
-                <main className="flex-1 p-6 md:ml-72 transition-all duration-300">
+                <Navigation isCollapsed={isCollapsed} onToggle={() => setIsCollapsed(!isCollapsed)} />
+                <main className={`flex-1 p-6 ${isCollapsed ? 'md:ml-20' : 'md:ml-72'} transition-all duration-300`}>
                     <div className="max-w-none mx-auto">
                         {children}
                     </div>

@@ -5,12 +5,17 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "../contexts/auth-context"
-import { CheckCircle, FileText, Users, BarChart3, HeadphonesIcon, Crown, DollarSign, Crosshair } from "lucide-react"
+import { CheckCircle, FileText, Users, BarChart3, HeadphonesIcon, Crown, DollarSign, Crosshair, ChevronLeft, ChevronRight } from "lucide-react"
 import { getSolicitacoesByDepartamento } from "../services/solicitacoes-service"
 import { getLiberacaoStatus } from "./ui/status-badges"
 import { converterDataBrParaDate, getCurrentDate } from "../utils/date-helpers"
 
-export default function Navigation() {
+interface NavigationProps {
+  isCollapsed?: boolean;
+  onToggle?: () => void;
+}
+
+export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
   const { usuario } = useAuth()
   const pathname = usePathname()
   const [alertaLiberacoes, setAlertaLiberacoes] = useState(false)
@@ -304,7 +309,7 @@ export default function Navigation() {
   const menuButtons = getMenuButtons()
 
   return (
-    <aside className="fixed left-0 top-[88px] bottom-0 w-72 bg-slate-900/95 backdrop-blur-md border-r border-white/10 z-40 overflow-y-auto hidden md:block transition-all duration-300">
+    <aside className={`fixed left-0 top-[88px] bottom-0 ${isCollapsed ? 'w-20' : 'w-72'} bg-slate-900/95 backdrop-blur-md border-r border-white/10 z-40 overflow-y-auto hidden md:block transition-all duration-300`}>
       <style jsx>{`
         @keyframes pulse-glow {
           0%, 100% {
@@ -322,10 +327,35 @@ export default function Navigation() {
         }
       `}</style>
 
-      <div className="p-4 space-y-2">
-        <div className="px-4 py-2 mb-4">
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Menu Principal</p>
-        </div>
+      <div className={`p-4 space-y-2 ${isCollapsed ? 'px-2' : ''}`}>
+        {!isCollapsed && (
+          <div className="px-4 py-2 mb-4 flex items-center justify-between">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Menu Principal</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onToggle}
+              className="h-6 w-6 p-0 hover:bg-white/10 text-slate-500 hover:text-white rounded-md transition-colors"
+              title="Recolher Menu"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+        
+        {isCollapsed && (
+          <div className="px-4 py-2 mb-4 flex justify-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onToggle}
+              className="h-8 w-8 p-0 hover:bg-white/10 text-slate-500 hover:text-white rounded-lg transition-colors"
+              title="Expandir Menu"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </Button>
+          </div>
+        )}
 
         {menuButtons.map((button) => {
           const IconComponent = button.icon
@@ -335,7 +365,7 @@ export default function Navigation() {
             <Link key={button.href} href={button.href} className="block group">
               <Button
                 className={`
-                  w-full justify-start rounded-xl px-4 py-6 transition-soft mb-1
+                  w-full ${isCollapsed ? 'justify-center' : 'justify-start'} rounded-xl px-4 py-6 transition-soft mb-1
                   ${isActive
                     ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20"
                     : "bg-transparent text-slate-300 hover:bg-white/5 hover:text-white border-transparent"}
@@ -344,10 +374,10 @@ export default function Navigation() {
                 variant="ghost"
                 asChild
               >
-                <span className="flex items-center gap-3">
-                  <IconComponent className={`h-5 w-5 ${isActive ? "text-white" : "text-slate-400 group-hover:text-blue-400"}`} />
-                  <span className="font-medium tracking-wide">{button.label}</span>
-                  {button.hasAlert && (
+                <span className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 w-full'}`}>
+                  <IconComponent className={`h-5 w-5 ${isActive ? "text-white" : "text-slate-400 group-hover:text-blue-400"} ${isCollapsed ? 'h-6 w-6' : ''}`} />
+                  {!isCollapsed && <span className="font-medium tracking-wide">{button.label}</span>}
+                  {button.hasAlert && !isCollapsed && (
                     <span className="ml-auto relative flex h-2 w-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
@@ -361,15 +391,17 @@ export default function Navigation() {
       </div>
 
       {/* Footer do Sidebar */}
-      <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-white/5 bg-slate-900/50">
+      <div className={`absolute bottom-0 left-0 right-0 p-6 border-t border-white/5 bg-slate-900/50 ${isCollapsed ? 'px-2 flex justify-center' : ''}`}>
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-500/30">
+          <div className="h-8 w-8 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-500/30 shrink-0">
             <span className="text-xs font-bold text-blue-400">{usuario?.nome?.charAt(0)}</span>
           </div>
-          <div className="overflow-hidden">
-            <p className="text-xs font-bold text-white truncate">{usuario?.nome}</p>
-            <p className="text-[10px] text-slate-400 truncate">{usuario?.departamento}</p>
-          </div>
+          {!isCollapsed && (
+            <div className="overflow-hidden">
+              <p className="text-xs font-bold text-white truncate">{usuario?.nome}</p>
+              <p className="text-[10px] text-slate-400 truncate">{usuario?.departamento}</p>
+            </div>
+          )}
         </div>
       </div>
     </aside>

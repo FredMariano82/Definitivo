@@ -51,7 +51,8 @@ import {
     Monitor,
     User,
     ShieldCheck as ShieldIcon,
-    Sun
+    Sun,
+    FileDown
 } from "lucide-react"
 
 import { useDraggable } from "@dnd-kit/core"
@@ -328,6 +329,8 @@ export default function PainelTaticoV2() {
     const [guiaTurno, setGuiaTurno] = useState<any[]>([])
     const [activeId, setActiveId] = useState<string | null>(null)
     const [searchTerm, setSearchTerm] = useState("")
+    const [activeTab, setActiveTab] = useState<'tatico' | 'relatorios'>('tatico')
+    const [historico, setHistorico] = useState<any[]>([])
 
     // Estado para o Modal de Rendição
     const [rendicaoData, setRendicaoData] = useState<{
@@ -355,8 +358,8 @@ export default function PainelTaticoV2() {
         )
     }
 
-    const fetchData = async () => {
-        setLoading(true)
+    const fetchData = async (silent = false) => {
+        if (!silent) setLoading(true)
         try {
             const hojeStr = new Date().toLocaleDateString('en-CA')
             const [eqData, postData, evData, alocData, escData, pausaData] = await Promise.all([
@@ -381,19 +384,26 @@ export default function PainelTaticoV2() {
                 const decorrido = differenceInSeconds(agora, inicio)
                 const restante = Math.max(0, p.segundos_duracao - decorrido)
                 
+                // Mudar exibição: Refeição -> Almoço
+                const tipoExibicao = p.tipo_pausa === 'Refeição' ? 'Almoço' : p.tipo_pausa
+
                 return {
                     id: p.colaborador_id,
                     nome: prof?.nome_completo || 'Desconhecido', // Fallback for name
-                    type: p.tipo_pausa,
+                    type: tipoExibicao,
                     seconds: restante,
                     timeLeft: `${Math.floor(restante/60)}:${(restante%60).toString().padStart(2, '0')}`
                 }
             })
             setPausasAtivas(pAtivas)
+
+            // Buscar histórico se estiver na aba de relatórios
+            const histData = await OpServiceV2.getHistoricoMovimentacoes()
+            setHistorico(histData)
         } catch (error) {
             console.error("Erro ao carregar dados táticos:", error)
         } finally {
-            setLoading(false)
+            if (!silent) setLoading(false)
         }
     }
 
@@ -432,6 +442,48 @@ export default function PainelTaticoV2() {
         return () => clearInterval(interval)
     }, [])
 
+    // Carregar dados iniciais
+    useEffect(() => {
+        fetchData(false) // Carga inicial visível
+        const interval = setInterval(() => fetchData(true), 30000) // Refresh silencioso a cada 30s
+        return () => clearInterval(interval)
+    }, [])
+
+    // Carregar dados quando a aba de relatório for selecionada
+    useEffect(() => {
+        if (activeTab === 'relatorios') {
+            fetchData(true) // Silencioso ao trocar de aba
+        }
+    }, [activeTab])
+
+    const handleExportarExcel = () => {
+        if (historico.length === 0) return
+
+        const headers = ["Horário", "Ação", "Profissional", "Origem", "Destino", "Rendeu Quem", "Duração (min)"]
+        const csvContent = [
+            headers.join(";"),
+            ...historico.map(log => [
+                format(parseISO(log.created_at), 'dd/MM/yyyy HH:mm:ss'),
+                log.acao,
+                log.colaborador_nome,
+                log.posto_origem || "",
+                log.posto_destino || "",
+                log.rendeu_quem_nome || "",
+                log.duracao_prevista ? Math.floor(log.duracao_prevista/60) : ""
+            ].join(";"))
+        ].join("\n")
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+        const link = document.createElement("a")
+        const url = URL.createObjectURL(blob)
+        link.setAttribute("href", url)
+        link.setAttribute("download", `relatorio_tatico_${format(new Date(), 'dd-MM-yyyy')}.csv`)
+        link.style.visibility = 'hidden'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+    }
+
     const handleDragStart = (event: DragStartEvent) => {
         setActiveId(event.active.id as string)
     }
@@ -450,8 +502,20 @@ export default function PainelTaticoV2() {
         // CORREÇÃO: Função da Base/Reserva (Pool)
         if (targetId === 'pool') {
             try {
+                const prof = equipe.find(p => p.id === profissionalId)
+                const alocAntiga = alocacoes.find(a => a.colaborador_id === profissionalId)
+                const postoAntigo = postos.find(p => p.id === alocAntiga?.posto_id)
+
                 await OpServiceV2.salvarAlocacao(profissionalId, null)
                 setPausasAtivas(prev => prev.filter(p => p.id !== profissionalId))
+                
+                await OpServiceV2.logMovimentacao({
+                    colaborador_id: profissionalId,
+                    colaborador_nome: prof?.nome_completo || 'Desconhecido',
+                    acao: 'RETORNO À BASE',
+                    posto_origem: postoAntigo?.nome_posto || 'Posto'
+                })
+
                 await fetchData()
             } catch (err) {
                 console.error("Erro ao liberar para base:", err)
@@ -494,25 +558,49 @@ export default function PainelTaticoV2() {
                 }
             }
 
-            if (type === 'pause') {
                 const prof = equipe.find((p: OpEquipe) => p.id === profissionalId)
-                const times: { [key: string]: number } = { 'Café': 15, 'Refeição': 60, 'Janta': 30, 'Ceia': 60 }
-                const mins = times[pauseType] || 15
-                
-                const agoraIso = new Date().toISOString()
-                // Primeiro libera da alocação (que limpa pausas antigas)
-                await OpServiceV2.salvarAlocacao(profissionalId, null)
-                // Depois inicia a nova pausa
-                await OpServiceV2.startPause(profissionalId, pauseType, mins * 60, undefined, agoraIso)
-            }
-            else if (type === 'event') {
-                const evento = eventos.find(e => e.id === targetId)
-                if (evento?.posto_id) {
-                    await OpServiceV2.salvarAlocacao(profissionalId, evento.posto_id)
+                const alocAntiga = alocacoes.find(a => a.colaborador_id === profissionalId)
+                const postoAntigo = postos.find(p => p.id === alocAntiga?.posto_id)
+
+                if (type === 'pause') {
+                    const times: { [key: string]: number } = { 'Café': 15, 'Refeição': 60, 'Janta': 30, 'Ceia': 60 }
+                    const mins = times[pauseType] || 15
+                    const agoraIso = new Date().toISOString()
+                    
+                    await OpServiceV2.salvarAlocacao(profissionalId, null)
+                    await OpServiceV2.startPause(profissionalId, pauseType, mins * 60, undefined, agoraIso)
+                    
+                    await OpServiceV2.logMovimentacao({
+                        colaborador_id: profissionalId,
+                        colaborador_nome: prof?.nome_completo || 'Desconhecido',
+                        acao: 'INÍCIO PAUSA',
+                        posto_origem: postoAntigo?.nome_posto || 'Reserva',
+                        posto_destino: pauseType,
+                        duracao_prevista: mins * 60
+                    })
                 }
-            } else {
-                await OpServiceV2.salvarAlocacao(profissionalId, finalTargetId)
-            }
+                else if (type === 'event') {
+                    const evento = eventos.find(e => e.id === targetId)
+                    if (evento?.posto_id) {
+                        await OpServiceV2.salvarAlocacao(profissionalId, evento.posto_id)
+                        await OpServiceV2.logMovimentacao({
+                            colaborador_id: profissionalId,
+                            colaborador_nome: prof?.nome_completo || 'Desconhecido',
+                            acao: 'ALOCAÇÃO EVENTO',
+                            posto_destino: evento.titulo
+                        })
+                    }
+                } else {
+                    await OpServiceV2.salvarAlocacao(profissionalId, finalTargetId)
+                    const postoDest = postos.find(p => p.id === finalTargetId)
+                    await OpServiceV2.logMovimentacao({
+                        colaborador_id: profissionalId,
+                        colaborador_nome: prof?.nome_completo || 'Desconhecido',
+                        acao: 'ALOCAÇÃO DIRETA',
+                        posto_origem: postoAntigo?.nome_posto || 'Reserva',
+                        posto_destino: postoDest?.nome_posto || 'Posto'
+                    })
+                }
         } catch (err: any) {
             console.error("Erro ao salvar alocação:", err)
             // Log detalhado para o desenvolvedor ver o erro do banco no console
@@ -531,12 +619,29 @@ export default function PainelTaticoV2() {
         }
 
         try {
+            const postoAlvo = postos.find(p => p.id === targetPostoId)
+
             // 1. Aloca o novo profissional no posto
             await OpServiceV2.salvarAlocacao(profissionalEntrando.id, targetPostoId)
             
+            await OpServiceV2.logMovimentacao({
+                colaborador_id: profissionalEntrando.id,
+                colaborador_nome: profissionalEntrando.nome_completo,
+                acao: 'RENDIÇÃO (ENTRADA)',
+                posto_destino: postoAlvo?.nome_posto || 'Posto',
+                rendeu_quem_id: profissionalSaindo.id,
+                rendeu_quem_nome: profissionalSaindo.nome_completo
+            })
+
             // 2. Destina o profissional que saiu
             if (destinoSaindo === 'Reserva') {
                 await OpServiceV2.salvarAlocacao(profissionalSaindo.id, null)
+                await OpServiceV2.logMovimentacao({
+                    colaborador_id: profissionalSaindo.id,
+                    colaborador_nome: profissionalSaindo.nome_completo,
+                    acao: 'RENDIÇÃO (SAÍDA PARA RESERVA)',
+                    posto_origem: postoAlvo?.nome_posto || 'Posto'
+                })
             } else {
                 // Inicia pausa (Café, Refeição, etc.)
                 const times: { [key: string]: number } = { 'Café': 15, 'Refeição': 60, 'Janta': 30, 'Ceia': 60 }
@@ -547,6 +652,15 @@ export default function PainelTaticoV2() {
                 const agoraIso = new Date().toISOString()
                 await OpServiceV2.salvarAlocacao(profissionalSaindo.id, null)
                 await OpServiceV2.startPause(profissionalSaindo.id, destinoSaindo, mins * 60, undefined, agoraIso)
+
+                await OpServiceV2.logMovimentacao({
+                    colaborador_id: profissionalSaindo.id,
+                    colaborador_nome: profissionalSaindo.nome_completo,
+                    acao: `RENDIÇÃO (SAÍDA PARA ${destinoSaindo.toUpperCase()})`,
+                    posto_origem: postoAlvo?.nome_posto || 'Posto',
+                    posto_destino: destinoSaindo,
+                    duracao_prevista: mins * 60
+                })
             }
         } catch (err) {
             console.error("Erro na rendição:", err)
@@ -618,7 +732,7 @@ export default function PainelTaticoV2() {
             onDragEnd={handleDragEnd}
         >
             <style>{styles}</style>
-            <div className="flex flex-col md:flex-row gap-8 min-h-[800px] bg-slate-50/50 p-2 rounded-3xl">
+            <div className="flex flex-col md:flex-row gap-8 min-h-[800px] bg-slate-50/50 p-2 rounded-3xl pt-6">
                 
                 {/* COLUNA LATERAL - GLASSMorphism SIDEBAR */}
                 <div className="w-full md:w-80 shrink-0">
@@ -634,21 +748,42 @@ export default function PainelTaticoV2() {
                                 </Badge>
                             </CardTitle>
                             
-                            {/* Shift Toggle */}
-                            <div className="flex items-center gap-6 mt-4">
-                                <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
-                                    <button 
-                                        onClick={() => setTurnoAtivo('Dia')}
-                                        className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${turnoAtivo === 'Dia' ? 'bg-white text-amber-600 shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'}`}
-                                    >
-                                        <Sun className="h-4 w-4" /> DIA
-                                    </button>
-                                    <button 
-                                        onClick={() => setTurnoAtivo('Noite')}
-                                        className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${turnoAtivo === 'Noite' ? 'bg-slate-900 text-blue-400 shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'}`}
-                                    >
-                                        <Moon className="h-4 w-4" /> NOITE
-                                    </button>
+                            {/* Tab & Shift Toggles */}
+                            <div className="space-y-4 mt-6">
+                                <div className="flex flex-col gap-2">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Vista do Painel</p>
+                                    <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
+                                        <button 
+                                            onClick={() => setActiveTab('tatico')}
+                                            className={`flex-1 py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${activeTab === 'tatico' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                                        >
+                                            <Monitor className="h-4 w-4" /> PAINEL
+                                        </button>
+                                        <button 
+                                            onClick={() => setActiveTab('relatorios')}
+                                            className={`flex-1 py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${activeTab === 'relatorios' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                                        >
+                                            <Calendar className="h-4 w-4" /> RELATÓRIOS
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-2">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Turno Ativo</p>
+                                    <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
+                                        <button 
+                                            onClick={() => setTurnoAtivo('Dia')}
+                                            className={`flex-1 py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${turnoAtivo === 'Dia' ? 'bg-white text-amber-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                                        >
+                                            <Sun className="h-4 w-4" /> DIA
+                                        </button>
+                                        <button 
+                                            onClick={() => setTurnoAtivo('Noite')}
+                                            className={`flex-1 py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${turnoAtivo === 'Noite' ? 'bg-slate-900 text-blue-400 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                                        >
+                                            <Moon className="h-4 w-4" /> NOITE
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -672,10 +807,12 @@ export default function PainelTaticoV2() {
                     </Card>
                 </div>
 
-                {/* PAINEL CENTRAL - OPERACIONAL UNIFICADO */}
-                <div className="flex-grow space-y-10 overflow-hidden">
+                {/* PAINEL CENTRAL - OPERACIONAL UNIFICADO - LIMITADO A 4 COLUNAS (300px cada) */}
+                <div className="flex-grow space-y-10 overflow-hidden max-w-[1320px] mx-auto lg:mx-0">
                     
-                    {/* GESTÃO DE PAUSAS NO TOPO */}
+                    {activeTab === 'tatico' ? (
+                        <>
+                            {/* GESTÃO DE PAUSAS NO TOPO */}
                     <section className="space-y-6">
                         <header className="flex items-center gap-4 mb-4">
                             <div className="h-10 w-1 rounded-full bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.4)]" />
@@ -686,9 +823,9 @@ export default function PainelTaticoV2() {
                             </h2>
                         </header>
 
-                        {/* BARRA DE GUIA OPERACIONAL */}
-                        <div className="mb-8 overflow-x-auto pb-4 no-scrollbar">
-                            <div className="flex gap-2 min-w-max px-4">
+                        {/* BARRA DE GUIA OPERACIONAL - AGORA COM QUEBRA DE LINHA */}
+                        <div className="mb-8 p-4 bg-slate-100/30 rounded-3xl border border-slate-100/50">
+                            <div className="flex flex-wrap gap-4">
                                 {guiaTurno.map((item, idx) => {
                                     const isCurrent = () => {
                                         const agora = new Date()
@@ -708,7 +845,7 @@ export default function PainelTaticoV2() {
                                         <div 
                                             key={idx} 
                                             className={`
-                                                flex flex-col p-4 rounded-3xl border transition-all duration-300 min-w-[280px]
+                                                flex flex-col p-4 rounded-3xl border transition-all duration-300 w-[300px] shrink-0
                                                 ${active ? `bg-${item.cor_alerta}-50 border-${item.cor_alerta}-200 ring-2 ring-${item.cor_alerta}-400/20 scale-105 z-10 shadow-xl` : 'bg-white border-slate-100 opacity-60 grayscale hover:grayscale-0 hover:opacity-100'}
                                             `}
                                         >
@@ -736,11 +873,11 @@ export default function PainelTaticoV2() {
                                 equipe={equipe}
                             />
                             <PauseBanner 
-                                title="Refeição" 
+                                title="Almoço" 
                                 color="orange" 
                                 icon={Utensils} 
                                 time={60} 
-                                professionals={pausasAtivas.filter(p => p.type === 'Refeição')} 
+                                professionals={pausasAtivas.filter(p => p.type === 'Almoço' || p.type === 'Refeição')} 
                                 equipe={equipe}
                             />
                             <PauseBanner 
@@ -876,6 +1013,131 @@ export default function PainelTaticoV2() {
                             </div>
                         </section>
                     )}
+                    </>
+                ) : (
+                    /* ABA DE RELATÓRIOS - ESTILO EXCEL */
+                    <section className="space-y-6 animate-in fade-in duration-500">
+                        <header className="flex items-center justify-between mb-8">
+                            <div className="flex items-center gap-4">
+                                <div className="h-10 w-1 rounded-full bg-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.4)]" />
+                                <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3 italic">
+                                    RELATÓRIOS
+                                    <span className="text-slate-200 not-italic">/</span>
+                                    <span className="text-slate-400 text-lg uppercase tracking-[0.1em] not-italic font-black">Histórico de Movimentações</span>
+                                </h2>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button 
+                                    variant="outline" 
+                                    className="rounded-xl border-slate-200 text-slate-600 font-bold hover:bg-slate-50 gap-2"
+                                    onClick={() => handleExportarExcel()}
+                                    disabled={historico.length === 0}
+                                >
+                                    <FileDown className="h-4 w-4" /> Exportar Planilha (CSV)
+                                </Button>
+                                <Button 
+                                    variant="outline" 
+                                    className="rounded-xl border-slate-200 text-slate-600 font-bold hover:bg-slate-50 gap-2"
+                                    onClick={() => fetchData()}
+                                >
+                                    <RefreshCcw className="h-4 w-4" /> Atualizar Dados
+                                </Button>
+                            </div>
+                        </header>
+
+                        <Card className="border-none shadow-xl shadow-slate-200/50 bg-white/90 backdrop-blur-sm overflow-hidden rounded-3xl">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50/50 border-b border-slate-100">
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Horário</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Profissional</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ação Realizada</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Origem</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Destino</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Rendeu Quem?</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Duração</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {historico.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={7} className="px-6 py-20 text-center text-slate-300 italic font-medium">
+                                                    Nenhuma movimentação registrada hoje.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            historico.map((log, i) => (
+                                                <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-sm font-black text-slate-700">{format(parseISO(log.created_at), 'HH:mm:ss')}</span>
+                                                            <span className="text-[9px] text-slate-400 font-bold">{format(parseISO(log.created_at), 'dd/MM/yyyy')}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="h-8 w-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-black text-xs">
+                                                                {log.colaborador_nome?.charAt(0)}
+                                                            </div>
+                                                            <span className="text-sm font-black text-slate-800">{log.colaborador_nome}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <Badge 
+                                                            variant="outline" 
+                                                            className={`
+                                                                font-black border-none px-3 py-1 text-[9px] uppercase tracking-tighter
+                                                                ${log.acao?.includes('RENDIÇÃO') ? 'bg-amber-100 text-amber-700' : 
+                                                                  log.acao?.includes('PAUSA') ? 'bg-blue-100 text-blue-700' : 
+                                                                  log.acao?.includes('POSTO') ? 'bg-emerald-100 text-emerald-700' : 
+                                                                  'bg-slate-100 text-slate-700'}
+                                                            `}
+                                                        >
+                                                            {log.acao}
+                                                        </Badge>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-2 text-slate-500">
+                                                            <MapPin className="h-3 w-3 opacity-30" />
+                                                            <span className="text-xs font-bold truncate max-w-[120px]">{log.posto_origem || '-'}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-2 text-slate-900 font-black italic">
+                                                            <ArrowRightLeft className="h-3 w-3 text-blue-500" />
+                                                            <span className="text-xs">{log.posto_destino || '-'}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        {log.rendeu_quem_nome ? (
+                                                            <div className="flex items-center gap-2 text-rose-600 font-black">
+                                                                <User className="h-3 w-3" />
+                                                                <span className="text-xs">{log.rendeu_quem_nome}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-slate-300 text-xs">-</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        {log.duracao_prevista ? (
+                                                            <div className="flex items-center gap-2 text-slate-500 font-mono text-xs">
+                                                                <Clock className="h-3 w-3" />
+                                                                <span>{Math.floor(log.duracao_prevista/60)}min</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-slate-300 text-xs">-</span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </Card>
+                    </section>
+                )}
                 </div>
             </div>
 

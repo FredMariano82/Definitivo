@@ -6,7 +6,12 @@ import { useAuth } from "../contexts/auth-context"
 import { useState } from "react"
 import AlterarSenhaModal from "./alterar-senha-modal"
 
-export default function Header() {
+interface HeaderProps {
+  isCollapsed?: boolean;
+  onToggle?: () => void;
+}
+
+export default function Header({ isCollapsed, onToggle }: HeaderProps) {
   const { usuario, logout } = useAuth()
   const [showAlterarSenha, setShowAlterarSenha] = useState(false)
 

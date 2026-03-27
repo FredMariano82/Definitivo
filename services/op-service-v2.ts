@@ -792,4 +792,48 @@ export class OpServiceV2 {
         if (error) throw error
         return data || []
     }
+
+    /**
+     * Registra uma movimentação tática no histórico
+     */
+    static async logMovimentacao(dados: {
+        colaborador_id: string,
+        colaborador_nome: string,
+        acao: string,
+        posto_origem?: string,
+        posto_destino?: string,
+        rendeu_quem_id?: string,
+        rendeu_quem_nome?: string,
+        duracao_prevista?: number
+    }) {
+        const { error } = await supabase
+            .from('op_historico_movimentacoes')
+            .insert({
+                ...dados,
+                created_at: new Date().toISOString()
+            })
+        
+        if (error) {
+            console.warn("Erro ao logar movimentação:", error)
+        }
+    }
+
+    /**
+     * Busca o histórico de movimentações de um dia (ou hoje)
+     */
+    static async getHistoricoMovimentacoes(data?: string): Promise<any[]> {
+        const hoje = data || format(new Date(), 'yyyy-MM-dd')
+        const { data: logs, error } = await supabase
+            .from('op_historico_movimentacoes')
+            .select('*')
+            .gte('created_at', `${hoje}T00:00:00Z`)
+            .lte('created_at', `${hoje}T23:59:59Z`)
+            .order('created_at', { ascending: false })
+        
+        if (error) {
+            console.error("Erro ao buscar histórico:", error)
+            return []
+        }
+        return logs || []
+    }
 }
