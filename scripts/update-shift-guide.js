@@ -12,19 +12,27 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 async function updateShiftGuide() {
-  console.log('Atualizando horário de Retorno do Almoço (11h) para 12:00...')
+  console.log('--- INICIANDO ATUALIZAÇÃO ---')
+  console.log('Buscando item para "11:30" e "Retorno do Almoço"...')
   
   const { data, error } = await supabase
     .from('op_guia_turno')
     .update({ horario_alvo: '12:00' })
     .ilike('titulo', '%Retorno do Almoço (11h)%')
+    .eq('horario_alvo', '11:30')
     .eq('turno', 'Dia')
+    .select()
 
   if (error) {
-    console.error('Erro ao atualizar:', error)
-  } else {
+    console.error('Erro ao atualizar banco:', error.message)
+  } else if (data && data.length > 0) {
     console.log('Sucesso! Horário atualizado para 12:00.')
-    console.log('Resultado:', data)
+    console.log('Alterado:', data[0].titulo, '(', data[0].horario_alvo, ')')
+  } else {
+    console.log('Aviso: Nenhum item correspondente encontrado para atualizar.')
+    // Tenta uma busca mais genérica se a anterior falhar
+    const { data: todos } = await supabase.from('op_guia_turno').select('titulo, horario_alvo').eq('turno', 'Dia')
+    console.log('Itens atuais no banco (Dia):', todos)
   }
 }
 

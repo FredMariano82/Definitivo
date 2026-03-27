@@ -77,6 +77,15 @@ const styles = `
 .pulsate-suggested {
   animation: pulsate-suggested 2s infinite;
 }
+
+@keyframes card-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); transform: scale(1.05); }
+  50% { box-shadow: 0 0 20px 10px rgba(59, 130, 246, 0); transform: scale(1.08); }
+  100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); transform: scale(1.05); }
+}
+.active-card-pulse {
+  animation: card-pulse 2s infinite ease-in-out;
+}
 `
 
 function DraggableProfessional({ profissional, status, onCheckOut }: { profissional: OpEquipe, status: 'service' | 'off' | 'event', onCheckOut?: (id: string) => void }) {
@@ -286,7 +295,7 @@ function DroppableSidebarArea({ id, reservaAguardando, handleCheckOut, searchTer
         >
             <h3 className="text-[9px] font-black text-emerald-500 uppercase tracking-[0.2em] flex items-center gap-2 mb-4">
                 <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Efetivo em Reserva
+                Efetivo Escalado
             </h3>
             <div className="grid gap-2">
                 {reservaAguardando.map((p: OpEquipe) => (
@@ -295,7 +304,7 @@ function DroppableSidebarArea({ id, reservaAguardando, handleCheckOut, searchTer
                 {reservaAguardando.length === 0 && !searchTerm && (
                     <div className="text-[10px] text-slate-300 border border-dashed rounded-xl py-6 text-center flex flex-col items-center gap-2">
                         <ShieldAlert className="h-4 w-4 opacity-30" />
-                        <span>Sem profissionais aguardando alocação</span>
+                        <span>Nenhum profissional escalado para hoje</span>
                     </div>
                 )}
             </div>
@@ -741,7 +750,7 @@ export default function PainelTaticoV2() {
                             <CardTitle className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <Users className="h-4 w-4 text-blue-500" />
-                                    <span>Efetivo do Dia</span>
+                                    <span>Efetivo Escalado</span>
                                 </div>
                                 <Badge className="bg-blue-50 text-blue-600 border-none font-bold">
                                     {efetivoTotalHoje.length}
@@ -846,7 +855,7 @@ export default function PainelTaticoV2() {
                                             key={idx} 
                                             className={`
                                                 flex flex-col p-4 rounded-3xl border transition-all duration-300 w-[300px] shrink-0
-                                                ${active ? `bg-${item.cor_alerta}-50 border-${item.cor_alerta}-200 ring-2 ring-${item.cor_alerta}-400/20 scale-105 z-10 shadow-xl` : 'bg-white border-slate-100 opacity-60 grayscale hover:grayscale-0 hover:opacity-100'}
+                                                ${active ? `bg-${item.cor_alerta}-50 border-${item.cor_alerta}-200 ring-2 ring-${item.cor_alerta}-400/20 z-10 shadow-xl active-card-pulse` : 'bg-white border-slate-100 opacity-60 grayscale hover:grayscale-0 hover:opacity-100'}
                                             `}
                                         >
                                             <div className="flex items-center justify-between mb-2">
