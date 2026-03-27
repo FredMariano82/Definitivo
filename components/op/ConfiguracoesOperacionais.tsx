@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { 
     Users, 
     UserPlus, 
@@ -17,14 +17,15 @@ import {
     AlertCircle,
     Plane,
     Clock,
-    Phone
+    Phone,
+    Plus
 } from "lucide-react"
 import { format } from "date-fns"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { OpServiceV2, OpEquipe } from "@/services/op-service-v2"
+import { OpServiceV2, OpEquipe, OpEscalaDiaria } from "@/services/op-service-v2"
 import { 
     Dialog, 
     DialogContent, 
@@ -39,13 +40,14 @@ import { toast } from "sonner"
 
 export default function ConfiguracoesOperacionais() {
     const [equipe, setEquipe] = useState<OpEquipe[]>([])
-    const [excecoes, setExcecoes] = useState<any[]>([])
+    const [excecoes, setExcecoes] = useState<OpEscalaDiaria[]>([])
     const [loading, setLoading] = useState(true)
     const [filtro, setFiltro] = useState("")
     
     // Modal de Cadastro/Edição
     const [isModalOpen, setIsModalOpen] = useState(false)
-    const [editingMember, setEditingMember] = useState<Partial<OpEquipe> | null>(null)
+    const [editingMember, setEditingMember] = useState<OpEquipe | null>(null)
+    const [isCustomFuncao, setIsCustomFuncao] = useState(false)
     const [formData, setFormData] = useState<Partial<OpEquipe>>({
         nome_completo: "",
         re: "",
@@ -60,6 +62,16 @@ export default function ConfiguracoesOperacionais() {
         cel2: "",
         tipo_vinculo: "clube"
     })
+
+    // Lista de cargos extraída dinamicamente da equipe + padrão
+    const funcoesDisponiveis = useMemo(() => {
+        const padrao = ["Vigilante", "VSPP", "Portaria", "Líder", "Motorista"]
+        const extras = equipe
+            .map(m => m.funcao)
+            .filter((v): v is string => !!v && !padrao.includes(v))
+        
+        return Array.from(new Set([...padrao, ...extras])).sort()
+    }, [equipe])
 
     useEffect(() => {
         loadEquipe()
@@ -101,7 +113,7 @@ export default function ConfiguracoesOperacionais() {
         
         let status = statusTeorico ? 'Trabalhando' : 'Folga'
         if (excecao) status = excecao.status_dia
-        
+
         if (membro.data_inicio_ferias && membro.data_fim_ferias) {
             if (dayStr >= membro.data_inicio_ferias && dayStr <= membro.data_fim_ferias) {
                 status = 'Férias'
@@ -109,11 +121,12 @@ export default function ConfiguracoesOperacionais() {
         }
         return status
     }
-
-    const handleOpenModal = (member: OpEquipe | null = null) => {
-        if (member) {
-            setEditingMember(member)
-            setFormData(member)
+    const handleOpenModal = (membro?: OpEquipe) => {
+        if (membro) {
+            setEditingMember(membro)
+            setFormData(membro)
+            // Verificar se o cargo atual está nas opções conhecidas
+            setIsCustomFuncao(!funcoesDisponiveis.includes(membro.funcao || ""))
         } else {
             setEditingMember(null)
             setFormData({
@@ -125,10 +138,12 @@ export default function ConfiguracoesOperacionais() {
                 status_ativo: true,
                 possui_porte_arma: false,
                 possui_cnh: false,
-                referencia_escala: new Date().toISOString().split('T')[0],
-                tipo_vinculo: "clube",
-                nivel: 3
+                nivel: 3,
+                cel1: "",
+                cel2: "",
+                tipo_vinculo: "clube"
             })
+            setIsCustomFuncao(false)
         }
         setIsModalOpen(true)
     }
@@ -181,7 +196,7 @@ export default function ConfiguracoesOperacionais() {
                 </Button>
             </div>
 
-            <Card className="border-none shadow-2xl bg-white/80 backdrop-blur-md rounded-[40px] overflow-hidden border border-white/20">
+            <Card className="border-none shadow-2xl bg-white/80 backdrop-blur-md rounded-[40px] overflow-hidden border border-white/20 w-fit max-w-full lg:max-w-[1300px]">
                 <CardHeader className="p-8 border-b bg-slate-50/50">
                     <CardTitle className="text-xl font-black text-slate-800 flex items-center gap-3">
                         <Users className="h-6 w-6 text-blue-600" />
@@ -191,14 +206,14 @@ export default function ConfiguracoesOperacionais() {
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="overflow-x-auto">
-                        <table className="w-full">
+                        <table className="w-auto min-w-full lg:min-w-0">
                             <thead>
-                                <tr className="bg-slate-50/80 border-b border-slate-100">
-                                    <th className="p-6 text-left text-[10px] font-black uppercase text-slate-400 tracking-widest">Efetivo Próprio (Clube)</th>
-                                    <th className="p-6 text-left text-[10px] font-black uppercase text-slate-400 tracking-widest">Escala / Contato</th>
-                                    <th className="p-6 text-left text-[10px] font-black uppercase text-slate-400 tracking-widest">Tipo</th>
-                                    <th className="p-6 text-left text-[10px] font-black uppercase text-slate-400 tracking-widest">Status</th>
-                                    <th className="p-6 text-right text-[10px] font-black uppercase text-slate-400 tracking-widest">Ações</th>
+                                <tr className="bg-slate-50/80 border-b border-slate-100 italic">
+                                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-slate-400 tracking-widest min-w-[320px]">Ajudante / Profissional</th>
+                                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-slate-400 tracking-widest w-[200px]">Escala / Contato</th>
+                                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-slate-400 tracking-widest w-[140px]">Tipo</th>
+                                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-slate-400 tracking-widest w-[120px]">Status</th>
+                                    <th className="px-6 py-4 text-right text-[10px] font-black uppercase text-slate-400 tracking-widest w-[100px]">Ações</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
@@ -206,7 +221,7 @@ export default function ConfiguracoesOperacionais() {
                                     <tr><td colSpan={5} className="p-20 text-center"><div className="animate-spin h-8 w-8 border-b-2 border-blue-600 mx-auto rounded-full"/></td></tr>
                                 ) : filteredEquipe.filter(m => (m.tipo_vinculo || 'clube') === 'clube').map(membro => (
                                     <tr key={membro.id} className="hover:bg-blue-50/30 transition-all group">
-                                        <td className="p-6">
+                                        <td className="px-6 py-4">
                                             <div className="flex items-center gap-4">
                                                 <div className="relative shrink-0">
                                                     {(() => {
@@ -238,7 +253,7 @@ export default function ConfiguracoesOperacionais() {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="p-6">
+                                        <td className="px-6 py-4">
                                             <div className="flex flex-col gap-1">
                                                 <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-200 border-none font-black text-[10px] py-1 px-3 rounded-xl uppercase tracking-wider w-fit">
                                                     {membro.tipo_escala}
@@ -257,26 +272,26 @@ export default function ConfiguracoesOperacionais() {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="p-6">
+                                        <td className="px-6 py-4">
                                             <div className="flex items-center gap-2">
                                                 {membro.tipo_servico === 'VSPP' ? (
                                                     <Badge className="bg-orange-100 text-orange-600 border-none font-black text-[10px] py-1 px-3 rounded-xl uppercase flex items-center gap-1">
-                                                        <Shield className="h-3 w-3" /> VSPP
+                                                        <Shield className="h-3 w-3" /> {membro.funcao || 'VSPP'}
                                                     </Badge>
                                                 ) : (
                                                     <Badge className="bg-blue-100 text-blue-600 border-none font-black text-[10px] py-1 px-3 rounded-xl uppercase">
-                                                        Vigilante
+                                                        {membro.funcao || 'Vigilante'}
                                                     </Badge>
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="p-6">
+                                        <td className="px-6 py-4">
                                             <div className="flex items-center gap-2 text-emerald-600 font-black text-[10px] uppercase">
                                                 <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-200" />
                                                 Ativo
                                             </div>
                                         </td>
-                                        <td className="p-6 text-right">
+                                        <td className="px-6 py-4 text-right">
                                             <Button 
                                                 variant="ghost" 
                                                 size="icon" 
@@ -304,14 +319,14 @@ export default function ConfiguracoesOperacionais() {
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="overflow-x-auto">
-                        <table className="w-full">
+                        <table className="w-auto min-w-full lg:min-w-0">
                             <thead>
-                                <tr className="bg-slate-50/80 border-b border-slate-100">
-                                    <th className="p-6 text-left text-[10px] font-black uppercase text-slate-400 tracking-widest">Profissional Especialista</th>
-                                    <th className="p-6 text-left text-[10px] font-black uppercase text-slate-400 tracking-widest">Contatos Rápidos</th>
-                                    <th className="p-6 text-left text-[10px] font-black uppercase text-slate-400 tracking-widest">Tipo</th>
-                                    <th className="p-6 text-left text-[10px] font-black uppercase text-slate-400 tracking-widest">Status</th>
-                                    <th className="p-6 text-right text-[10px] font-black uppercase text-slate-400 tracking-widest">Ações</th>
+                                <tr className="bg-slate-50/80 border-b border-slate-100 italic">
+                                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-slate-400 tracking-widest min-w-[320px]">Profissional Especialista</th>
+                                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-slate-400 tracking-widest w-[200px]">Contatos Rápidos</th>
+                                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-slate-400 tracking-widest w-[140px]">Tipo</th>
+                                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-slate-400 tracking-widest w-[120px]">Status</th>
+                                    <th className="px-6 py-4 text-right text-[10px] font-black uppercase text-slate-400 tracking-widest w-[100px]">Ações</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
@@ -319,7 +334,7 @@ export default function ConfiguracoesOperacionais() {
                                     <tr><td colSpan={5} className="p-10 text-center"><div className="animate-spin h-5 w-5 border-b-2 border-slate-400 mx-auto rounded-full"/></td></tr>
                                 ) : filteredEquipe.filter(m => m.tipo_vinculo === 'externo').map(membro => (
                                     <tr key={membro.id} className="hover:bg-orange-50/30 transition-all group">
-                                        <td className="p-6">
+                                        <td className="px-6 py-4">
                                             <div className="flex items-center gap-4">
                                                 <div className="relative shrink-0">
                                                     {(() => {
@@ -346,7 +361,7 @@ export default function ConfiguracoesOperacionais() {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="p-6">
+                                        <td className="px-6 py-4">
                                             <div className="flex flex-col gap-1">
                                                 <div className="flex items-center gap-2 text-[11px] font-black text-slate-700">
                                                     <Smartphone className="h-3.5 w-3.5 text-orange-500" />
@@ -360,18 +375,24 @@ export default function ConfiguracoesOperacionais() {
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="p-6">
-                                            <Badge className="bg-slate-900 text-white border-none font-black text-[10px] py-1 px-3 rounded-xl uppercase">
-                                                {membro.tipo_servico || 'Externo'}
-                                            </Badge>
+                                        <td className="px-6 py-4">
+                                                {membro.tipo_servico === 'VSPP' ? (
+                                                    <Badge className="bg-orange-100 text-orange-600 border-none font-black text-[10px] py-1 px-3 rounded-xl uppercase flex items-center gap-1">
+                                                        <Shield className="h-3 w-3" /> {membro.funcao || 'VSPP'}
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge className="bg-slate-900 text-white border-none font-black text-[10px] py-1 px-3 rounded-xl uppercase">
+                                                        {membro.funcao || 'Externo'}
+                                                    </Badge>
+                                                )}
                                         </td>
-                                        <td className="p-6">
+                                        <td className="px-6 py-4">
                                             <div className="flex items-center gap-2 text-slate-400 font-black text-[10px] uppercase">
                                                 <div className="w-2 h-2 rounded-full bg-slate-300" />
                                                 Especialista
                                             </div>
                                         </td>
-                                        <td className="p-6 text-right">
+                                        <td className="px-6 py-4 text-right">
                                             <Button 
                                                 variant="ghost" 
                                                 size="icon" 
@@ -455,18 +476,49 @@ export default function ConfiguracoesOperacionais() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-4">
+                        <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Função / Serviço Especializado</Label>
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Função (Cargo Visual)</Label>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={() => setIsCustomFuncao(!isCustomFuncao)}
+                                        className={`h-6 px-1.5 rounded-lg text-[9px] font-black transition-all ${isCustomFuncao ? 'bg-blue-600 text-white hover:bg-blue-700' : 'text-blue-600 hover:bg-blue-50'}`}
+                                    >
+                                        {isCustomFuncao ? <CheckCircle2 className="h-3 w-3 mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
+                                        {isCustomFuncao ? 'ESCOLHER DA LISTA' : 'ADICIONAR NOVA'}
+                                    </Button>
+                                </div>
+                                {isCustomFuncao ? (
+                                    <Input 
+                                        value={formData.funcao}
+                                        placeholder="Digite o cargo (ex: Técnico CFTV)..."
+                                        onChange={(e) => setFormData({...formData, funcao: e.target.value})}
+                                        className="h-12 rounded-2xl border-slate-200 bg-blue-50/30 focus:bg-white font-black text-sm transition-all animate-in fade-in slide-in-from-top-2"
+                                    />
+                                ) : (
+                                    <Select value={formData.funcao} onValueChange={(v) => setFormData({...formData, funcao: v})}>
+                                        <SelectTrigger className="h-12 rounded-2xl border-slate-200 font-black text-sm bg-slate-50/50">
+                                            <SelectValue placeholder="Selecione o cargo" />
+                                        </SelectTrigger>
+                                        <SelectContent className="rounded-2xl">
+                                            {funcoesDisponiveis.map(f => (
+                                                <SelectItem key={f} value={f}>{f}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )}
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest text-orange-600">Categoria (Regra Operacional)</Label>
                                 <Select value={formData.tipo_servico} onValueChange={(v) => setFormData({...formData, tipo_servico: v})}>
                                     <SelectTrigger className="h-12 rounded-2xl border-slate-200 font-black text-sm bg-slate-50/50">
-                                        <SelectValue />
+                                        <SelectValue placeholder="Selecione" />
                                     </SelectTrigger>
                                     <SelectContent className="rounded-2xl">
                                         <SelectItem value="Vigilante/Operacional">Vigilante / Operacional</SelectItem>
-                                        <SelectItem value="VSPP">VSPP (Armado)</SelectItem>
-                                        <SelectItem value="Consultor">Consultor / Especialista</SelectItem>
-                                        <SelectItem value="Motorista">Motorista / Batedor</SelectItem>
+                                        <SelectItem value="VSPP">VSPP (Proteção Pessoal)</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

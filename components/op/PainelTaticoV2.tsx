@@ -21,6 +21,7 @@ import {
 } from "@dnd-kit/sortable"
 import { format, parseISO, differenceInSeconds } from 'date-fns'
 import { OpServiceV2, OpEquipe } from "@/services/op-service-v2"
+import { useTheme } from "@/contexts/theme-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -89,6 +90,7 @@ const styles = `
 `
 
 function DraggableProfessional({ profissional, status, onCheckOut }: { profissional: OpEquipe, status: 'service' | 'off' | 'event', onCheckOut?: (id: string) => void }) {
+    const { isDarkMode } = useTheme()
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: profissional.id,
         data: {
@@ -110,13 +112,14 @@ function DraggableProfessional({ profissional, status, onCheckOut }: { profissio
             {...attributes}
             className={`
                 group p-3 rounded-xl border flex items-center justify-between gap-3 cursor-grab active:cursor-grabbing transition-all duration-200 select-none touch-none
-                ${isDragging ? 'opacity-40 ring-2 ring-blue-500 bg-blue-50 z-[9999]' : 'bg-white/70 backdrop-blur-sm border-slate-200 shadow-sm hover:border-blue-300 hover:shadow-md hover:-translate-y-0.5'}
+                ${isDragging ? 'opacity-40 ring-2 ring-blue-500 bg-blue-50 z-[9999]' : ''}
+                ${!isDragging && (isDarkMode ? 'bg-slate-800/80 backdrop-blur-sm border-white/5 shadow-xl hover:border-blue-500/50' : 'bg-white/70 backdrop-blur-sm border-slate-200 shadow-sm hover:border-blue-300 hover:shadow-md hover:-translate-y-0.5')}
             `}
         >
             <div className="flex items-center gap-3 overflow-hidden flex-1 pointer-events-none">
                 <div className="overflow-hidden">
                     <div className="flex items-center gap-2">
-                        <p className="text-sm font-black text-slate-800 truncate leading-tight">{profissional.nome_completo}</p>
+                        <p className={`text-sm font-black truncate leading-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{profissional.nome_completo}</p>
                         {profissional.tipo_servico === 'VSPP' && (
                             <Badge className="bg-rose-600 text-white text-[9px] font-black h-4 px-1.5 border-none uppercase shadow-sm">VSPP</Badge>
                         )}
@@ -146,6 +149,7 @@ function DraggableProfessional({ profissional, status, onCheckOut }: { profissio
 }
 
 function DroppableZone({ id, title, icon: Icon, professionals, capacity, colorClass, type, isLocked, onToggleLock, onRemoveProfessional }: any) {
+    const { isDarkMode } = useTheme()
     const { isOver, setNodeRef } = useDroppable({
         id: id,
         data: { type },
@@ -164,10 +168,11 @@ function DroppableZone({ id, title, icon: Icon, professionals, capacity, colorCl
             `}
         >
             <Card className={`
-                border-none shadow-lg shadow-slate-200/50 overflow-hidden flex flex-col w-[300px] shrink-0
-                ${isOver ? 'bg-blue-50/80 backdrop-blur-md' : 'bg-white/90 backdrop-blur-sm'}
+                border-none shadow-lg overflow-hidden flex flex-col w-[300px] shrink-0 transition-colors duration-500
+                ${isOver ? (isDarkMode ? 'bg-blue-900/40 backdrop-blur-md' : 'bg-blue-50/80 backdrop-blur-md') : (isDarkMode ? 'bg-slate-900/90 backdrop-blur-sm' : 'bg-white/90 backdrop-blur-sm')}
                 ${isFull && !isLocked ? 'ring-1 ring-emerald-500/20' : ''}
-                ${isLocked ? 'bg-slate-50/50' : ''}
+                ${isLocked ? (isDarkMode ? 'bg-black/40' : 'bg-slate-50/50') : ''}
+                ${isDarkMode ? 'shadow-black/40' : 'shadow-slate-200/50'}
             `}>
                 <div className={`h-1.5 w-full ${isLocked ? 'bg-slate-300' : colorClass.split(' ')[1]}`} />
                 <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0 pb-2">
@@ -195,8 +200,8 @@ function DroppableZone({ id, title, icon: Icon, professionals, capacity, colorCl
                 <CardContent className="p-4 pt-2 flex-grow">
                     <div className={`
                         min-h-[110px] rounded-xl border-2 border-dashed p-2 space-y-2 flex flex-col transition-colors
-                        ${isOver ? 'border-blue-200 bg-white/50' : 'border-slate-100'}
-                        ${isLocked ? 'bg-slate-100/30 border-slate-200' : ''}
+                        ${isOver ? (isDarkMode ? 'border-blue-500/50 bg-blue-900/20' : 'border-blue-200 bg-white/50') : (isDarkMode ? 'border-white/5' : 'border-slate-100')}
+                        ${isLocked ? (isDarkMode ? 'bg-black/20 border-white/5' : 'bg-slate-100/30 border-slate-200') : ''}
                     `}>
                         {isLocked ? (
                             <div className="flex-grow flex flex-col items-center justify-center opacity-40">
@@ -226,6 +231,7 @@ function DroppableZone({ id, title, icon: Icon, professionals, capacity, colorCl
 }
 
 function PauseBanner({ title, color, icon: Icon, time, professionals, equipe, onStartPause }: any) {
+    const { isDarkMode } = useTheme()
     const { isOver, setNodeRef } = useDroppable({
         id: `pause-${title.toLowerCase()}`,
         data: { type: 'pause', pauseType: title }
@@ -237,14 +243,14 @@ function PauseBanner({ title, color, icon: Icon, time, professionals, equipe, on
             className={`
                 min-h-[140px] rounded-3xl p-4 transition-all duration-300 flex flex-col justify-between border-2 w-[300px] shrink-0
                 ${isOver ? 'scale-105 ring-4 ring-offset-2' : ''}
-                ${color === 'amber' ? 'bg-amber-50 border-amber-100 ring-amber-400' : ''}
-                ${color === 'orange' ? 'bg-orange-50 border-orange-100 ring-orange-400' : ''}
-                ${color === 'blue' ? 'bg-blue-50 border-blue-100 ring-blue-400' : ''}
-                ${color === 'purple' ? 'bg-purple-50 border-purple-100 ring-purple-400' : ''}
+                ${color === 'amber' ? (isDarkMode ? 'bg-amber-950/20 border-amber-500/30 ring-amber-500' : 'bg-amber-50 border-amber-100 ring-amber-400') : ''}
+                ${color === 'orange' ? (isDarkMode ? 'bg-orange-950/20 border-orange-500/30 ring-orange-400' : 'bg-orange-50 border-orange-100 ring-orange-400') : ''}
+                ${color === 'blue' ? (isDarkMode ? 'bg-blue-950/20 border-blue-500/30 ring-blue-400' : 'bg-blue-50 border-blue-100 ring-blue-400') : ''}
+                ${color === 'purple' ? (isDarkMode ? 'bg-purple-950/20 border-purple-500/30 ring-purple-400' : 'bg-purple-50 border-purple-100 ring-purple-400') : ''}
             `}
         >
             <div className="flex items-center justify-between">
-                <div className={`p-2 rounded-xl bg-white shadow-sm`}>
+                <div className={`p-2 rounded-xl shadow-sm ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}>
                     <Icon className={`h-5 w-5 ${color === 'amber' ? 'text-amber-500' : color === 'orange' ? 'text-orange-500' : color === 'blue' ? 'text-blue-500' : 'text-purple-500'}`} />
                 </div>
                 <Badge variant="outline" className="bg-white/50 border-none font-black text-[10px]">
@@ -253,8 +259,8 @@ function PauseBanner({ title, color, icon: Icon, time, professionals, equipe, on
             </div>
             
             <div>
-                <h3 className="text-xs font-black uppercase tracking-widest text-slate-600 mb-0.5">{title}</h3>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{time} MINUTOS</p>
+                <h3 className={`text-xs font-black uppercase tracking-widest mb-0.5 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{title}</h3>
+                <p className={`text-[10px] font-bold uppercase tracking-tighter ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{time} MINUTOS</p>
             </div>
 
             <div className="mt-4 space-y-2">
@@ -283,6 +289,7 @@ function PauseBanner({ title, color, icon: Icon, time, professionals, equipe, on
 }
 
 function DroppableSidebarArea({ id, reservaAguardando, handleCheckOut, searchTerm }: any) {
+    const { isDarkMode } = useTheme()
     const { isOver, setNodeRef } = useDroppable({
         id: id,
         data: { type: 'pool' }
@@ -291,7 +298,7 @@ function DroppableSidebarArea({ id, reservaAguardando, handleCheckOut, searchTer
     return (
         <div 
             ref={setNodeRef} 
-            className={`space-y-3 rounded-2xl transition-colors min-h-[500px] ${isOver ? 'bg-blue-50/50 ring-2 ring-blue-200 ring-inset' : ''}`}
+            className={`space-y-3 rounded-2xl transition-colors min-h-[500px] ${isOver ? (isDarkMode ? 'bg-blue-900/20 ring-2 ring-blue-500/50' : 'bg-blue-50/50 ring-2 ring-blue-200 ring-inset') : ''}`}
         >
             <h3 className="text-[9px] font-black text-emerald-500 uppercase tracking-[0.2em] flex items-center gap-2 mb-4">
                 <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -321,8 +328,8 @@ function DroppableSidebarArea({ id, reservaAguardando, handleCheckOut, searchTer
 }
 
 // --- COMPONENTE PRINCIPAL ---
-
 export default function PainelTaticoV2() {
+    const { isDarkMode } = useTheme()
     const [equipe, setEquipe] = useState<OpEquipe[]>([])
     const [postos, setPostos] = useState<any[]>([])
     const [eventos, setEventos] = useState<any[]>([])
@@ -741,11 +748,11 @@ export default function PainelTaticoV2() {
             onDragEnd={handleDragEnd}
         >
             <style>{styles}</style>
-            <div className="flex flex-col md:flex-row gap-8 min-h-[800px] bg-slate-50/50 p-2 rounded-3xl pt-6">
+            <div className={`flex flex-col md:flex-row gap-8 min-h-[800px] transition-colors duration-500 rounded-3xl pt-6 ${isDarkMode ? 'bg-slate-900/40' : 'bg-slate-50/50 p-2'}`}>
                 
                 {/* COLUNA LATERAL - GLASSMorphism SIDEBAR */}
                 <div className="w-full md:w-80 shrink-0">
-                    <Card className="border-none shadow-xl shadow-slate-200/60 bg-white/80 backdrop-blur-xl h-full sticky top-6">
+                    <Card className={`border-none shadow-xl transition-colors duration-500 h-full sticky top-6 ${isDarkMode ? 'bg-slate-900/80 shadow-black/20 text-slate-100' : 'shadow-slate-200/60 bg-white/80 backdrop-blur-xl'}`}>
                         <CardHeader className="p-6 pb-4">
                             <CardTitle className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center justify-between">
                                 <div className="flex items-center gap-2">
@@ -761,16 +768,16 @@ export default function PainelTaticoV2() {
                             <div className="space-y-4 mt-6">
                                 <div className="flex flex-col gap-2">
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Vista do Painel</p>
-                                    <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
+                                    <div className={`flex p-1 rounded-2xl border shadow-inner ${isDarkMode ? 'bg-slate-800/80 border-white/5' : 'bg-slate-100 border-slate-200'}`}>
                                         <button 
                                             onClick={() => setActiveTab('tatico')}
-                                            className={`flex-1 py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${activeTab === 'tatico' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                                            className={`flex-1 py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${activeTab === 'tatico' ? (isDarkMode ? 'bg-slate-700 text-white shadow-lg' : 'bg-white text-blue-600 shadow-md') : 'text-slate-400 hover:text-slate-600'}`}
                                         >
                                             <Monitor className="h-4 w-4" /> PAINEL
                                         </button>
                                         <button 
                                             onClick={() => setActiveTab('relatorios')}
-                                            className={`flex-1 py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${activeTab === 'relatorios' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                                            className={`flex-1 py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${activeTab === 'relatorios' ? (isDarkMode ? 'bg-slate-700 text-white shadow-lg' : 'bg-white text-blue-600 shadow-md') : 'text-slate-400 hover:text-slate-600'}`}
                                         >
                                             <Calendar className="h-4 w-4" /> RELATÓRIOS
                                         </button>
@@ -782,7 +789,7 @@ export default function PainelTaticoV2() {
                                     <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
                                         <button 
                                             onClick={() => setTurnoAtivo('Dia')}
-                                            className={`flex-1 py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${turnoAtivo === 'Dia' ? 'bg-white text-amber-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                                            className={`flex-1 py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${turnoAtivo === 'Dia' ? (isDarkMode ? 'bg-amber-600 text-white' : 'bg-white text-amber-600 shadow-md') : 'text-slate-400 hover:text-slate-600'}`}
                                         >
                                             <Sun className="h-4 w-4" /> DIA
                                         </button>
@@ -801,7 +808,7 @@ export default function PainelTaticoV2() {
                                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                                 <Input 
                                     placeholder="Buscar profissional..." 
-                                    className="pl-9 bg-slate-100/50 border-none h-10 rounded-xl text-sm font-medium focus-visible:ring-blue-400"
+                                    className={`pl-9 border-none h-10 rounded-xl text-sm font-medium focus-visible:ring-blue-400 ${isDarkMode ? 'bg-slate-800 text-white placeholder:text-slate-600' : 'bg-slate-100/50'}`}
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
@@ -824,11 +831,11 @@ export default function PainelTaticoV2() {
                             {/* GESTÃO DE PAUSAS NO TOPO */}
                     <section className="space-y-6">
                         <header className="flex items-center gap-4 mb-4">
-                            <div className="h-10 w-1 rounded-full bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.4)]" />
-                            <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3 italic">
+                             <div className="h-10 w-1 rounded-full bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.4)]" />
+                            <h2 className={`text-2xl font-black tracking-tight flex items-center gap-3 italic ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                                 LOGÍSTICA
-                                <span className="text-slate-200 not-italic">/</span>
-                                <span className="text-slate-400 text-lg uppercase tracking-[0.1em] not-italic font-black">Gestão de Pausas</span>
+                                <span className={isDarkMode ? 'text-slate-700' : 'text-slate-200'}>/</span>
+                                <span className={`text-lg uppercase tracking-[0.1em] not-italic font-black ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Gestão de Pausas</span>
                             </h2>
                         </header>
 
@@ -855,7 +862,14 @@ export default function PainelTaticoV2() {
                                             key={idx} 
                                             className={`
                                                 flex flex-col p-4 rounded-3xl border transition-all duration-300 w-[300px] shrink-0
-                                                ${active ? `bg-${item.cor_alerta}-50 border-${item.cor_alerta}-200 ring-2 ring-${item.cor_alerta}-400/20 z-10 shadow-xl active-card-pulse` : 'bg-white border-slate-100 opacity-60 grayscale hover:grayscale-0 hover:opacity-100'}
+                                                ${active 
+                                                    ? (isDarkMode 
+                                                        ? `bg-${item.cor_alerta}-950/40 border-${item.cor_alerta}-500/50 z-10 shadow-2xl active-card-pulse` 
+                                                        : `bg-${item.cor_alerta}-50 border-${item.cor_alerta}-200 ring-2 ring-${item.cor_alerta}-400/20 z-10 shadow-xl active-card-pulse`)
+                                                    : (isDarkMode
+                                                        ? 'bg-slate-800/40 border-slate-700/50 opacity-40 grayscale hover:grayscale-0 hover:opacity-100'
+                                                        : 'bg-white border-slate-100 opacity-60 grayscale hover:grayscale-0 hover:opacity-100')
+                                                }
                                             `}
                                         >
                                             <div className="flex items-center justify-between mb-2">
@@ -864,8 +878,8 @@ export default function PainelTaticoV2() {
                                                 </span>
                                                 {active && <div className={`h-2 w-2 rounded-full bg-${item.cor_alerta}-500 animate-pulse`} />}
                                             </div>
-                                            <h3 className="text-sm font-black text-slate-900 mb-1">{item.titulo}</h3>
-                                            <p className="text-[11px] text-slate-600 leading-relaxed">{item.instrucao}</p>
+                                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{item.titulo}</h3>
+                                            <p className={`text-[11px] leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>{item.instrucao}</p>
                                         </div>
                                     )
                                 })}
@@ -913,10 +927,10 @@ export default function PainelTaticoV2() {
                         <header className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
                                 <div className="h-10 w-1 rounded-full bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]" />
-                                <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3 italic">
+                                <h2 className={`text-2xl font-black tracking-tight flex items-center gap-3 italic ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                                     TORRE DE CONTROLE
-                                    <span className="text-slate-200 not-italic">/</span>
-                                    <span className="text-slate-400 text-lg uppercase tracking-[0.1em] not-italic font-black">Mapa de Postos</span>
+                                    <span className={isDarkMode ? 'text-slate-700' : 'text-slate-200'}>/</span>
+                                    <span className={`text-lg uppercase tracking-[0.1em] not-italic font-black ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Mapa de Postos</span>
                                 </h2>
                             </div>
                         </header>

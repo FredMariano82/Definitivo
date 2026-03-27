@@ -1,8 +1,9 @@
 "use client"
 
-import { LogOut, Settings } from "lucide-react"
+import { LogOut, Settings, Sun, Moon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "../contexts/auth-context"
+import { useTheme } from "@/contexts/theme-context"
 import { useState } from "react"
 import AlterarSenhaModal from "./alterar-senha-modal"
 
@@ -12,6 +13,7 @@ interface HeaderProps {
 }
 
 export default function Header({ isCollapsed, onToggle }: HeaderProps) {
+  const { isDarkMode, toggleTheme } = useTheme()
   const { usuario, logout } = useAuth()
   const [showAlterarSenha, setShowAlterarSenha] = useState(false)
 
@@ -37,6 +39,22 @@ export default function Header({ isCollapsed, onToggle }: HeaderProps) {
             {/* Ações Rápidas */}
             <div className="flex items-center space-x-4">
               <div className="flex items-center bg-white/5 p-1 rounded-xl border border-white/10">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleTheme}
+                  className="text-white hover:bg-white/10 transition-soft rounded-lg h-9 w-9 p-0 flex items-center justify-center"
+                  title={isDarkMode ? "Mudar para Modo Claro" : "Mudar para Modo Escuro"}
+                >
+                  {isDarkMode ? (
+                    <Sun className="h-4 w-4 text-amber-400 fill-amber-400" />
+                  ) : (
+                    <Moon className="h-4 w-4 text-slate-300" />
+                  )}
+                </Button>
+
+                <div className="w-[1px] h-4 bg-white/10 mx-1"></div>
+
                 <Button
                   variant="ghost"
                   size="sm"

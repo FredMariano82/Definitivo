@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useTheme } from "@/contexts/theme-context"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -16,6 +17,7 @@ interface NavigationProps {
 }
 
 export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
+  const { isDarkMode } = useTheme()
   const { usuario } = useAuth()
   const pathname = usePathname()
   const [alertaLiberacoes, setAlertaLiberacoes] = useState(false)

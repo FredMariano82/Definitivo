@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/auth-context"
 import Header from "@/components/header"
 import Navigation from "@/components/navigation"
 import InvitationMonitor from "@/components/op/InvitationMonitor"
+import { ThemeProvider } from "@/contexts/theme-context"
 
 export default function AuthenticatedLayout({
     children,
@@ -36,10 +37,34 @@ export default function AuthenticatedLayout({
     if (!usuario) return null
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col">
-            <Header isCollapsed={isCollapsed} onToggle={() => setIsCollapsed(!isCollapsed)} />
+        <ThemeProvider>
+            <AuthenticatedLayoutContent isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
+                {children}
+            </AuthenticatedLayoutContent>
+        </ThemeProvider>
+    )
+}
+
+function AuthenticatedLayoutContent({ 
+    children, 
+    isCollapsed, 
+    setIsCollapsed 
+}: { 
+    children: React.ReactNode, 
+    isCollapsed: boolean, 
+    setIsCollapsed: (v: boolean) => void 
+}) {
+    return (
+        <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
+            <Header 
+                isCollapsed={isCollapsed} 
+                onToggle={() => setIsCollapsed(!isCollapsed)} 
+            />
             <div className="flex flex-1">
-                <Navigation isCollapsed={isCollapsed} onToggle={() => setIsCollapsed(!isCollapsed)} />
+                <Navigation 
+                    isCollapsed={isCollapsed} 
+                    onToggle={() => setIsCollapsed(!isCollapsed)} 
+                />
                 <main className={`flex-1 p-6 ${isCollapsed ? 'md:ml-20' : 'md:ml-72'} transition-all duration-300`}>
                     <div className="max-w-none mx-auto">
                         {children}
@@ -50,3 +75,4 @@ export default function AuthenticatedLayout({
         </div>
     )
 }
+
