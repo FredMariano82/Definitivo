@@ -154,7 +154,7 @@ function DroppableZone({ id, title, icon: Icon, professionals, capacity, colorCl
             `}
         >
             <Card className={`
-                border-none shadow-lg shadow-slate-200/50 overflow-hidden h-full flex flex-col
+                border-none shadow-lg shadow-slate-200/50 overflow-hidden flex flex-col w-[300px] shrink-0
                 ${isOver ? 'bg-blue-50/80 backdrop-blur-md' : 'bg-white/90 backdrop-blur-sm'}
                 ${isFull && !isLocked ? 'ring-1 ring-emerald-500/20' : ''}
                 ${isLocked ? 'bg-slate-50/50' : ''}
@@ -225,7 +225,7 @@ function PauseBanner({ title, color, icon: Icon, time, professionals, equipe, on
         <div 
             ref={setNodeRef}
             className={`
-                flex-1 min-h-[140px] rounded-3xl p-4 transition-all duration-300 flex flex-col justify-between border-2
+                min-h-[140px] rounded-3xl p-4 transition-all duration-300 flex flex-col justify-between border-2 w-[300px] shrink-0
                 ${isOver ? 'scale-105 ring-4 ring-offset-2' : ''}
                 ${color === 'amber' ? 'bg-amber-50 border-amber-100 ring-amber-400' : ''}
                 ${color === 'orange' ? 'bg-orange-50 border-orange-100 ring-orange-400' : ''}
@@ -499,10 +499,11 @@ export default function PainelTaticoV2() {
                 const times: { [key: string]: number } = { 'Café': 15, 'Refeição': 60, 'Janta': 30, 'Ceia': 60 }
                 const mins = times[pauseType] || 15
                 
+                const agoraIso = new Date().toISOString()
                 // Primeiro libera da alocação (que limpa pausas antigas)
                 await OpServiceV2.salvarAlocacao(profissionalId, null)
                 // Depois inicia a nova pausa
-                await OpServiceV2.startPause(profissionalId, pauseType, mins * 60)
+                await OpServiceV2.startPause(profissionalId, pauseType, mins * 60, undefined, agoraIso)
             }
             else if (type === 'event') {
                 const evento = eventos.find(e => e.id === targetId)
@@ -543,8 +544,9 @@ export default function PainelTaticoV2() {
                 
                 // IMPORTANTE: Primeiro remove a alocação (que encerra pausas antigas)
                 // e DEPOIS inicia a nova pausa.
+                const agoraIso = new Date().toISOString()
                 await OpServiceV2.salvarAlocacao(profissionalSaindo.id, null)
-                await OpServiceV2.startPause(profissionalSaindo.id, destinoSaindo, mins * 60)
+                await OpServiceV2.startPause(profissionalSaindo.id, destinoSaindo, mins * 60, undefined, agoraIso)
             }
         } catch (err) {
             console.error("Erro na rendição:", err)
@@ -686,7 +688,7 @@ export default function PainelTaticoV2() {
 
                         {/* BARRA DE GUIA OPERACIONAL */}
                         <div className="mb-8 overflow-x-auto pb-4 no-scrollbar">
-                            <div className="flex gap-4 min-w-max px-4">
+                            <div className="flex gap-2 min-w-max px-4">
                                 {guiaTurno.map((item, idx) => {
                                     const isCurrent = () => {
                                         const agora = new Date()
@@ -724,7 +726,7 @@ export default function PainelTaticoV2() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div className="flex flex-wrap gap-6">
                              <PauseBanner 
                                 title="Café" 
                                 color="amber" 
@@ -773,7 +775,7 @@ export default function PainelTaticoV2() {
                             </div>
                         </header>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        <div className="flex flex-wrap gap-6">
                             {/* POSTO RENDICIONISTA DINÂMICO */}
                             {(postos || []).length > 0 && (() => {
                                 const postoRend = postos.find(p => p.nome_posto?.trim().toUpperCase() === 'RENDICIONISTA')
@@ -855,7 +857,7 @@ export default function PainelTaticoV2() {
                                 </h2>
                             </header>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            <div className="flex flex-wrap gap-6">
                                 {eventos.map(ev => (
                                     <DroppableZone 
                                         key={ev.id} 

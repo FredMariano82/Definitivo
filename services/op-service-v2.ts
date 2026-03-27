@@ -528,7 +528,7 @@ export class OpServiceV2 {
     /**
      * Inicia uma pausa para um colaborador
      */
-    static async startPause(colaborador_id: string, tipo_pausa: string, segundos: number, posto_anterior_id?: string) {
+    static async startPause(colaborador_id: string, tipo_pausa: string, segundos: number, posto_anterior_id?: string, data_inicio?: string) {
         const { error } = await supabase
             .from('op_pausas')
             .insert({
@@ -536,7 +536,8 @@ export class OpServiceV2 {
                 tipo_pausa,
                 segundos_duracao: segundos,
                 posto_anterior_id,
-                encerrada: false
+                encerrada: false,
+                data_inicio: data_inicio || new Date().toISOString()
             })
         
         if (error) throw error
