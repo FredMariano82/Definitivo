@@ -14,14 +14,12 @@ import {
     TrendingUp,
     Sparkles,
     MessageSquare,
-    Bot,
     XCircle
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { OpServiceV2, OpEquipe, OpEscalaDiaria, OpEvento } from "@/services/op-service-v2"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { OraculoChat } from "./OraculoChat"
 
 export default function DashboardOperacional() {
     const [stats, setStats] = useState({
@@ -35,7 +33,6 @@ export default function DashboardOperacional() {
     })
     const [loading, setLoading] = useState(true)
     const [eventosProximos, setEventosProximos] = useState<OpEvento[]>([])
-    const [isOraculoOpen, setIsOraculoOpen] = useState(false)
 
     useEffect(() => {
         loadDashboardData()
@@ -233,30 +230,6 @@ export default function DashboardOperacional() {
                 </Card>
             </div>
 
-            {/* BOTÃO FLUTUANTE DO ORÁCULO */}
-            <div className="fixed bottom-8 right-8 z-50 flex flex-col items-end gap-4">
-                {isOraculoOpen && (
-                    <div className="w-[450px] shadow-2xl animate-in fade-in slide-in-from-bottom-10 duration-500">
-                        <OraculoChat />
-                    </div>
-                )}
-                
-                <Button 
-                    onClick={() => setIsOraculoOpen(!isOraculoOpen)}
-                    className={`h-16 w-16 rounded-full shadow-2xl transition-all duration-500 hover:scale-110 active:scale-95 border-none
-                        ${isOraculoOpen 
-                            ? 'bg-rose-500 hover:bg-rose-600 text-white' 
-                            : 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white'}`}
-                >
-                    {isOraculoOpen ? <XCircle className="h-8 w-8" /> : <Bot className="h-8 w-8" />}
-                    {!isOraculoOpen && (
-                        <span className="absolute -top-1 -right-1 flex h-5 w-5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-5 w-5 bg-emerald-500 border-2 border-white items-center justify-center text-[8px] font-black">AI</span>
-                        </span>
-                    )}
-                </Button>
-            </div>
         </div>
     )
 }

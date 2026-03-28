@@ -1,99 +1,69 @@
-const XLSX = require('xlsx');
+const xlsx = require('xlsx');
 const path = require('path');
 const fs = require('fs');
 
-const baseDir = 'C:\\Users\\central_seguranca\\.gemini\\antigravity\\scratch\\recuperar';
-const afetadosPath = path.join(baseDir, 'Afetados pelo Robo4.xlsx');
-const backupPath = path.join(baseDir, 'Planilha Pessoas BACKUP 21_03.xlsx');
-const outputPath = path.join(baseDir, 'Afetados_com_Datas_Restauradas.xlsx');
+const sourceDir = 'C:\\Users\\central_seguranca\\.gemini\\antigravity\\scratch\\recuperar';
+const sourceFile = path.join(sourceDir, 'TODOS.xlsx');
+const targetFile = path.join(sourceDir, 'afetados_FINAL_REVISADO.xlsx');
+const outputFile = path.join(sourceDir, 'afetados_FINAL_REVISADO_ATUALIZADO.xlsx');
 
-function normalizar(str) {
-  return String(str || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ")
-    .replace(/[^a-z0-9 ]/g, "")
-    .trim();
-}
+async function processExcel() {
+    console.log('🚀 Iniciando cruzamento de dados...');
 
-async function cruzar() {
-  console.log("🚀 Iniciando cruzamento de planilhas...");
+    // Ler arquivo fonte (TODOS)
+    const wbTodos = xlsx.readFile(sourceFile);
+    const wsTodos = wbTodos.Sheets[wbTodos.SheetNames[0]];
+    const dataTodos = xlsx.utils.sheet_to_json(wsTodos);
 
-  if (!fs.existsSync(afetadosPath) || !fs.existsSync(backupPath)) {
-    console.error("❌ Arquivos não encontrados na pasta scratch/recuperar");
-    return;
-  }
+    console.log(`✅ Arquivo TODOS carregado: ${dataTodos.length} registros`);
 
-  // LER BACKUP
-  console.log("📖 Lendo backup...");
-  const wbBackup = XLSX.readFile(backupPath);
-  const sheetBackup = wbBackup.Sheets[wbBackup.SheetNames[0]];
-  const dataBackup = XLSX.utils.sheet_to_json(sheetBackup);
-  
-  console.log(`📊 Backup carregado: ${dataBackup.length} registros.`);
-
-  // Criar Mapa de Backup por Nome
-  const mapaBackup = new Map();
-  dataBackup.forEach((row, i) => {
-    let nome = "";
-    let dataIni = "";
-    let dataFin = "";
-
-    Object.keys(row).forEach(key => {
-      const kn = normalizar(key);
-      if (kn === 'nome' || kn === 'usuario' || kn === 'usurio') nome = row[key];
-      if (kn === 'data inicial' || kn === 'data_inicial') dataIni = row[key];
-      if (kn === 'data final' || kn === 'data_final') dataFin = row[key];
+    // Criar mapa de NOME -> { EMPRESA, DEPARTAMENTO }
+    const mapa = new Map();
+    dataTodos.forEach(row => {
+        const nome = (row['NOME'] || '').toString().trim().toUpperCase();
+        if (nome) {
+            mapa.set(nome, {
+                empresa: row['EMPRESA'] || '',
+                departamento: row['DEPARTAMENTO'] || ''
+            });
+        }
     });
 
-    if (nome) {
-      mapaBackup.set(normalizar(nome), { dataIni, dataFin, originalName: nome });
-    }
-  });
+    // Ler arquivo destino (afetados)
+    const wbAfetados = xlsx.readFile(targetFile);
+    const wsAfetados = wbAfetados.Sheets[wbAfetados.SheetNames[0]];
+    const dataAfetados = xlsx.utils.sheet_to_json(wsAfetados);
 
-  console.log(`✅ Mapa de backup criado com ${mapaBackup.size} nomes únicos.`);
+    console.log(`✅ Arquivo afetados_FINAL_REVISADO carregado: ${dataAfetados.length} registros`);
 
-  // LER AFETADOS
-  console.log("📖 Lendo lista de afetados...");
-  const wbAfetados = XLSX.readFile(afetadosPath);
-  const sheetAfetados = wbAfetados.Sheets[wbAfetados.SheetNames[0]];
-  const dataAfetados = XLSX.utils.sheet_to_json(sheetAfetados);
-  
-  console.log(`📊 Lista de afetados carregada: ${dataAfetados.length} registros.`);
-
-  // PROCESSAR MATCHES
-  let matches = 0;
-  const resultado = dataAfetados.map(row => {
-    let nomeAfetado = "";
-    Object.keys(row).forEach(key => {
-      const kn = normalizar(key);
-      if (kn === 'nome' || kn === 'usuario' || kn === 'usurio') nomeAfetado = row[key];
+    let matches = 0;
+    // Atualizar os registros
+    const dataAtualizada = dataAfetados.map(row => {
+        const nome = (row['NOME'] || '').toString().trim().toUpperCase();
+        const info = mapa.get(nome);
+        
+        if (info) {
+            matches++;
+            return {
+                ...row,
+                'EMPRESA': info.empresa,
+                'DEPARTAMENTO': info.departamento
+            };
+        }
+        return row;
     });
 
-    if (nomeAfetado) {
-      const match = mapaBackup.get(normalizar(nomeAfetado));
-      if (match) {
-        row["DATA INICIAL"] = match.dataIni || "";
-        row["DATA FINAL"] = match.dataFin || "";
-        matches++;
-      } else {
-        row["DATA INICIAL"] = "NÃO ENCONTRADO";
-        row["DATA FINAL"] = "NÃO ENCONTRADO";
-      }
-    }
-    return row;
-  });
+    console.log(`📊 Total de matches encontrados: ${matches}`);
 
-  console.log(`🎯 Cruzamento concluído: ${matches} matches encontrados de ${dataAfetados.length} nomes.`);
+    // Salvar novo arquivo
+    const newWs = xlsx.utils.json_to_sheet(dataAtualizada);
+    const newWb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(newWb, newWs, 'Afetados Atualizados');
+    xlsx.writeFile(newWb, outputFile);
 
-  // SALVAR RESULTADO
-  const newWs = XLSX.utils.json_to_sheet(resultado);
-  const newWb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(newWb, newWs, "Resultado");
-  XLSX.writeFile(newWb, outputPath);
-
-  console.log(`💾 Resultado salvo em: ${outputPath}`);
+    console.log(`✨ Arquivo salvo com sucesso em: ${outputFile}`);
 }
 
-cruzar().catch(err => console.error("💥 Erro fatal:", err));
+processExcel().catch(err => {
+    console.error('💥 Erro no processamento:', err);
+});

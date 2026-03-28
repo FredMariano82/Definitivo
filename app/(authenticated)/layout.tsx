@@ -7,6 +7,9 @@ import Header from "@/components/header"
 import Navigation from "@/components/navigation"
 import InvitationMonitor from "@/components/op/InvitationMonitor"
 import { ThemeProvider } from "@/contexts/theme-context"
+import { OraculoChat } from "@/components/op/OraculoChat"
+import { Bot, XCircle } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 export default function AuthenticatedLayout({
     children,
@@ -15,6 +18,7 @@ export default function AuthenticatedLayout({
 }) {
     const { usuario, isLoading } = useAuth()
     const [isCollapsed, setIsCollapsed] = useState(false)
+    const [isOraculoOpen, setIsOraculoOpen] = useState(false)
     const router = useRouter()
 
     useEffect(() => {
@@ -38,7 +42,12 @@ export default function AuthenticatedLayout({
 
     return (
         <ThemeProvider>
-            <AuthenticatedLayoutContent isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
+            <AuthenticatedLayoutContent 
+                isCollapsed={isCollapsed} 
+                setIsCollapsed={setIsCollapsed}
+                isOraculoOpen={isOraculoOpen}
+                setIsOraculoOpen={setIsOraculoOpen}
+            >
                 {children}
             </AuthenticatedLayoutContent>
         </ThemeProvider>
@@ -48,11 +57,15 @@ export default function AuthenticatedLayout({
 function AuthenticatedLayoutContent({ 
     children, 
     isCollapsed, 
-    setIsCollapsed 
+    setIsCollapsed,
+    isOraculoOpen,
+    setIsOraculoOpen
 }: { 
     children: React.ReactNode, 
     isCollapsed: boolean, 
-    setIsCollapsed: (v: boolean) => void 
+    setIsCollapsed: (v: boolean) => void,
+    isOraculoOpen: boolean,
+    setIsOraculoOpen: (v: boolean) => void
 }) {
     return (
         <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
@@ -72,6 +85,31 @@ function AuthenticatedLayoutContent({
                 </main>
             </div>
             <InvitationMonitor />
+
+            {/* BOTÃO FLUTUANTE DO ORÁCULO GLOBAL */}
+            <div className="fixed bottom-8 right-8 z-[9999] flex flex-col items-end gap-4">
+                {isOraculoOpen && (
+                    <div className="w-[450px] shadow-2xl animate-in fade-in slide-in-from-bottom-10 duration-500">
+                        <OraculoChat onClose={() => setIsOraculoOpen(false)} />
+                    </div>
+                )}
+                
+                <Button 
+                    onClick={() => setIsOraculoOpen(!isOraculoOpen)}
+                    className={`h-16 w-16 rounded-full shadow-2xl transition-all duration-500 hover:scale-110 active:scale-95 border-none
+                        ${isOraculoOpen 
+                            ? 'bg-rose-500 hover:bg-rose-600 text-white' 
+                            : 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white'}`}
+                >
+                    {isOraculoOpen ? <XCircle className="h-8 w-8" /> : <Bot className="h-8 w-8" />}
+                    {!isOraculoOpen && (
+                        <span className="absolute -top-1 -right-1 flex h-5 w-5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-5 w-5 bg-emerald-500 border-2 border-white items-center justify-center text-[8px] font-black text-white">AI</span>
+                        </span>
+                    )}
+                </Button>
+            </div>
         </div>
     )
 }

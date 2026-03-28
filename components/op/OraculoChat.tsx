@@ -18,7 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { useTheme } from '@/components/theme-provider'
+import { useTheme } from "@/contexts/theme-context"
 
 interface Message {
     id: string
@@ -34,7 +34,7 @@ const SUGGESTIONS = [
     "Regras para dependentes e convidados."
 ]
 
-export function OraculoChat() {
+export function OraculoChat({ onClose }: { onClose?: () => void }) {
     const { isDarkMode } = useTheme()
     const [messages, setMessages] = useState<Message[]>([
         {
@@ -118,10 +118,12 @@ export function OraculoChat() {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10 text-slate-400 hover:text-blue-500 transition-colors">
-                            <BookOpen className="h-5 w-5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10 text-slate-400 hover:text-rose-500 transition-colors">
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="rounded-xl h-10 w-10 text-slate-400 hover:text-rose-500 transition-colors"
+                            onClick={onClose}
+                        >
                             <X className="h-5 w-5" />
                         </Button>
                     </div>
