@@ -30,7 +30,7 @@ export async function POST(req: Request) {
             body: JSON.stringify({
                 contents: [{
                     parts: [{
-                        text: `Você é o Oráculo MVM, um assistente inteligente do sistema de segurança e gestão. 
+                        text: `Você é o Oráculo IA, um assistente inteligente do sistema de segurança e gestão. 
                         Use o contexto abaixo para responder perguntas de funcionários de forma profissional, clara e prestativa.
                         Se não souber a resposta com base no contexto, diga que não encontrou essa informação específica no Estatuto e sugira consultar a diretoria.
                         

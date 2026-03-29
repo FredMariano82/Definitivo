@@ -15,68 +15,92 @@ export function extrairPrestadoresDeTexto(textoLivre: string): {
         return { sucesso: false, erro: "Texto vazio", totalProcessados: 0, prestadores: [] };
     }
 
-    const linhas = textoLivre.split('\n').filter(linha => linha.trim().length > 5);
+    // 🎯 LIMPEZA EXTREMA: OCR costuma colocar ruídos em linhas vazias
+    // Aumentamos a sensibilidade para capturar linhas mais curtas que podem ser nomes
+    const linhas = textoLivre.split('\n')
+        .map(l => l.trim())
+        .filter(linha => linha.length > 2);
+
     const prestadoresEncontrados: PrestadorExtraido[] = [];
     let falhas = 0;
 
-    const docRegex = /([0-9]{2,3}[\.]?[0-9]{3}[\.]?[0-9]{3}[\-]?[0-9X]{1,2})|(\d{7,14})/gi;
+    // 🎯 REGEX HARDENED: Suporta diversos formatos de documento
+    const docRegex = /([0-9]{1,3}[\.\, \-]?)([0-9]{3}[\.\, \-]?)([0-9]{3}[\.\, \-]?)([0-9X]{1,2})/gi;
 
     linhas.forEach(linha => {
-        let linhaLimpa = linha.replace(/[—–]/g, '-').trim();
+        // Ignorar linhas puramente ruidosas (muito curtas e sem números)
+        if (linha.length < 5 && !/\d/.test(linha)) {
+            falhas++;
+            return;
+        }
+
+        let linhaLimpa = linha.replace(/[—–]/g, '-');
         const matchesDoc = [...linhaLimpa.matchAll(docRegex)];
 
         if (matchesDoc && matchesDoc.length > 0) {
-            let docMatchCompleto = matchesDoc[0][0];
-            let docPrincipal = docMatchCompleto.replace(/[^0-9X]/gi, '');
+            // Pegar o match que parece mais um RG/CPF (geralmente o primeiro longo)
+            // Filtramos matches curtos demais para serem documentos reais
+            const matchValido = matchesDoc.find(m => m[0].replace(/\D/g, '').length >= 6) || matchesDoc[0];
+            const docTexto = matchValido[0];
+            const docLimpo = docTexto.replace(/[^0-9X]/gi, '');
 
-            if (docPrincipal.length >= 5) {
-                let partesPeloDocumento = linhaLimpa.split(docMatchCompleto);
+            const partes = linhaLimpa.split(docTexto);
+            let nome = "";
+            let empresa = "";
 
-                if (partesPeloDocumento.length > 0) {
-                    let parteEsquerda = partesPeloDocumento[0].trim();
-                    // Captura o que estiver à direita do documento como empresa
-                    let parteDireita = partesPeloDocumento.slice(1).join(docMatchCompleto).trim();
+            if (partes.length >= 1) {
+                let antes = partes[0].trim();
+                let depois = partes.slice(1).join(docTexto).trim();
 
-                    // Limpa traços colados ao lado do nome (ex: "Joãozinho -")
-                    parteEsquerda = parteEsquerda.replace(/(RG|CPF|Doc|Documento)[\s]*\:?/gi, '');
-                    parteEsquerda = parteEsquerda.replace(/^[-:/|.,\s]+|[-:/|.,\s]+$/g, '');
+                // Limpeza agressiva de prefixos
+                antes = antes.replace(/^[0-9\.\-\s\(\)\*]+/, ''); 
+                antes = antes.replace(/(RG|CPF|Doc|Documento|IDENTIDADE|NOME|PRESTADOR)[\s]*\:?/gi, '');
+                antes = antes.replace(/^[-:/|.,\s]+|[-:/|.,\s]+$/g, '');
 
-                    // NOVA REGRA (OCR Limpeza Extrema Frontal): 
-                    // Lê o começo da frase e apaga TUDO (símbolos de bullet point, asteriscos, números, espaços)
-                    // até bater de frente com a PRIMEIRA LETRA (incluindo letras acentuadas).
-                    parteEsquerda = parteEsquerda.replace(/^[^a-zA-ZÀ-ÿ]+/g, '');
+                // Limpeza agressiva de sufixos na empresa
+                depois = depois.replace(/^[-:/|.,\s]+/, '');
+                depois = depois.replace(/[-:/|.,\s]+$/g, '');
+                depois = depois.replace(/^(EMPRESA|CIA|CORP)[\s]*\:?/gi, '');
 
-                    // NOVA LOGICA: Suporte para [NOME] [SEPARADOR] [EMPRESA] [SEPARADOR] [DOC]
-                    // Se houver vírgula, traço, pipe ou separadores claros, tentamos separar Nome de Empresa
-                    let nomeProvavel = parteEsquerda.trim();
-                    let empresaExtraida = parteDireita.replace(/^[-:/|.,\s]+/, '').trim();
+                // Lógica de separação nome/empresa baseada em contexto
+                const separadores = /[,|;]|\s{3,}/; 
+                const partesEsquerda = antes.split(separadores).map(p => p.trim()).filter(p => p.length > 0);
 
-                    const separadores = /[,|;]|\s{3,}/; // Vírgula, pipe, ponto-e-vírgula ou 3+ espaços
-                    // Nota: O traço (-) foi removido da regex principal de split para não quebrar nomes compostos 
-                    // ou empresas com hífen, mas podemos usar se houver espaços ao redor.
-                    const partesEsquerda = nomeProvavel.split(separadores).map(p => p.trim()).filter(p => p.length > 0);
-
-                    if (partesEsquerda.length >= 2) {
-                        // Se houver pelo menos 2 partes, a última (antes do documento) é provavelmente a empresa
-                        // e o restante é o nome. 
-                        // Ex: "João da Silva, Empresa ABC" -> Nome: João da Silva, Empresa: Empresa ABC
-                        nomeProvavel = partesEsquerda.slice(0, -1).join(' ');
-                        empresaExtraida = partesEsquerda[partesEsquerda.length - 1];
+                if (partesEsquerda.length >= 2) {
+                    nome = partesEsquerda[0];
+                    empresa = partesEsquerda.slice(1).join(' ') + (depois ? ' ' + depois : '');
+                } else if (antes.length > 0) {
+                    nome = antes;
+                    empresa = depois;
+                } else {
+                    // Se o nome vier depois do documento
+                    const partesDireita = depois.split(separadores).map(p => p.trim()).filter(p => p.length > 0);
+                    if (partesDireita.length >= 1) {
+                        nome = partesDireita[0];
+                        empresa = partesDireita.slice(1).join(' ');
                     }
+                }
 
-                    const nomeLcase = nomeProvavel.toLowerCase();
-                    const palavrasProibidas = ['solicita', 'segue', 'obrigado', 'favor', 'verifiquem', 'incluir', 'bom ', 'boa ', 'olá', 'boa tarde'];
-                    const temPalavraProibida = palavrasProibidas.some(palavra => nomeLcase.includes(palavra));
+                // 🎯 FORMATADOR DE TEXTO (CAPITALIZAÇÃO INTELIGENTE)
+                const formatarIniciais = (texto: string) => {
+                    const deDaDos = ['de', 'da', 'do', 'das', 'dos', 'e'];
+                    return (texto || "").toLowerCase().split(' ').map(palavra => {
+                        if (deDaDos.includes(palavra)) return palavra;
+                        return palavra.charAt(0).toUpperCase() + palavra.slice(1);
+                    }).join(' ').trim();
+                };
 
-                    if (nomeProvavel.length > 2 && !temPalavraProibida) {
-                        prestadoresEncontrados.push({
-                            nome: nomeProvavel,
-                            doc1: docPrincipal,
-                            doc2: matchesDoc.length > 1 ? (matchesDoc[1][1] || matchesDoc[1][0]).replace(/[^0-9X]/gi, '') : undefined,
-                            empresa: empresaExtraida || ""
-                        });
-                        return;
-                    }
+                // 🎯 VALIDAÇÃO FINAL (Relaxada para garantir captura)
+                if (nome.length >= 2 && nome.length < 100 && docLimpo.length >= 6) {
+                    prestadoresEncontrados.push({
+                        nome: formatarIniciais(nome),
+                        doc1: docLimpo,
+                        doc2: matchesDoc.length > 1 && matchesDoc[1][0] !== docTexto 
+                               ? matchesDoc[1][0].replace(/[^0-9X]/gi, '') 
+                               : undefined,
+                        empresa: formatarIniciais(empresa)
+                    });
+                    return;
                 }
             }
         }
@@ -86,7 +110,7 @@ export function extrairPrestadoresDeTexto(textoLivre: string): {
     if (prestadoresEncontrados.length > 0) {
         return {
             sucesso: true,
-            erro: falhas > 0 ? `${falhas} linhas ignoradas por não possuírem um documento ou nome válido.` : "",
+            erro: falhas > 10 ? "Nota: Algumas linhas ruidosas na imagem foram ignoradas." : "",
             totalProcessados: prestadoresEncontrados.length,
             prestadores: prestadoresEncontrados,
         };
@@ -94,7 +118,7 @@ export function extrairPrestadoresDeTexto(textoLivre: string): {
 
     return {
         sucesso: false,
-        erro: "Não conseguimos identificar nenhum par de (Nome + Número de Documento) no texto colado.",
+        erro: "Não conseguimos ler os nomes e documentos nesta imagem. Tente uma foto mais nítida ou aproximada.",
         totalProcessados: 0,
         prestadores: [],
     };

@@ -40,7 +40,7 @@ export function OraculoChat({ onClose }: { onClose?: () => void }) {
         {
             id: '1',
             role: 'assistant',
-            content: 'Olá! Sou o Oráculo MVM. Estou aqui para te ajudar com dúvidas sobre o Estatuto Social e normas da empresa. Como posso te auxiliar hoje?',
+            content: 'Olá! Sou o Oráculo. Estou aqui para te ajudar com dúvidas sobre o Estatuto Social e normas da empresa. Como posso te auxiliar hoje?',
             timestamp: new Date()
         }
     ])
@@ -107,7 +107,7 @@ export function OraculoChat({ onClose }: { onClose?: () => void }) {
                         </div>
                         <div>
                             <CardTitle className={`text-xl font-black italic tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                                MVM ORÁCULO
+                                ORÁCULO IA
                             </CardTitle>
                             <div className="flex items-center gap-2">
                                 <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -211,7 +211,7 @@ export function OraculoChat({ onClose }: { onClose?: () => void }) {
                     </Button>
                 </div>
                 <p className="text-[9px] text-center font-bold text-slate-500 mt-4 uppercase tracking-[0.2em]">
-                    Powered by MVM Intelligence & Google Gemini
+                    Powered by AI Intelligence & Google Gemini
                 </p>
             </CardFooter>
         </Card>
