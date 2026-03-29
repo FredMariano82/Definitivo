@@ -56,7 +56,8 @@ export default function DashboardAdmin() {
     buscarDados()
   }, [filtroSolicitante])
 
-  // Efeito específico para o Robo4 (Apenas SuperAdmin)
+  // Efeito específico para o Robo4 (Desativado conforme solicitação - Basta descomentar para reativar)
+  /*
   useEffect(() => {
     if (usuario?.perfil === "superadmin") {
       const inicializarRobo = async () => {
@@ -84,6 +85,7 @@ export default function DashboardAdmin() {
       return () => clearInterval(interval)
     }
   }, [usuario])
+  */
 
   const handleToggleRobo = async (checked: boolean) => {
     setCarregandoRobo(true)
@@ -220,6 +222,8 @@ export default function DashboardAdmin() {
         </CardContent>
       </Card>
 
+      {/* Controle do Robo4 desativado conforme solicitação. Descomente abaixo para reativar. */}
+      {/* 
       {usuario?.perfil === "superadmin" && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card className="border-2 border-blue-200 bg-blue-50/10">
@@ -276,6 +280,7 @@ export default function DashboardAdmin() {
           </Card>
         </div>
       )}
+      */}
 
       <GraficoProdutividadeUsuarios />
     </div>
