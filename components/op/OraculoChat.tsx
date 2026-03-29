@@ -18,7 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { useTheme } from '@/components/theme-provider'
+import { useTheme } from "@/contexts/theme-context"
 
 interface Message {
     id: string
@@ -40,7 +40,7 @@ export function OraculoChat() {
         {
             id: '1',
             role: 'assistant',
-            content: 'Olá! Sou o Oráculo MVM. Estou aqui para te ajudar com dúvidas sobre o Estatuto Social e normas da empresa. Como posso te auxiliar hoje?',
+            content: 'Olá! Sou o Oráculo. Estou aqui para te ajudar com dúvidas sobre o Estatuto Social e normas da empresa. Como posso te auxiliar hoje?',
             timestamp: new Date()
         }
     ])
@@ -107,7 +107,7 @@ export function OraculoChat() {
                         </div>
                         <div>
                             <CardTitle className={`text-xl font-black italic tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                                MVM ORÁCULO
+                                ORÁCULO IA
                             </CardTitle>
                             <div className="flex items-center gap-2">
                                 <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -209,7 +209,7 @@ export function OraculoChat() {
                     </Button>
                 </div>
                 <p className="text-[9px] text-center font-bold text-slate-500 mt-4 uppercase tracking-[0.2em]">
-                    Powered by MVM Intelligence & Google Gemini
+                    Powered by AI Intelligence & Google Gemini
                 </p>
             </CardFooter>
         </Card>

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import type { PrestadorExcelSolicitante } from "@/services/excel-service"
 import { extrairPrestadoresDeTexto } from "@/utils/text-parser"
-// import Tesseract from "tesseract.js"
+import Tesseract from "tesseract.js"
 import { Progress } from "@/components/ui/progress"
 
 interface UploadFotoListaProps {
@@ -53,11 +53,11 @@ export default function UploadFotoLista({ onListaProcessada }: UploadFotoListaPr
         setStatusOCR("Iniciando Leitura Ótica (OCR)...")
 
         try {
-            console.log("📸 OCR desativado temporariamente...")
-            /*
+            console.log("📸 Iniciando OCR Real com Tesseract...")
+            
             const { data: { text } } = await Tesseract.recognize(
                 imagem,
-                'por', // Português
+                'por',
                 {
                     logger: (m: any) => {
                         if (m.status === "recognizing text") {
@@ -69,10 +69,9 @@ export default function UploadFotoLista({ onListaProcessada }: UploadFotoListaPr
                     }
                 }
             )
-            */
-            const text = "OCR desativado"
 
             console.log("📝 Texto extraído da imagem:", text)
+            
             setStatusOCR("Analisando Nomes e Documentos...")
 
             // Utiliza a mesma lógica do Regex! O reuso perfeito.
@@ -81,7 +80,7 @@ export default function UploadFotoLista({ onListaProcessada }: UploadFotoListaPr
             setResultado(resultadoExtracao)
 
             if (!resultadoExtracao.sucesso) {
-                setResultado(prev => prev ? { ...prev, erro: "A foto estava muito embaçada ou não possui RGs/CPFs no padrão reconhecível. Tente tirar outra foto mais nítida." } : null)
+                setResultado(prev => prev ? { ...prev, erro: "Não conseguimos ler os dados com clareza. Tente tirar outra foto mais nítida ou aproximada." } : null)
             }
 
         } catch (error: any) {
@@ -118,18 +117,24 @@ export default function UploadFotoLista({ onListaProcessada }: UploadFotoListaPr
     return (
         <Card className="w-full max-w-4xl mx-auto shadow-none border-0 sm:border sm:shadow-sm">
             <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-fuchsia-700">
+                <CardTitle className="flex items-center gap-2 text-[#D24726]">
                     <Camera className="h-5 w-5" />
-                    Tirar Foto da Lista de Papel (OCR)
+                    Facilitador IA: Leitura de Foto (OCR)
                 </CardTitle>
             </CardHeader>
 
             <CardContent className="space-y-4">
-                <Alert className="border-fuchsia-100 bg-fuchsia-50/50">
-                    <ImageIcon className="h-4 w-4 text-fuchsia-600" />
-                    <AlertDescription className="text-fuchsia-800 text-sm">
-                        <p><strong>Recebeu uma folha de papel impressa com os nomes?</strong></p>
-                        <p>Tire uma foto bem focada pelo celular e envie aqui. O sistema lerá a foto e extrairá os Nomes e Documentos pra você!</p>
+                <Alert className="border-orange-100 bg-orange-50/50">
+                    <ImageIcon className="h-4 w-4 text-[#D24726]" />
+                    <AlertDescription className="text-orange-900 text-sm">
+                        <div className="space-y-2">
+                            <p><strong>💡 Facilitador de Cadastro:</strong> Este recurso utiliza inteligência artificial para tentar ler nomes e documentos de fotos ou prints.</p>
+                            <p className="text-[12px] text-orange-800">⚠️ <strong>Atenção:</strong> A precisão depende da nitidez da imagem. Sempre revise os dados extraídos antes de confirmar.</p>
+                            <div className="bg-white/50 p-2 rounded border border-orange-100 mt-2">
+                                <p className="text-[11px] font-bold text-orange-900 uppercase tracking-wider mb-1">Formato Recomendado:</p>
+                                <p className="text-[11px] font-mono text-orange-700">NOME DO PRESTADOR - 00.000.000-0 - EMPRESA</p>
+                            </div>
+                        </div>
                     </AlertDescription>
                 </Alert>
 
@@ -141,7 +146,7 @@ export default function UploadFotoLista({ onListaProcessada }: UploadFotoListaPr
                             <Button
                                 onClick={() => inputRef.current?.click()}
                                 variant="outline"
-                                className="border-fuchsia-200 text-fuchsia-700 hover:bg-fuchsia-50 h-12 w-full sm:w-auto px-8"
+                                className="border-orange-200 text-[#D24726] hover:bg-orange-50 h-12 w-full sm:w-auto px-8"
                             >
                                 <Camera className="h-5 w-5 mr-2" />
                                 Tirar Foto / Anexar Imagem
@@ -169,7 +174,7 @@ export default function UploadFotoLista({ onListaProcessada }: UploadFotoListaPr
                                     <Button
                                         onClick={processarImagem}
                                         disabled={carregando}
-                                        className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white w-full"
+                                        className="bg-[#D24726] hover:bg-[#B73E21] text-white w-full"
                                     >
                                         <Wand2 className="h-4 w-4 mr-2" />
                                         {carregando ? "Olhando para a foto..." : "Ler Nomes e Documentos da Foto"}
@@ -183,11 +188,11 @@ export default function UploadFotoLista({ onListaProcessada }: UploadFotoListaPr
                 {/* Progress */}
                 {carregando && (
                     <div className="space-y-2 py-4 px-2">
-                        <div className="flex justify-between text-xs text-fuchsia-700 font-medium">
+                        <div className="flex justify-between text-xs text-[#D24726] font-medium">
                             <span>{statusOCR}</span>
                             <span>{progresso}%</span>
                         </div>
-                        <Progress value={progresso} className="h-2 bg-fuchsia-100 [&>div]:bg-fuchsia-600" />
+                        <Progress value={progresso} className="h-2 bg-orange-100 [&>div]:bg-[#D24726]" />
                     </div>
                 )}
 

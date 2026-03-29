@@ -109,10 +109,9 @@ export default function LoginForm() {
         <Card className="w-full max-w-md shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
           <CardHeader className="space-y-6 pb-6">
             <div className="text-center">
-              <div className="flex justify-center mb-6">
-                <img src="/images/mvm-solutions-logo.png" alt="MVM Solutions" className="h-24 w-auto" />
-              </div>
-              <div className="w-24 h-1 bg-gradient-to-r from-blue-400 to-cyan-400 mx-auto rounded-full"></div>
+              <h2 className="text-2xl font-bold text-slate-800">Acesso ao Sistema</h2>
+              <p className="text-sm text-slate-500 mt-2">Entre com suas credenciais</p>
+              <div className="w-16 h-1 bg-gradient-to-r from-blue-500 to-cyan-500 mx-auto rounded-full mt-4"></div>
             </div>
           </CardHeader>
           <CardContent>

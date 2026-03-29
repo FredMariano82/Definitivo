@@ -58,9 +58,8 @@ export default function UploadListaExcel({ onListaProcessada }: UploadListaExcel
         prestadores: resultadoProcessamento.prestadores,
       })
 
-      if (resultadoProcessamento.sucesso && onListaProcessada) {
-        onListaProcessada(resultadoProcessamento.prestadores)
-      }
+      // IMPORTANTE: Removemos o envio automático aqui para permitir que o usuário veja
+      // o contador de nomes primeiro e clique no botão de confirmar manualmente.
     } catch (error: any) {
       console.error("💥 SOLICITANTE - Erro no processamento:", error)
       setResultado({
@@ -137,9 +136,9 @@ export default function UploadListaExcel({ onListaProcessada }: UploadListaExcel
             <Button
               onClick={() => inputRef.current?.click()}
               variant="outline"
-              className="border-slate-600 text-slate-600 hover:bg-slate-50"
+              className="border-[#217346] text-[#217346] hover:bg-green-50"
             >
-              <Upload className="h-4 w-4 mr-2" />
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
               Selecionar Arquivo Excel
             </Button>
 
@@ -158,7 +157,7 @@ export default function UploadListaExcel({ onListaProcessada }: UploadListaExcel
             <Button
               onClick={processarArquivo}
               disabled={carregando}
-              className="bg-slate-600 hover:bg-slate-700 text-white"
+              className="bg-[#217346] hover:bg-[#1A5C38] text-white"
             >
               {carregando ? "Processando..." : "Processar Lista Excel"}
             </Button>
@@ -185,22 +184,31 @@ export default function UploadListaExcel({ onListaProcessada }: UploadListaExcel
               <div className="space-y-3">
                 {resultado.sucesso ? (
                   <>
-                    <p>
-                      <strong>✅ Lista processada com sucesso!</strong>
-                    </p>
-                    <p className="text-sm">📊 Total de prestadores: {resultado.totalProcessados}</p>
+                    <div className="flex items-center gap-3">
+                      <div className="bg-green-100 text-green-700 px-4 py-2 rounded-full font-bold text-lg flex items-center gap-2">
+                        <Users className="h-5 w-5" />
+                        {resultado.totalProcessados}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-green-800">✅ Lista lida com sucesso!</p>
+                        <p className="text-xs text-green-600">Encontramos {resultado.totalProcessados} prestadores prontos para importação.</p>
+                      </div>
+                    </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-3 pt-2">
                       <Button
                         onClick={usarListaNaSolicitacao}
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700 text-white"
+                        className="bg-[#217346] hover:bg-[#1A5C38] text-white shadow-sm"
                       >
-                        Usar Lista na Solicitação
+                        Enviar para o Formulário
                       </Button>
 
-                      <Button onClick={() => setMostrarPreview(!mostrarPreview)} variant="outline" size="sm">
-                        {mostrarPreview ? "Ocultar" : "Ver"} Preview
+                      <Button 
+                        onClick={() => setMostrarPreview(!mostrarPreview)} 
+                        variant="outline" 
+                        className="border-green-200 text-green-700 hover:bg-green-100"
+                      >
+                        {mostrarPreview ? "Ocultar" : "Ver"} Lista Encontrada
                       </Button>
                     </div>
                   </>

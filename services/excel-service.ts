@@ -118,10 +118,10 @@ export class ExcelService {
 
               const prestador: PrestadorExcelADM = {
                 id: getVal(colunas.id) || undefined,
-                nome: nomeRaw,
+                nome: this.formatarIniciais(nomeRaw),
                 doc1: documentoFinal,
                 doc2: this.limparDoc1(getVal(colunas.doc2)) || undefined,
-                empresa: empresaRaw,
+                empresa: this.formatarIniciais(empresaRaw),
                 cargo: getVal(colunas.cargo) || undefined,
                 observacoes: getVal(colunas.observacoes) || undefined,
                 validaAte: this.formatarData(getVal(colunas.validaAte)),
@@ -241,10 +241,10 @@ export class ExcelService {
         try {
           const prestador: PrestadorExcelADM = {
             id: this.extrairValor(linha, colunas.id) || undefined,
-            nome: this.extrairValor(linha, colunas.nome) || "Sem Nome",
+            nome: this.formatarIniciais(this.extrairValor(linha, colunas.nome)) || "Sem Nome",
             doc1: this.limparDoc1(this.extrairValor(linha, colunas.doc1)),
             doc2: this.limparDoc1(this.extrairValor(linha, colunas.doc2)) || undefined,
-            empresa: this.extrairValor(linha, colunas.empresa) || "Não Informada",
+            empresa: this.formatarIniciais(this.extrairValor(linha, colunas.empresa)) || "Não Informada",
             cargo: this.extrairValor(linha, colunas.cargo) || undefined,
             observacoes: this.extrairValor(linha, colunas.observacoes) || undefined,
             validaAte: this.formatarData(this.extrairValor(linha, colunas.validaAte)),
@@ -385,10 +385,10 @@ export class ExcelService {
 
         try {
           const prestador: PrestadorExcelSolicitante = {
-            nome: this.extrairValor(linha, colunas.nome),
+            nome: this.formatarIniciais(this.extrairValor(linha, colunas.nome)),
             doc1: this.limparDoc1(this.extrairValor(linha, colunas.doc1)),
             doc2: this.limparDoc1(this.extrairValor(linha, colunas.doc2)) || undefined,
-            empresa: this.extrairValor(linha, colunas.empresa) || "",
+            empresa: this.formatarIniciais(this.extrairValor(linha, colunas.empresa)) || "",
           }
 
           // 🎯 NOVO: Ignorar se a linha for um cabeçalho repetido ou lixo
@@ -502,6 +502,20 @@ export class ExcelService {
   }
 
   // 🔧 FUNÇÕES AUXILIARES
+  private static formatarIniciais(texto: string): string {
+    if (!texto) return ""
+    const deDaDos = ["de", "da", "do", "das", "dos", "e"]
+    return String(texto)
+      .toLowerCase()
+      .split(" ")
+      .map((palavra) => {
+        if (deDaDos.includes(palavra)) return palavra
+        return palavra.charAt(0).toUpperCase() + palavra.slice(1)
+      })
+      .join(" ")
+      .trim()
+  }
+
   private static encontrarColuna(cabecalho: string[], possiveisNomes: string[]): number {
     for (const nome of possiveisNomes) {
       const index = cabecalho.findIndex((col) => {

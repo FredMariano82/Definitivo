@@ -24,15 +24,11 @@ export default function Header({ isCollapsed, onToggle }: HeaderProps) {
       <header className="sticky top-0 z-50 premium-gradient shadow-xl border-b border-white/10 backdrop-blur-sm h-[88px] flex items-center">
         <div className="w-full px-6">
           <div className="flex items-center justify-between">
-            {/* Logo e Info do Sistema */}
+            {/* Logo e Info do Sistema - OCULTADO PARA APRESENTAÇÃO */}
             <div className="flex items-center space-x-5 group">
-              <div className="relative">
-                <div className="absolute -inset-1 bg-gradient-to-r from-blue-400 to-cyan-400 rounded-lg blur opacity-25 group-hover:opacity-50 transition-soft"></div>
-                <img src="/images/mvm-solutions-logo.png" alt="MVM Solutions" className="relative h-12 w-auto transition-soft group-hover:scale-105" />
-              </div>
               <div className="hidden sm:block">
-                <h1 className="text-xl font-bold text-white tracking-tight leading-none">MVM SOLUTIONS</h1>
-                <p className="text-[10px] font-medium text-blue-300/60 uppercase tracking-widest mt-1">Gestão de Prestadores</p>
+                <h1 className="text-xl font-bold text-white tracking-tight leading-none uppercase">Sistema de Gestão</h1>
+                <p className="text-[10px] font-medium text-blue-300/60 uppercase tracking-widest mt-1">Controle de Acessos</p>
               </div>
             </div>
 

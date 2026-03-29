@@ -11,11 +11,11 @@ import { SolicitacoesService } from "../../services/solicitacoes-service"
 import { PrestadoresService } from "../../services/prestadores-service"
 import AvisoPrazo from "./aviso-prazo"
 import type { Prestador } from "../../types"
-import { Plus, Trash2, AlertTriangle, User, FileSpreadsheet, X, Wand2, Camera } from "lucide-react"
+import { Plus, Trash2, AlertTriangle, User, FileSpreadsheet, X, Wand2, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import UploadListaExcel from "./upload-lista-excel"
-import UploadFotoLista from "./upload-foto-lista"
+import UploadTextoLivre from "./upload-texto-livre"
 import ModalPreviaSolicitacao from "./modal-previa-solicitacao"
 import FinalidadeSolicitacao from "./finalidade-solicitacao"
 import { AutocompleteRG } from "@/components/ui/autocomplete-rg"
@@ -91,9 +91,8 @@ export default function NovaSolicitacao({
 
   // Adicionar estado para controlar modal de upload
   const [mostrarUploadLista, setMostrarUploadLista] = useState(false)
-  const [mostrarUploadFoto, setMostrarUploadFoto] = useState(false)
-
-  // 🎯 NOVOS ESTADOS PARA CORREÇÕES
+  const [mostrarUploadTexto, setMostrarUploadTexto] = useState(false)
+  const [mostrarPrevia, setMostrarPrevia] = useState(false)
   const [dadosVieramDoExcel, setDadosVieramDoExcel] = useState(false)
 
   const [mostrarModalPrevia, setMostrarModalPrevia] = useState(false)
@@ -697,17 +696,39 @@ export default function NovaSolicitacao({
         </div>
       )}
 
-      {finalidade && mostrarUploadFoto && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-4 border-b flex justify-between items-center text-fuchsia-700">
-              <h2 className="text-xl font-bold flex items-center gap-2"><Camera className="w-5 h-5" /> Tirar Foto da Lista (OCR)</h2>
-              <Button onClick={() => setMostrarUploadFoto(false)} variant="ghost" size="sm">
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+      {finalidade && mostrarUploadTexto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white rounded-lg shadow-xl relative">
+            <button
+              onClick={() => setMostrarUploadTexto(false)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 z-10"
+            >
+              <X className="h-6 w-6" />
+            </button>
             <div className="p-4">
-              <UploadFotoLista onListaProcessada={(prestadores) => { processarListaExcel(prestadores); setMostrarUploadFoto(false); }} />
+              <UploadTextoLivre
+                onListaProcessada={(novosPrestadores) => {
+                  const prestadoresComId = novosPrestadores.map((p) => ({
+                    ...p,
+                    id: Math.random().toString(36).substr(2, 9),
+                  }))
+                  
+                  // Se a primeira linha estiver totalmente vazia, remover antes de adicionar
+                  const listaBase = (prestadores.length === 1 && !prestadores[0].nome && !prestadores[0].doc1) 
+                    ? [] 
+                    : prestadores;
+                  
+                  setPrestadores([...listaBase, ...prestadoresComId])
+                  setMostrarUploadTexto(false)
+
+                  // Detecção de empresas para Texto de Whatsapp
+                  const empresasEspecificas = novosPrestadores.filter((p) => p.empresa?.trim())
+                  if (empresasEspecificas.length > 0) {
+                    setModoEmpresa("especifica")
+                    setEmpresa("")
+                  }
+                }}
+              />
             </div>
           </div>
         </div>
@@ -774,19 +795,18 @@ export default function NovaSolicitacao({
                   <div className="flex flex-wrap gap-2 justify-end md:justify-start mt-2">
                     <Button
                       type="button"
-                      onClick={() => setMostrarUploadFoto(true)}
-                      className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-[0_0_15px_rgba(192,38,211,0.3)] transition-all"
+                      onClick={() => setMostrarUploadTexto(true)}
+                      className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white shadow-[0_0_15px_rgba(37,99,235,0.2)] transition-all"
                       size="sm"
                     >
-                      <Camera className="h-4 w-4 mr-2" />
-                      Tirar Foto da Lista
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Texto de Whatsapp
                     </Button>
                     <Button
                       type="button"
                       onClick={() => setMostrarUploadLista(true)}
-                      variant="outline"
                       size="sm"
-                      className="border-slate-600 text-slate-600 hover:bg-slate-50"
+                      className="bg-[#1e293b] hover:bg-[#0f172a] text-white shadow-[0_0_15px_rgba(30,41,59,0.2)] transition-all"
                     >
                       <FileSpreadsheet className="h-4 w-4 mr-2" />
                       Upload Excel
@@ -805,28 +825,9 @@ export default function NovaSolicitacao({
                 </div>
 
                 <div className="space-y-4">
-                  {/* 🎯 ALERTA EXPLICATIVO INTELIGENTE */}
-                  <Alert className="mb-4 border-blue-200 bg-blue-50">
-                    <User className="h-4 w-4 text-blue-600" />
-                    <AlertDescription className="text-blue-700">
-                      <div className="space-y-2">
-                        <p>
-                          <strong>🔍 Busca Dupla + Auto-preenchimento:</strong> Preencha Doc1 ou Doc2. O sistema buscará
-                          em ambas as colunas do banco e preencherá automaticamente o nome quando encontrar o prestador.
-                        </p>
-                        <p>
-                          <strong>🏢 Modo Empresa:</strong> Preencha a empresa geral OU as empresas específicas (não
-                          ambos)
-                        </p>
-                      </div>
-                    </AlertDescription>
-                  </Alert>
-
                   {prestadores.map((prestador, index) => (
                     <div key={prestador.id} className="space-y-3">
-                      {/* Grid com 5 colunas - ORDEM: Doc1, Doc2, Nome, Empresa */}
                       <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
-                        {/* Doc1 (Autocomplete) */}
                         <div className="md:col-span-1">
                           <Label className="text-sm font-medium text-slate-700">Doc1 (RG, etc)</Label>
                           <AutocompleteRG
@@ -848,7 +849,6 @@ export default function NovaSolicitacao({
                               )
                               setPrestadores(novosPrestadores)
 
-                              // Se selecionou empresa, ajustar modo
                               if (sugestao.empresa && modoEmpresa !== "especifica") {
                                 setModoEmpresa("especifica")
                                 setEmpresa("")
@@ -859,7 +859,6 @@ export default function NovaSolicitacao({
                           />
                         </div>
 
-                        {/* Doc2 */}
                         <div>
                           <Label className="text-sm font-medium text-slate-700">Doc2 (CPF, CNH, etc)</Label>
                           <Input
@@ -871,7 +870,6 @@ export default function NovaSolicitacao({
                           />
                         </div>
 
-                        {/* Nome */}
                         <div>
                           <Label className="text-sm font-medium text-slate-700">Nome</Label>
                           <Input
@@ -882,7 +880,6 @@ export default function NovaSolicitacao({
                           />
                         </div>
 
-                        {/* 🎯 EMPRESA ESPECÍFICA INTELIGENTE */}
                         <div>
                           <Label className="text-sm font-medium text-slate-700">Empresa</Label>
                           <Input
@@ -896,7 +893,6 @@ export default function NovaSolicitacao({
                           />
                         </div>
 
-                        {/* Botão remover */}
                         <div>
                           {prestadores.length > 1 && (
                             <Button
@@ -915,8 +911,6 @@ export default function NovaSolicitacao({
                       <div className="text-xs text-slate-500 ml-1">
                         💡 Preencha o Documento (RG, CPF, CNH, etc) | 🏢 Escolha: empresa geral OU específicas
                       </div>
-
-                      {/* REMOVER TODA ESTA SEÇÃO DE ALERTAS */}
                     </div>
                   ))}
                 </div>
@@ -924,9 +918,10 @@ export default function NovaSolicitacao({
 
               <Separator />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Datas de Acesso - FORMATO COMPACTO */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
-                  <Label htmlFor="dataInicial" className="text-sm font-medium text-slate-700">
+                  <Label htmlFor="dataInicial" className="text-xs font-semibold text-slate-500 uppercase">
                     Data Inicial do Acesso *
                   </Label>
                   <Input
@@ -937,11 +932,11 @@ export default function NovaSolicitacao({
                       setDataInicial(e.target.value)
                       verificarDataUrgente(e.target.value)
                     }}
-                    className="border-slate-300 focus:border-slate-600 focus:ring-slate-600"
+                    className="border-slate-300 focus:border-slate-600 focus:ring-slate-600 h-9"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="dataFinal" className="text-sm font-medium text-slate-700">
+                  <Label htmlFor="dataFinal" className="text-xs font-semibold text-slate-500 uppercase">
                     Data Final do Acesso *
                   </Label>
                   <Input
@@ -950,11 +945,13 @@ export default function NovaSolicitacao({
                     value={dataFinal}
                     onChange={(e) => {
                       setDataFinal(e.target.value)
-                      // A revalidação será feita pelo useEffect quando dataFinal mudar
                     }}
-                    className="border-slate-300 focus:border-slate-600 focus:ring-slate-600"
+                    className="border-slate-300 focus:border-slate-600 focus:ring-slate-600 h-9"
                   />
                 </div>
+                
+                {/* Espaçamento extra para manter os campos compactos à esquerda */}
+                <div className="hidden lg:block lg:col-span-2"></div>
               </div>
 
               {alertaValidacao && (

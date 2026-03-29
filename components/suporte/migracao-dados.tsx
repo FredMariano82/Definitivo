@@ -305,7 +305,7 @@ export default function MigracaoDados() {
               <Button
                 onClick={() => setMostrarUploadExcel(!mostrarUploadExcel)}
                 variant="outline"
-                className="border-purple-600 text-purple-600 hover:bg-purple-50"
+                className="border-[#217346] text-[#217346] hover:bg-green-50"
               >
                 <Upload className="h-4 w-4 mr-2" />
                 {mostrarUploadExcel ? "Cancelar Upload" : "Upload Excel"}

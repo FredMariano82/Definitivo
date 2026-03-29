@@ -10,13 +10,13 @@ import { useAuth } from "../../contexts/auth-context"
 import { SolicitacoesService } from "../../services/solicitacoes-service"
 import { PrestadoresService } from "../../services/prestadores-service"
 import type { Prestador } from "../../types"
-import { Plus, Trash2, User, FileSpreadsheet, X, AlertTriangle, CheckCircle, Camera, ShieldCheck } from "lucide-react"
+import { Plus, Trash2, User, FileSpreadsheet, X, AlertTriangle, CheckCircle, Wand2, ShieldCheck, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import UploadListaExcel from "../solicitante/upload-lista-excel"
-import UploadFotoLista from "../solicitante/upload-foto-lista"
+import UploadTextoLivre from "../solicitante/upload-texto-livre"
 import ModalPreviaSolicitacao from "../solicitante/modal-previa-solicitacao"
 import UploadHistoricoExcel from "./upload-historico-excel"
 import { Switch } from "@/components/ui/switch"
@@ -56,6 +56,10 @@ export default function NovaSolicitacaoAdmin({
   const [dataInicial, setDataInicial] = useState("")
   const [dataFinal, setDataFinal] = useState("")
   const [erro, setErro] = useState("")
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const tipoSolicitacao = "checagem_liberacao" // ← ADM: Fixo como checagem + liberação
+
+  // Efeito para carregar dados iniciais e verificar perfil
   const [sucesso, setSucesso] = useState("")
   const [carregando, setCarregando] = useState(false)
 
@@ -68,9 +72,8 @@ export default function NovaSolicitacaoAdmin({
 
   // Adicionar estado para controlar modal de upload
   const [mostrarUploadLista, setMostrarUploadLista] = useState(false)
-  const [mostrarUploadFoto, setMostrarUploadFoto] = useState(false)
-
-  // 🎯 NOVOS ESTADOS PARA CORREÇÕES
+  const [mostrarUploadTexto, setMostrarUploadTexto] = useState(false)
+  const [mostrarPrevia, setMostrarPrevia] = useState(false)
   const [dadosVieramDoExcel, setDadosVieramDoExcel] = useState(false)
 
   const [mostrarModalPrevia, setMostrarModalPrevia] = useState(false)
@@ -201,30 +204,6 @@ export default function NovaSolicitacaoAdmin({
       } catch (error) {
         console.error("❌ ADM - Erro ao buscar prestador:", error)
       }
-    }
-  }
-
-  const converterDataBrParaDate = (dataBr: string): Date | null => {
-    if (!dataBr) return null
-
-    try {
-      const [dia, mes, ano] = dataBr.split("/").map(Number)
-      return new Date(ano, mes - 1, dia) // Mês é 0-indexado em JavaScript
-    } catch (error) {
-      console.error("Erro ao converter data:", error)
-      return null
-    }
-  }
-
-  // Função para converter data no formato YYYY-MM-DD para objeto Date
-  const converterDataIsoParaDate = (dataIso: string): Date | null => {
-    if (!dataIso) return null
-
-    try {
-      return new Date(dataIso)
-    } catch (error) {
-      console.error("Erro ao converter data ISO:", error)
-      return null
     }
   }
 
@@ -366,12 +345,8 @@ export default function NovaSolicitacaoAdmin({
     }
   }
 
-  // Revalidar prestadores quando mudar o tipo de solicitação OU data final
   useEffect(() => {
     if (dadosPrePreenchidos) {
-      if (dadosPrePreenchidos.tipoSolicitacao) {
-        // REMOVE setTipoSolicitacao(dadosPrePreenchidos.tipoSolicitacao as "checagem_liberacao" | "somente_liberacao")
-      }
       if (dadosPrePreenchidos.local) {
         setLocal(dadosPrePreenchidos.local)
       }
@@ -388,10 +363,6 @@ export default function NovaSolicitacaoAdmin({
         setDataFinal(dadosPrePreenchidos.dataFinal)
       }
 
-      // Aceitar automaticamente o prazo se for renovação
-      // REMOVE setAceitouPrazo(true)
-
-      // Limpar dados após aplicar
       if (onLimparDadosPrePreenchidos) {
         onLimparDadosPrePreenchidos()
       }
@@ -438,7 +409,6 @@ export default function NovaSolicitacaoAdmin({
     }
   }
 
-  // Adicionar função para processar lista do Excel
   const processarListaExcel = (prestadoresExcel: any[]) => {
     console.log(`📝 ADM EXCEL LIMPO - Processando ${prestadoresExcel.length} prestadores`)
 
@@ -468,8 +438,6 @@ export default function NovaSolicitacaoAdmin({
     console.log(`✅ ADM EXCEL LIMPO - ${novosPrestadores.length} prestadores carregados SEM validações`)
   }
 
-  const tipoSolicitacao = "checagem_liberacao" // ← ADM: Fixo como checagem + liberação
-
   const verificarDataUrgente = (data: string) => {
     if (!data) {
       setAlertaDataUrgente("")
@@ -494,43 +462,6 @@ export default function NovaSolicitacaoAdmin({
 
   return (
     <div className="min-h-screen bg-transparent p-4 space-y-6">
-      {mostrarUploadHistorico && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h2 className="text-xl font-bold">Upload de Histórico Excel</h2>
-              <Button onClick={() => setMostrarUploadHistorico(false)} variant="ghost" size="sm">
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="p-4">
-              <UploadHistoricoExcel
-                onUploadCompleto={() => {
-                  console.log(`✅ ADM - Upload histórico concluído`)
-                  setMostrarUploadHistorico(false)
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {tipoSolicitacao && mostrarUploadLista && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h2 className="text-xl font-bold">Upload de Lista Excel</h2>
-              <Button onClick={() => setMostrarUploadLista(false)} variant="ghost" size="sm">
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="p-4">
-              <UploadListaExcel onListaProcessada={processarListaExcel} />
-            </div>
-          </div>
-        </div>
-      )}
-
       {tipoSolicitacao && (
         <Card className="shadow-lg border-0">
           <CardHeader className="pb-6">
@@ -647,12 +578,12 @@ export default function NovaSolicitacaoAdmin({
                   <div className="flex gap-2">
                     <Button
                       type="button"
-                      onClick={() => setMostrarUploadFoto(true)}
-                      className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-[0_0_15px_rgba(192,38,211,0.3)] transition-all"
+                      onClick={() => setMostrarUploadTexto(true)}
+                      className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white shadow-[0_0_15px_rgba(37,99,235,0.2)] transition-all"
                       size="sm"
                     >
-                      <Camera className="h-4 w-4 mr-2" />
-                      Tirar Foto da Lista
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Texto de Whatsapp
                     </Button>
                     <Button
                       type="button"
@@ -667,9 +598,8 @@ export default function NovaSolicitacaoAdmin({
                     <Button
                       type="button"
                       onClick={() => setMostrarUploadLista(true)}
-                      variant="outline"
                       size="sm"
-                      className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                      className="bg-[#1e293b] hover:bg-[#0f172a] text-white shadow-[0_0_15px_rgba(30,41,59,0.2)] transition-all"
                     >
                       <FileSpreadsheet className="h-4 w-4 mr-2" />
                       Upload Excel
@@ -690,16 +620,13 @@ export default function NovaSolicitacaoAdmin({
                 <div className="space-y-4">
                   {prestadores.map((prestador, index) => (
                     <div key={prestador.id} className="space-y-3">
-                      {/* Grid com 5 colunas - ORDEM: Doc1, Doc2, Nome, Empresa */}
                       <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
-                        {/* Doc1 (Autocomplete) */}
                         <div className="md:col-span-1">
                           <Label className="text-sm font-medium text-slate-700">Doc1 (RG, etc)</Label>
                           <AutocompleteRG
                             value={prestador.doc1}
                             onChange={(valor) => atualizarPrestador(prestador.id, "doc1", valor)}
                             onSelect={(sugestao) => {
-                              console.log("🎯 ADM - Sugestão selecionada:", sugestao)
                               const novosPrestadores = prestadores.map((p) =>
                                 p.id === prestador.id
                                   ? {
@@ -711,8 +638,6 @@ export default function NovaSolicitacaoAdmin({
                                   : p,
                               )
                               setPrestadores(novosPrestadores)
-
-                              // Se selecionou empresa, ajustar modo
                               if (sugestao.empresa && modoEmpresa !== "especifica") {
                                 setModoEmpresa("especifica")
                                 setEmpresa("")
@@ -723,7 +648,6 @@ export default function NovaSolicitacaoAdmin({
                           />
                         </div>
 
-                        {/* Doc2 */}
                         <div>
                           <Label className="text-sm font-medium text-slate-700">Doc2 (CPF, CNH, etc)</Label>
                           <Input
@@ -735,7 +659,6 @@ export default function NovaSolicitacaoAdmin({
                           />
                         </div>
 
-                        {/* Nome */}
                         <div>
                           <Label className="text-sm font-medium text-slate-700">Nome</Label>
                           <Input
@@ -747,7 +670,6 @@ export default function NovaSolicitacaoAdmin({
                           />
                         </div>
 
-                        {/* 🎯 EMPRESA ESPECÍFICA INTELIGENTE - NO GRID */}
                         <div>
                           <Label className="text-sm font-medium text-slate-700">Empresa</Label>
                           <Input
@@ -761,7 +683,6 @@ export default function NovaSolicitacaoAdmin({
                           />
                         </div>
 
-                        {/* Botão remover - SÓ ÍCONE */}
                         <div>
                           {prestadores.length > 1 && (
                             <Button
@@ -783,9 +704,10 @@ export default function NovaSolicitacaoAdmin({
 
               <Separator />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Datas de Acesso - FORMATO COMPACTO */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
-                  <Label htmlFor="dataInicial" className="text-sm font-medium text-slate-700">
+                  <Label htmlFor="dataInicial" className="text-xs font-semibold text-slate-500 uppercase">
                     Data Inicial {usuario?.perfil !== "superadmin" && "*"}
                   </Label>
                   <Input
@@ -796,11 +718,11 @@ export default function NovaSolicitacaoAdmin({
                       setDataInicial(e.target.value)
                       verificarDataUrgente(e.target.value)
                     }}
-                    className="border-slate-300 focus:border-blue-600 focus:ring-blue-600"
+                    className="border-slate-300 focus:border-blue-600 focus:ring-blue-600 h-9"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="dataFinal" className="text-sm font-medium text-slate-700">
+                  <Label htmlFor="dataFinal" className="text-xs font-semibold text-slate-500 uppercase">
                     Data Final {usuario?.perfil !== "superadmin" && "*"}
                   </Label>
                   <Input
@@ -808,9 +730,12 @@ export default function NovaSolicitacaoAdmin({
                     id="dataFinal"
                     value={dataFinal}
                     onChange={(e) => setDataFinal(e.target.value)}
-                    className="border-slate-300 focus:border-blue-600 focus:ring-blue-600"
+                    className="border-slate-300 focus:border-blue-600 focus:ring-blue-600 h-9"
                   />
                 </div>
+                
+                {/* Espaçamento extra para manter os campos compactos à esquerda */}
+                <div className="hidden lg:block lg:col-span-2"></div>
               </div>
 
               {alertaDataUrgente && (
@@ -840,7 +765,6 @@ export default function NovaSolicitacaoAdmin({
                 </Alert>
               )}
 
-              {/* 🎯 SELETOR DE MODO DE APROVAÇÃO (EXCLUSIVO SUPERADMIN) */}
               {usuario?.perfil === "superadmin" && (
                 <div className="bg-blue-50/50 p-6 rounded-xl border border-blue-100 space-y-4">
                   <div className="flex items-center gap-2 text-blue-800">
@@ -914,6 +838,45 @@ export default function NovaSolicitacaoAdmin({
         </Card>
       )}
 
+      {/* Modal de Upload Texto Livre */}
+      {mostrarUploadTexto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white rounded-lg shadow-xl relative">
+            <button
+              onClick={() => setMostrarUploadTexto(false)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 z-10"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <div className="p-4">
+              <UploadTextoLivre
+                onListaProcessada={(novosPrestadores) => {
+                  const prestadoresComId = novosPrestadores.map((p) => ({
+                    ...p,
+                    id: Math.random().toString(36).substr(2, 9),
+                  }))
+                  
+                  // Se a primeira linha estiver totalmente vazia, remover antes de adicionar
+                  const listaBase = (prestadores.length === 1 && !prestadores[0].nome && !prestadores[0].doc1) 
+                    ? [] 
+                    : prestadores;
+
+                  setPrestadores([...listaBase, ...prestadoresComId])
+                  setMostrarUploadTexto(false)
+
+                  // Detecção de empresas para Texto de Whatsapp
+                  const empresasEspecificas = novosPrestadores.filter((p) => p.empresa?.trim())
+                  if (empresasEspecificas.length > 0) {
+                    setModoEmpresa("especifica")
+                    setEmpresa("")
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {mostrarUploadHistorico && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -946,26 +909,6 @@ export default function NovaSolicitacaoAdmin({
         </div>
       )}
 
-      {mostrarUploadFoto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Tirar Foto da Lista</h3>
-              <Button variant="ghost" size="icon" onClick={() => setMostrarUploadFoto(false)}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="p-4">
-              <UploadFotoLista
-                onListaProcessada={(prestadoresRef) => {
-                  processarListaExcel(prestadoresRef)
-                  setMostrarUploadFoto(false)
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
 
       <ModalPreviaSolicitacao
         isOpen={mostrarModalPrevia}
