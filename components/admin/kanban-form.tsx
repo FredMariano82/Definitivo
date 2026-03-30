@@ -27,11 +27,13 @@ import { PlusIcon, TrashIcon } from "lucide-react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/contexts/auth-context"
+import { ImageUpload } from "@/components/ui/image-upload"
 
 const kanbanSchema = z.object({
   titulo: z.string().min(3, "O título deve ter no mínimo 3 caracteres."),
   descricao: z.string().optional(),
-  categoria: z.enum(["imagem", "os", "ocorrencia", "autorizacao_chaves", "achados_perdidos", "eventos"], {
+  foto_url: z.string().optional(),
+  categoria: z.enum(["imagem", "os", "ocorrencia", "autorizacao_chaves", "achados_perdidos", "eventos", "uniforme"], {
     required_error: "Selecione uma categoria.",
   }),
   // Campos dinâmicos (Imagem)
@@ -58,6 +60,11 @@ const kanbanSchema = z.object({
   data_hora_desmontagem: z.string().optional(),
   publico_estimado: z.string().optional(),
   foto_evento_url: z.string().optional(),
+  // Campos dinâmicos (Uniforme)
+  tipo_acao_uniforme: z.enum(['retirada', 'troca', 'devolucao']).optional(),
+  peca_uniforme: z.string().optional(),
+  tamanho_atual: z.string().optional(),
+  tamanho_novo: z.string().optional(),
 })
 
 type KanbanFormValues = z.infer<typeof kanbanSchema>
@@ -76,6 +83,7 @@ export function KanbanForm({ onSuccess, defaultValues }: KanbanFormProps) {
     defaultValues: {
       titulo: defaultValues?.titulo || "",
       descricao: defaultValues?.descricao || "",
+      foto_url: defaultValues?.foto_url || "",
       categoria: defaultValues?.categoria || "ocorrencia",
       data_hora_evento: defaultValues?.data_hora_evento || "",
       cameras_solicitadas: defaultValues?.cameras_solicitadas || "",
@@ -96,6 +104,10 @@ export function KanbanForm({ onSuccess, defaultValues }: KanbanFormProps) {
       data_hora_desmontagem: defaultValues?.data_hora_desmontagem || "",
       publico_estimado: defaultValues?.publico_estimado || "",
       foto_evento_url: defaultValues?.foto_evento_url || "",
+      tipo_acao_uniforme: defaultValues?.tipo_acao_uniforme || "retirada",
+      peca_uniforme: defaultValues?.peca_uniforme || "",
+      tamanho_atual: defaultValues?.tamanho_atual || "",
+      tamanho_novo: defaultValues?.tamanho_novo || "",
     },
   })
 
@@ -106,7 +118,7 @@ export function KanbanForm({ onSuccess, defaultValues }: KanbanFormProps) {
     setIsSubmitting(true)
     try {
       // Separando campos padrão dos dados específicos
-      const { titulo, descricao, categoria, ...rest } = data;
+      const { titulo, descricao, categoria, foto_url, ...rest } = data;
       
       let dados_especificos = {};
       
@@ -144,6 +156,15 @@ export function KanbanForm({ onSuccess, defaultValues }: KanbanFormProps) {
           publico_estimado: rest.publico_estimado,
           foto_evento_url: rest.foto_evento_url
         };
+      } else if (categoria === 'uniforme') {
+        dados_especificos = {
+          tipo_acao_uniforme: rest.tipo_acao_uniforme,
+          peca_uniforme: rest.peca_uniforme,
+          ...(rest.tipo_acao_uniforme === 'troca' ? {
+            tamanho_atual: rest.tamanho_atual,
+            tamanho_novo: rest.tamanho_novo
+          } : {})
+        };
       }
       
       const { error } = await supabase
@@ -153,6 +174,7 @@ export function KanbanForm({ onSuccess, defaultValues }: KanbanFormProps) {
             titulo,
             descricao,
             categoria,
+            foto_url,
             status: 'entrada', // Status padrão na criação
             dados_especificos,
             created_by_name: usuario?.nome || 'Usuário Desconhecido',
@@ -177,6 +199,24 @@ export function KanbanForm({ onSuccess, defaultValues }: KanbanFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <FormField
+          control={form.control}
+          name="foto_url"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Foto do Registro (Opcional)</FormLabel>
+              <FormControl>
+                <ImageUpload 
+                  value={field.value} 
+                  onChange={field.onChange} 
+                  disabled={isSubmitting}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         <FormField
           control={form.control}
           name="titulo"
@@ -211,6 +251,7 @@ export function KanbanForm({ onSuccess, defaultValues }: KanbanFormProps) {
                     <SelectItem value="autorizacao_chaves">Autorização de Chaves</SelectItem>
                     <SelectItem value="achados_perdidos">Achados e Perdidos</SelectItem>
                     <SelectItem value="eventos">Eventos</SelectItem>
+                    <SelectItem value="uniforme">Uniforme</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormDescription>
@@ -568,6 +609,83 @@ export function KanbanForm({ onSuccess, defaultValues }: KanbanFormProps) {
               <p className="text-sm text-muted-foreground">O envio de anexos/plantas será implementado em breve com o Storage Bucket.</p>
               <Button type="button" variant="secondary" size="sm" className="mt-2" disabled>Anexar Mapa (Em breve)</Button>
             </div>
+          </div>
+        )}
+
+        {/* --- CAMPOS CAMALEÃO: UNIFORME --- */}
+        {categoria === "uniforme" && (
+          <div className="space-y-4 p-4 border rounded-md bg-muted/30">
+            <h4 className="font-medium text-sm text-muted-foreground mb-4">Controle de Uniforme</h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="tipo_acao_uniforme"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Ação</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="retirada">Retirada</SelectItem>
+                        <SelectItem value="troca">Troca</SelectItem>
+                        <SelectItem value="devolucao">Devolução</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="peca_uniforme"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Item / Peça</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Calça, Bota, Gandola..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Campos de tamanho aparecem APENAS se for TROCA */}
+            {form.watch("tipo_acao_uniforme") === "troca" && (
+              <div className="grid grid-cols-2 gap-4 mt-2 p-3 bg-primary/5 rounded-lg border border-primary/10">
+                <FormField
+                  control={form.control}
+                  name="tamanho_atual"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tamanho Atual (Dando Baixa)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: M" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="tamanho_novo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tamanho Novo (Recebendo)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: G" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
           </div>
         )}
 

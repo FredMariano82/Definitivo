@@ -279,7 +279,7 @@ export default function ConsultaSolicitacoesGestor() {
         .from("prestadores")
         .update({
           checagem: "excecao", // Coluna: Checagem
-          liberacao: "ok",    // Coluna: Liberação (Alinhado com a Regra de Economia)
+          liberacao: "pendente", // 🔥 PRODUÇÃO REAL: Alterado para PENDENTE (Admin deve fazer o cadastro manual)
           justificativa: novaJustificativa,
           data_avaliacao: new Date().toISOString(),
           aprovado_por: "Gestor - Exceção",
@@ -315,7 +315,7 @@ export default function ConsultaSolicitacoesGestor() {
               prestador: {
                 ...item.prestador,
                 checagem: "excecao" as any,
-                liberacao: "ok" as any,
+                liberacao: "pendente" as any,
                 justificativa: novaJustificativa,
               },
             }

@@ -7,7 +7,7 @@ import { KanbanDesfechoModal, DesfechoTipo } from "@/components/admin/kanban-des
 import { KanbanDetailsModal } from "@/components/admin/kanban-details-modal"
 import { OpServiceV2 } from "@/services/op-service-v2"
 import { Button } from "@/components/ui/button"
-import { PlusIcon, BookTextIcon, MapPin } from "lucide-react"
+import { PlusIcon, BookTextIcon, MapPin, ImageIcon, Trash2Icon } from "lucide-react"
 import Link from "next/link"
 import {
   Dialog,
@@ -23,8 +23,8 @@ import { useAuth } from "@/contexts/auth-context"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 
-type TarefaStatus = 'entrada' | 'fazendo' | 'aguardando' | 'historico'
-type TarefaCategoria = 'imagem' | 'os' | 'ocorrencia' | 'autorizacao_chaves' | 'achados_perdidos' | 'eventos'
+type TarefaStatus = 'entrada' | 'andamento' | 'aguardando' | 'revisao' | 'finalizado'
+type TarefaCategoria = 'imagem' | 'os' | 'ocorrencia' | 'autorizacao_chaves' | 'achados_perdidos' | 'eventos' | 'uniforme'
 
 interface KanbanTarefa {
   id: string
@@ -32,6 +32,7 @@ interface KanbanTarefa {
   descricao: string
   status: TarefaStatus
   categoria: TarefaCategoria
+  foto_url?: string
   dados_especificos: Record<string, any>
   created_by_name?: string
   updated_by_name?: string
@@ -77,9 +78,10 @@ export default function KanbanBoardPage() {
 
   const columns: { id: TarefaStatus; title: string }[] = [
     { id: 'entrada', title: 'Entrada' },
-    { id: 'fazendo', title: 'Fazendo' },
+    { id: 'andamento', title: 'Em Andamento' },
     { id: 'aguardando', title: 'Aguardando' },
-    { id: 'historico', title: 'Histórico' },
+    { id: 'revisao', title: 'Revisão' },
+    { id: 'finalizado', title: 'Finalizado' },
   ]
 
   const getCategoriaBadge = (categoria: string) => {
@@ -89,12 +91,56 @@ export default function KanbanBoardPage() {
       case 'autorizacao_chaves': return <Badge variant="default" className="bg-emerald-600">Chaves</Badge>
       case 'achados_perdidos': return <Badge variant="default" className="bg-purple-500">Achados & Perdidos</Badge>
       case 'eventos': return <Badge variant="default" className="bg-rose-500">Eventos</Badge>
+      case 'uniforme': return <Badge variant="default" className="bg-teal-600">Uniforme</Badge>
       default: return <Badge variant="secondary">Ocorrência</Badge>
     }
   }
 
+  const getSubcategoriaBadge = (tarefa: KanbanTarefa) => {
+    const { categoria, dados_especificos } = tarefa
+    if (!dados_especificos) return null
+
+    let text = ""
+    let className = "bg-slate-100 text-slate-600 border-slate-200"
+
+    switch (categoria) {
+      case 'uniforme':
+        text = dados_especificos.tipo_acao_uniforme
+        className = "bg-teal-50 text-teal-700 border-teal-200"
+        break
+      case 'os':
+        text = dados_especificos.prioridade
+        if (text === 'urgente' || text === 'alta') className = "bg-red-50 text-red-700 border-red-200"
+        else className = "bg-amber-50 text-amber-700 border-amber-200"
+        break
+      case 'imagem':
+        text = dados_especificos.solicitante
+        break
+      case 'eventos':
+        text = dados_especificos.local_evento
+        className = "bg-rose-50 text-rose-700 border-rose-200"
+        break
+      case 'achados_perdidos':
+        text = dados_especificos.local_encontro
+        break
+      default:
+        return null
+    }
+
+    if (!text) return null
+
+    return (
+      <Badge 
+        variant="outline" 
+        className={`ml-1.5 capitalize font-normal text-[10px] h-5 ${className}`}
+      >
+        {text.replace('_', ' ')}
+      </Badge>
+    )
+  }
+
   const handleStatusChangeClick = (tarefa: KanbanTarefa, newStatus: TarefaStatus) => {
-    if (newStatus === 'historico') {
+    if (newStatus === 'finalizado') {
       // Abre modal de desfecho
       setTarefaSelecionadaParaDesfecho(tarefa)
       setDesfechoModalOpen(true)
@@ -124,10 +170,11 @@ export default function KanbanBoardPage() {
 
       // Sincronização com Eventos se for categoria 'eventos'
       if (tarefa?.categoria === 'eventos' && tarefa.dados_especificos?.evento_id) {
-        if (newStatus === 'historico') {
-          await OpServiceV2.setEventoConcluido(tarefa.dados_especificos.evento_id, true)
-        } else if (tarefa.status === 'historico' && newStatus !== 'historico') {
-          await OpServiceV2.setEventoConcluido(tarefa.dados_especificos.evento_id, false)
+        const evento_id = tarefa.dados_especificos.evento_id;
+        if (newStatus === 'finalizado') {
+          await OpServiceV2.setEventoConcluido(evento_id, true)
+        } else if ((tarefa.status as string) === 'finalizado' && newStatus !== 'finalizado') {
+          await OpServiceV2.setEventoConcluido(evento_id, false)
         }
       }
 
@@ -137,12 +184,32 @@ export default function KanbanBoardPage() {
       toast.error("Erro ao atualizar status: " + e.message)
     }
   }
+  
+  const handleDeleteTarefa = async (tarefaId: string) => {
+    if (!confirm("Tem certeza que deseja excluir esta tarefa? Esta ação não pode ser desfeita.")) return
+
+    try {
+      const { error } = await supabase
+        .from('kanban_tarefas')
+        .delete()
+        .eq('id', tarefaId)
+
+      if (error) throw error
+
+      toast.success("Tarefa excluída com sucesso!")
+      fetchTarefas()
+      setDetailsModalOpen(false)
+      setTarefaSelecionadaDetalhes(null)
+    } catch (e: any) {
+      toast.error("Erro ao excluir tarefa: " + e.message)
+    }
+  }
 
   const handleDesfechoConfirm = async (desfecho: DesfechoTipo, observacao: string) => {
     if (!tarefaSelecionadaParaDesfecho) return
 
     setDesfechoModalOpen(false)
-    await updateTarefaStatus(tarefaSelecionadaParaDesfecho.id, 'historico', {
+    await updateTarefaStatus(tarefaSelecionadaParaDesfecho.id, 'finalizado', {
       desfecho_final: desfecho,
       desfecho_observacao: observacao,
       data_desfecho: new Date().toISOString()
@@ -289,21 +356,47 @@ export default function KanbanBoardPage() {
                       onClick={() => handleCardClick(tarefa)}
                     >
                       <div className="flex justify-between items-start">
-                        {getCategoriaBadge(tarefa.categoria)}
+                        <div className="flex items-center flex-wrap gap-y-1">
+                          {getCategoriaBadge(tarefa.categoria)}
+                          {getSubcategoriaBadge(tarefa)}
+                        </div>
                         {/* Dropdown status temporário simulando drag n drop */}
-                        <select 
-                          className="text-xs bg-transparent border-none text-muted-foreground cursor-pointer outline-none opacity-50 hover:opacity-100 transition-opacity ml-2"
-                          value={tarefa.status}
-                          onChange={(e) => {
-                             e.stopPropagation() // Evita abrir o modal
-                             handleStatusChangeClick(tarefa, e.target.value as TarefaStatus)
-                          }}
-                          onClick={(e) => e.stopPropagation()} // Evita abrir o modal ao clicar no seletor
-                        >
-                          {columns.map(c => <option key={c.id} value={c.id}>Mover p/ {c.title}</option>)}
-                        </select>
+                        <div className="flex items-center">
+                          <select 
+                            className="text-xs bg-transparent border-none text-muted-foreground cursor-pointer outline-none opacity-50 hover:opacity-100 transition-opacity ml-2"
+                            value={tarefa.status}
+                            onChange={(e) => {
+                               e.stopPropagation() 
+                               handleStatusChangeClick(tarefa, e.target.value as TarefaStatus)
+                            }}
+                            onClick={(e) => e.stopPropagation()} 
+                          >
+                            {columns.map(c => <option key={c.id} value={c.id}>Mover p/ {c.title}</option>)}
+                          </select>
+                          {usuario?.perfil === 'superadmin' && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0 ml-1"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteTarefa(tarefa.id)
+                              }}
+                            >
+                              <Trash2Icon className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                      <h4 className="font-medium mt-1">{tarefa.titulo}</h4>
+                      
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="font-medium mt-1 flex-1">{tarefa.titulo}</h4>
+                        {tarefa.foto_url && (
+                          <div className="mt-1 shrink-0 bg-primary/10 p-1 rounded-md" title="Possui foto anexa">
+                             <ImageIcon className="h-4 w-4 text-primary" />
+                          </div>
+                        )}
+                      </div>
                       
                       {/* Dados Específicos Summary */}
                       {tarefa.categoria === 'imagem' && tarefa.dados_especificos?.solicitante && (
@@ -344,8 +437,8 @@ export default function KanbanBoardPage() {
                         </div>
                       )}
 
-                      {/* Desfecho Badge se for Historico */}
-                      {tarefa.status === 'historico' && tarefa.dados_especificos?.desfecho_final && (
+                      {/* Desfecho Badge se for Finalizado */}
+                      {tarefa.status === 'finalizado' && tarefa.dados_especificos?.desfecho_final && (
                         <div className={`mt-2 text-xs font-medium px-2 py-1.5 rounded-md flex items-center justify-center border
                           ${tarefa.dados_especificos.desfecho_final === 'sucesso' ? 'bg-green-500/10 text-green-600 border-green-500/20' : 
                             tarefa.dados_especificos.desfecho_final === 'insucesso_tecnico' ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20' : 
@@ -400,6 +493,7 @@ export default function KanbanBoardPage() {
         }}
         tarefa={tarefaSelecionadaDetalhes}
         onAddNote={handleAddNote}
+        onDelete={usuario?.perfil === 'superadmin' ? handleDeleteTarefa : undefined}
       />
     </div>
   )

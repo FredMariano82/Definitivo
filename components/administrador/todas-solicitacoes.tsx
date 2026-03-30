@@ -1208,14 +1208,14 @@ export default function TodasSolicitacoes() {
                                   <Button
                                     onClick={() => handleConfirmarCadastro(solicitacao, prestador)}
                                     size="sm"
-                                    disabled={!((prestador.checagem as string) === "aprovado" || prestador.checagem === "aprovada")}
-                                    className={`h-7 w-7 p-0 text-white ${!((prestador.checagem as string) === "aprovado" || prestador.checagem === "aprovada")
+                                    disabled={!((prestador.checagem as string) === "aprovado" || prestador.checagem === "aprovada" || prestador.checagem === "excecao")}
+                                    className={`h-7 w-7 p-0 text-white ${!((prestador.checagem as string) === "aprovado" || prestador.checagem === "aprovada" || prestador.checagem === "excecao")
                                       ? "bg-green-600 opacity-40 cursor-not-allowed"
                                       : "bg-green-600 hover:bg-green-700"
                                       }`}
                                     title={
-                                      !((prestador.checagem as string) === "aprovado" || prestador.checagem === "aprovada")
-                                        ? "Checagem precisa estar Aprovada para liberar"
+                                      !((prestador.checagem as string) === "aprovado" || prestador.checagem === "aprovada" || prestador.checagem === "excecao")
+                                        ? "Checagem precisa estar Aprovada ou Exceção para liberar"
                                         : "Aprovar liberação"
                                     }
                                   >
@@ -1228,14 +1228,14 @@ export default function TodasSolicitacoes() {
                                   onClick={() => handleNegarClick(solicitacao, prestador)}
                                   variant="outline"
                                   size="sm"
-                                  disabled={!((prestador.checagem as string) === "aprovado" || prestador.checagem === "aprovada")}
-                                  className={`h-7 w-7 p-0 border-red-600 text-red-600 ${!((prestador.checagem as string) === "aprovado" || prestador.checagem === "aprovada")
+                                  disabled={!((prestador.checagem as string) === "aprovado" || prestador.checagem === "aprovada" || prestador.checagem === "excecao")}
+                                  className={`h-7 w-7 p-0 border-red-600 text-red-600 ${!((prestador.checagem as string) === "aprovado" || prestador.checagem === "aprovada" || prestador.checagem === "excecao")
                                     ? "opacity-40 cursor-not-allowed"
                                     : "hover:bg-red-50"
                                     }`}
                                   title={
                                     !((prestador.checagem as string) === "aprovado" || prestador.checagem === "aprovada")
-                                      ? "Checagem precisa estar Aprovada para negar"
+                                      ? "Checagem precisa estar Aprovada ou Exceção para negar"
                                       : "Negar liberação"
                                   }
                                 >

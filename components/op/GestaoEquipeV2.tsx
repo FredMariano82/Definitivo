@@ -512,8 +512,11 @@ export default function GestaoEquipeV2() {
                                                 </div>
                                                 <div className="overflow-hidden flex-1 cursor-pointer group/name" onClick={() => openEditModal(membro)}>
                                                     <div className="flex items-center justify-between mb-1.5">
-                                                        <p className="font-black text-slate-800 text-sm truncate group-hover/name:text-blue-600 transition-colors tracking-tight">
+                                                        <p className="font-black text-slate-800 text-sm truncate group-hover/name:text-blue-600 transition-colors tracking-tight flex items-center gap-2">
                                                             {membro.nome_completo}
+                                                            {membro.tipo_servico === 'VSPP' && (
+                                                                <Badge className="bg-rose-600 text-white text-[9px] font-black h-4 px-1.5 border-none uppercase shadow-sm">VSPP</Badge>
+                                                            )}
                                                         </p>
                                                         <Settings className="h-3.5 w-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-all hover:text-blue-500 ml-2" />
                                                     </div>

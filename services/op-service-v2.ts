@@ -320,7 +320,8 @@ export class OpServiceV2 {
             return diaSemana !== 0 && diaSemana !== 6
         }
 
-        return true
+        // Se for 'A DEFINIR' ou qualquer outra coisa não mapeada, não gera turno automático
+        return false
     }
 
     /**
@@ -779,6 +780,20 @@ export class OpServiceV2 {
     /**
      * Marca um evento como concluído ou ativo usando o campo observações
      */
+    static async setEventoConcluido(eventoId: string, concluido: boolean) {
+        const { data: evento } = await supabase.from('op_eventos').select('observacoes').eq('id', eventoId).single()
+        let obs = evento?.observacoes || ''
+        
+        if (concluido) {
+            if (!obs.includes('[CONCLUIDO]')) {
+                obs = `[CONCLUIDO] ${obs}`
+            }
+        } else {
+            obs = obs.replace('[CONCLUIDO] ', '').replace('[CONCLUIDO]', '')
+        }
+
+        await this.updateEvento(eventoId, { observacoes: obs })
+    }
     /**
      * Busca o guia operacional para um turno específico
      */

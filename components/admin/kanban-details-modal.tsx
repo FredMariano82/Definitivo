@@ -15,10 +15,10 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Clock, User } from "lucide-react"
+import { Clock, User, Trash2Icon } from "lucide-react"
 
-type TarefaStatus = 'entrada' | 'fazendo' | 'aguardando' | 'historico'
-type TarefaCategoria = 'imagem' | 'os' | 'ocorrencia' | 'autorizacao_chaves' | 'achados_perdidos' | 'eventos'
+type TarefaStatus = 'entrada' | 'andamento' | 'aguardando' | 'revisao' | 'finalizado'
+type TarefaCategoria = 'imagem' | 'os' | 'ocorrencia' | 'autorizacao_chaves' | 'achados_perdidos' | 'eventos' | 'uniforme'
 
 interface KanbanTarefa {
   id: string
@@ -26,6 +26,7 @@ interface KanbanTarefa {
   descricao: string
   status: TarefaStatus
   categoria: TarefaCategoria
+  foto_url?: string
   dados_especificos: Record<string, any>
   created_by_name?: string
   updated_by_name?: string
@@ -38,6 +39,7 @@ interface KanbanDetailsModalProps {
   isOpen: boolean
   onClose: () => void
   onAddNote: (tarefaId: string, note: string) => Promise<void>
+  onDelete?: (tarefaId: string) => Promise<void>
 }
 
 export function KanbanDetailsModal({
@@ -45,6 +47,7 @@ export function KanbanDetailsModal({
   isOpen,
   onClose,
   onAddNote,
+  onDelete,
 }: KanbanDetailsModalProps) {
   const [newNote, setNewNote] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -58,6 +61,7 @@ export function KanbanDetailsModal({
       case 'autorizacao_chaves': return <Badge className="bg-emerald-600">Autorização de Chaves</Badge>
       case 'achados_perdidos': return <Badge className="bg-purple-500">Achados & Perdidos</Badge>
       case 'eventos': return <Badge className="bg-rose-500">Evento</Badge>
+      case 'uniforme': return <Badge className="bg-teal-600">Uniforme</Badge>
       default: return <Badge variant="secondary">Ocorrência Padrão</Badge>
     }
   }
@@ -65,9 +69,10 @@ export function KanbanDetailsModal({
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'entrada': return <Badge variant="outline">Entrada</Badge>
-      case 'fazendo': return <Badge variant="outline" className="text-blue-500 border-blue-500">Fazendo</Badge>
+      case 'andamento': return <Badge variant="outline" className="text-blue-500 border-blue-500">Em Andamento</Badge>
       case 'aguardando': return <Badge variant="outline" className="text-amber-500 border-amber-500">Aguardando</Badge>
-      case 'historico': return <Badge variant="outline" className="text-muted-foreground bg-muted">Histórico</Badge>
+      case 'revisao': return <Badge variant="outline" className="text-purple-500 border-purple-500">Revisão</Badge>
+      case 'finalizado': return <Badge variant="outline" className="text-emerald-500 bg-emerald-50">Finalizado</Badge>
       default: return <Badge variant="outline">{status}</Badge>
     }
   }
@@ -98,6 +103,17 @@ export function KanbanDetailsModal({
                 {getStatusBadge(tarefa.status)}
               </div>
             </div>
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                onClick={() => onDelete(tarefa.id)}
+                title="Excluir tarefa"
+              >
+                <Trash2Icon className="h-5 w-5" />
+              </Button>
+            )}
           </div>
         </DialogHeader>
 
@@ -113,6 +129,24 @@ export function KanbanDetailsModal({
                   {tarefa.descricao || "Sem descrição fornecida."}
                 </div>
               </section>
+
+              {/* Photo Section */}
+              {tarefa.foto_url && (
+                <section>
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">Foto anexa</h3>
+                  <div className="relative aspect-video w-full rounded-lg overflow-hidden border bg-muted group">
+                    <img 
+                      src={tarefa.foto_url} 
+                      alt="Anexo da tarefa" 
+                      className="object-contain w-full h-full cursor-pointer transition-transform duration-300 group-hover:scale-[1.02]"
+                      onClick={() => window.open(tarefa.foto_url, '_blank')}
+                    />
+                    <div className="absolute bottom-2 right-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity">
+                      Clique para abrir em tela cheia
+                    </div>
+                  </div>
+                </section>
+              )}
 
               {/* Specific Data Section */}
               <section className="space-y-3">
@@ -259,6 +293,31 @@ export function KanbanDetailsModal({
                            <div className="h-12 w-12 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
                               <span className="text-white font-bold">$</span>
                            </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {tarefa.categoria === 'uniforme' && (
+                    <>
+                      <div className="grid grid-cols-3 gap-2 border-b pb-2">
+                        <span className="text-muted-foreground">Ação:</span>
+                        <span className="col-span-2 font-bold uppercase text-teal-600">{tarefa.dados_especificos?.tipo_acao_uniforme || '-'}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 border-b pb-2">
+                        <span className="text-muted-foreground">Item / Peça:</span>
+                        <span className="col-span-2 font-medium">{tarefa.dados_especificos?.peca_uniforme || '-'}</span>
+                      </div>
+                      {tarefa.dados_especificos?.tipo_acao_uniforme === 'troca' && (
+                        <div className="grid grid-cols-2 gap-4 pt-2">
+                          <div className="p-2 bg-muted rounded border border-dashed">
+                             <div className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Tamanho Anterior</div>
+                             <div className="text-lg font-black text-slate-500">{tarefa.dados_especificos?.tamanho_atual || '-'}</div>
+                          </div>
+                          <div className="p-2 bg-teal-50 rounded border border-teal-100">
+                             <div className="text-[10px] text-teal-600 uppercase font-bold mb-1">Novo Tamanho</div>
+                             <div className="text-lg font-black text-teal-700">{tarefa.dados_especificos?.tamanho_novo || '-'}</div>
+                          </div>
                         </div>
                       )}
                     </>

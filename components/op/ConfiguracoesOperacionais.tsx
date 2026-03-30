@@ -244,7 +244,12 @@ export default function ConfiguracoesOperacionais() {
                                                     )}
                                                 </div>
                                                 <div>
-                                                    <p className="font-black text-slate-800 text-sm">{membro.nome_completo}</p>
+                                                    <p className="font-black text-slate-800 text-sm flex items-center gap-2">
+                                                        {membro.nome_completo}
+                                                        {membro.tipo_servico === 'VSPP' && (
+                                                            <Badge className="bg-rose-600 text-white text-[9px] font-black h-4 px-1.5 border-none uppercase shadow-sm">VSPP</Badge>
+                                                        )}
+                                                    </p>
                                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                                                         RE {membro.re} 
                                                         <span className="text-slate-200">|</span> 
@@ -352,7 +357,12 @@ export default function ConfiguracoesOperacionais() {
                                                     })()}
                                                 </div>
                                                 <div>
-                                                    <p className="font-black text-slate-800 text-sm">{membro.nome_completo}</p>
+                                                    <p className="font-black text-slate-800 text-sm flex items-center gap-2">
+                                                        {membro.nome_completo}
+                                                        {membro.tipo_servico === 'VSPP' && (
+                                                            <Badge className="bg-rose-600 text-white text-[9px] font-black h-4 px-1.5 border-none uppercase shadow-sm">VSPP</Badge>
+                                                        )}
+                                                    </p>
                                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                                                         CPF/REF: {membro.re} 
                                                         <span className="text-slate-200">|</span> 
@@ -510,17 +520,47 @@ export default function ConfiguracoesOperacionais() {
                                     </Select>
                                 )}
                             </div>
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest text-orange-600">Categoria (Regra Operacional)</Label>
-                                <Select value={formData.tipo_servico} onValueChange={(v) => setFormData({...formData, tipo_servico: v})}>
-                                    <SelectTrigger className="h-12 rounded-2xl border-slate-200 font-black text-sm bg-slate-50/50">
-                                        <SelectValue placeholder="Selecione" />
-                                    </SelectTrigger>
-                                    <SelectContent className="rounded-2xl">
-                                        <SelectItem value="Vigilante/Operacional">Vigilante / Operacional</SelectItem>
-                                        <SelectItem value="VSPP">VSPP (Proteção Pessoal)</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest text-orange-600">Categoria (Regra Operacional)</Label>
+                                    <Select 
+                                        value={formData.tipo_servico} 
+                                        onValueChange={(v) => {
+                                            const isVSPP = v === 'VSPP';
+                                            setFormData({
+                                                ...formData, 
+                                                tipo_servico: v,
+                                                possui_porte_arma: isVSPP ? true : formData.possui_porte_arma
+                                            });
+                                        }}
+                                    >
+                                        <SelectTrigger className="h-12 rounded-2xl border-slate-200 font-black text-sm bg-slate-50/50">
+                                            <SelectValue placeholder="Selecione" />
+                                        </SelectTrigger>
+                                        <SelectContent className="rounded-2xl">
+                                            <SelectItem value="Vigilante/Operacional">Vigilante / Operacional</SelectItem>
+                                            <SelectItem value="VSPP">VSPP (Proteção Pessoal)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                
+                                <div 
+                                    onClick={() => setFormData({ ...formData, possui_porte_arma: !formData.possui_porte_arma })}
+                                    className={`flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer ${formData.possui_porte_arma ? 'bg-orange-50 border-orange-200 ring-2 ring-orange-500/10' : 'bg-slate-50 border-slate-100 opacity-60'}`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-2 rounded-xl ${formData.possui_porte_arma ? 'bg-orange-500 text-white' : 'bg-slate-200 text-slate-400'}`}>
+                                            <Shield className="h-4 w-4" />
+                                        </div>
+                                        <div>
+                                            <p className={`text-[10px] font-black uppercase tracking-widest ${formData.possui_porte_arma ? 'text-orange-600' : 'text-slate-400'}`}>Porte de Arma</p>
+                                            <p className="text-[9px] font-bold text-slate-400">{formData.possui_porte_arma ? 'PROFISSIONAL ARMADO' : 'SEM ARMAMENTO'}</p>
+                                        </div>
+                                    </div>
+                                    <div className={`w-10 h-6 rounded-full relative transition-all ${formData.possui_porte_arma ? 'bg-orange-500' : 'bg-slate-200'}`}>
+                                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${formData.possui_porte_arma ? 'left-5' : 'left-1'}`} />
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

@@ -30,8 +30,9 @@ interface KanbanTarefa {
   id: string
   titulo: string
   descricao: string
-  status: 'entrada' | 'fazendo' | 'aguardando' | 'historico'
-  categoria: TarefaCategoria
+  status: 'entrada' | 'andamento' | 'aguardando' | 'revisao' | 'finalizado'
+  categoria: 'imagem' | 'os' | 'ocorrencia' | 'autorizacao_chaves' | 'achados_perdidos' | 'eventos' | 'uniforme'
+  foto_url?: string
   dados_especificos: Record<string, any>
   created_by_name?: string
   updated_by_name?: string
@@ -57,7 +58,7 @@ export default function LivroRegistrosPage() {
       const { data, error } = await supabase
         .from('kanban_tarefas')
         .select('*')
-        .eq('status', 'historico')
+        .eq('status', 'finalizado')
         .order('updated_at', { ascending: false })
 
       if (error) {
@@ -78,6 +79,7 @@ export default function LivroRegistrosPage() {
       case 'autorizacao_chaves': return <Badge className="bg-emerald-600">Autorização de Chaves</Badge>
       case 'achados_perdidos': return <Badge className="bg-purple-500">Achados & Perdidos</Badge>
       case 'eventos': return <Badge className="bg-rose-500">Evento</Badge>
+      case 'uniforme': return <Badge className="bg-teal-600">Uniforme</Badge>
       default: return <Badge variant="secondary">Ocorrência Padrão</Badge>
     }
   }
@@ -174,6 +176,7 @@ export default function LivroRegistrosPage() {
             <SelectItem value="autorizacao_chaves">Autorização de Chaves</SelectItem>
             <SelectItem value="achados_perdidos">Achados e Perdidos</SelectItem>
             <SelectItem value="eventos">Eventos</SelectItem>
+            <SelectItem value="uniforme">Uniforme</SelectItem>
           </SelectContent>
         </Select>
       </div>
