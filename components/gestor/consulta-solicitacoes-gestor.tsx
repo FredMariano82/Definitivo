@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Eye, AlertTriangle, Filter, ArrowUpDown, ChevronLeft, ChevronRight, CheckSquare } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Eye, AlertTriangle, Filter, ArrowUpDown, ChevronLeft, ChevronRight, CheckSquare, Calendar } from "lucide-react"
 import type { Solicitacao, PrestadorAvaliacao } from "../../types"
 import { getAllSolicitacoes } from "../../services/solicitacoes-service"
 import { supabase } from "@/lib/supabase"
@@ -39,6 +40,11 @@ export default function ConsultaSolicitacoesGestor() {
   const [mostrandoConfirmacao, setMostrandoConfirmacao] = useState(false)
   const [filtroStatus, setFiltroStatus] = useState<string>("todos")
   const [ordenacaoData, setOrdenacaoData] = useState<string>("desc") // desc = mais recente primeiro
+  const [dataValidadeExcecao, setDataValidadeExcecao] = useState<string>(() => {
+    const data = new Date()
+    data.setMonth(data.getMonth() + 6)
+    return data.toISOString().split("T")[0]
+  })
   const [metricasEconomia, setMetricasEconomia] = useState<EconomiaMetricas>({
     totalEconomizado: 0,
     totalCasos: 0,
@@ -111,24 +117,23 @@ export default function ConsultaSolicitacoesGestor() {
         if (filtroStatus === "excecao") {
           return item.prestador.checagem === "excecao"
         }
+        if (filtroStatus === "pendente_gestor") {
+          return item.solicitacao.statusGeral === "pendente_gestor"
+        }
         return true
       })
     }
 
-    // ORDENAÇÃO POR DATA DE SOLICITAÇÃO
+    // PRIORIZAÇÃO: 
+    // 1. Pendentes Gestor (Renovações urgentes)
+    // 2. Reprovados (Casos novos)
+    // 3. Exceções já vigentes
     dadosFiltrados.sort((a, b) => {
-      const dataA = new Date(a.solicitacao.dataSolicitacao).getTime()
-      const dataB = new Date(b.solicitacao.dataSolicitacao).getTime()
+      const isPendA = a.solicitacao.statusGeral === "pendente_gestor" ? 1 : 0
+      const isPendB = b.solicitacao.statusGeral === "pendente_gestor" ? 1 : 0
+      
+      if (isPendA !== isPendB) return isPendB - isPendA
 
-      if (ordenacaoData === "desc") {
-        return dataB - dataA // Mais recente primeiro
-      } else {
-        return dataA - dataB // Mais antigo primeiro
-      }
-    })
-
-    // PRIORIZAÇÃO: REPROVADOS SEMPRE PRIMEIRO
-    dadosFiltrados.sort((a, b) => {
       const statusA = a.prestador.checagem
       const statusB = b.prestador.checagem
 
@@ -140,7 +145,6 @@ export default function ConsultaSolicitacoesGestor() {
       if (statusA === "excecao" && (statusB === "reprovado" || statusB === "reprovada")) {
         return 1
       }
-      // Se ambos têm o mesmo tipo de status, manter ordem atual
       return 0
     })
 
@@ -281,6 +285,7 @@ export default function ConsultaSolicitacoesGestor() {
           checagem: "excecao", // Coluna: Checagem
           liberacao: "pendente", // 🔥 PRODUÇÃO REAL: Alterado para PENDENTE (Admin deve fazer o cadastro manual)
           justificativa: novaJustificativa,
+          checagem_valida_ate: dataValidadeExcecao, // Salvar data de validade da exceção
           data_avaliacao: new Date().toISOString(),
           aprovado_por: "Gestor - Exceção",
         })
@@ -317,6 +322,7 @@ export default function ConsultaSolicitacoesGestor() {
                 checagem: "excecao" as any,
                 liberacao: "pendente" as any,
                 justificativa: novaJustificativa,
+                checagemValidaAte: dataValidadeExcecao.split("-").reverse().join("/"), // Atualizar localmente no formato DD/MM/YYYY
               },
             }
           }
@@ -367,6 +373,70 @@ export default function ConsultaSolicitacoesGestor() {
     }
   }
 
+  const handleRevisarRenovacao = (item: { solicitacao: Solicitacao; prestador: PrestadorAvaliacao }) => {
+    setPrestadorSelecionado(item)
+    setDialogAberto(true)
+    setMostrandoConfirmacao(true)
+    // Pre-preecher com dados da renovação
+    setNovaJustificativa(item.prestador.justificativa || "")
+    
+    // Tentar pegar a data final da solicitação para a validade da exceção
+    if (item.solicitacao.dataFinal) {
+      if (item.solicitacao.dataFinal.includes("/")) {
+        const [d, m, a] = item.solicitacao.dataFinal.split("/")
+        setDataValidadeExcecao(`${a}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`)
+      }
+    }
+  }
+
+  const handleAprovarRenovacao = async (solicitacaoId: string, novaJustif?: string) => {
+    try {
+      console.log("🔓 Validando renovação:", solicitacaoId)
+      
+      const updateData: any = { 
+        status_geral: "aprovado"
+      }
+      
+      // Atualizar solicitação
+      const { error: errorSolic } = await supabase
+        .from("solicitacoes")
+        .update(updateData)
+        .eq("id", solicitacaoId)
+
+      if (errorSolic) throw errorSolic
+
+      // Se passou nova justificativa, atualizar o prestador também
+      if (novaJustif && prestadorSelecionado) {
+        await supabase
+          .from("prestadores")
+          .update({ 
+            justificativa: novaJustif,
+            checagem_valida_ate: dataValidadeExcecao 
+          })
+          .eq("id", prestadorSelecionado.prestador.id)
+      }
+
+      setPrestadoresReprovados((prev) =>
+        prev.map((item) => {
+          if (item.solicitacao.id === solicitacaoId) {
+            return {
+              ...item,
+              solicitacao: { ...item.solicitacao, statusGeral: "aprovado" as any },
+            }
+          }
+          return item
+        }),
+      )
+
+      setDialogAberto(false)
+      setMostrandoConfirmacao(false)
+      alert("✅ Renovação validada com sucesso! Agora a ADM pode liberar o acesso.")
+    } catch (error: any) {
+      console.error("Erro ao validar renovação:", error)
+      alert("Erro ao validar: " + error.message)
+    }
+  }
+
   // Calcular paginação
   const totalPrestadores = prestadoresFiltrados.length
   const totalPaginas = Math.ceil(totalPrestadores / PRESTADORES_POR_PAGINA)
@@ -413,6 +483,7 @@ export default function ConsultaSolicitacoesGestor() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="pendente_gestor">🔔 Pendente Validação</SelectItem>
                   <SelectItem value="reprovado">❌ Reprovada</SelectItem>
                   <SelectItem value="excecao">🟣 Exceção</SelectItem>
                 </SelectContent>
@@ -574,33 +645,47 @@ export default function ConsultaSolicitacoesGestor() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => handleVisualizarSolicitacao(item)}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            {(item.prestador.checagem === "reprovado" || item.prestador.checagem === "reprovada") && (
-                              <>
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="outline" onClick={() => handleVisualizarSolicitacao(item)}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              
+                              {/* Botão de Validar Renovação - Idêntico ao de Exceção mas com outra função */}
+                              {item.solicitacao.statusGeral === "pendente_gestor" && (
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   className="text-orange-600 border-orange-600 hover:bg-orange-50"
-                                  onClick={() => handleExcecao(item)}
-                                  title="Criar Exceção"
+                                  onClick={() => handleRevisarRenovacao(item)}
+                                  title="Validar Renovação de Exceção"
                                 >
                                   <AlertTriangle className="h-4 w-4" />
                                 </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                                  onClick={() => handleConfirmarReprovacao(item)}
-                                  title="Confirmar Reprovação"
-                                >
-                                  <CheckSquare className="h-4 w-4" />
-                                </Button>
-                              </>
-                            )}
-                          </div>
+                              )}
+
+                              {(item.prestador.checagem === "reprovado" || item.prestador.checagem === "reprovada") && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-orange-600 border-orange-600 hover:bg-orange-50"
+                                    onClick={() => handleExcecao(item)}
+                                    title="Criar Exceção"
+                                  >
+                                    <AlertTriangle className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                                    onClick={() => handleConfirmarReprovacao(item)}
+                                    title="Confirmar Reprovação"
+                                  >
+                                    <CheckSquare className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -721,7 +806,9 @@ export default function ConsultaSolicitacoesGestor() {
               <div className="bg-orange-50 border border-orange-200 rounded-lg p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <AlertTriangle className="h-6 w-6 text-orange-600" />
-                  <h4 className="font-semibold text-orange-800 text-lg">Confirmação de Exceção</h4>
+                  <h4 className="font-semibold text-orange-800 text-lg">
+                    {prestadorSelecionado.solicitacao.statusGeral === "pendente_gestor" ? "Validação de Renovação" : "Confirmação de Exceção"}
+                  </h4>
                 </div>
 
                 <div className="bg-white rounded-lg p-4 mb-4">
@@ -731,10 +818,10 @@ export default function ConsultaSolicitacoesGestor() {
                   <p className="text-gray-700 mb-2">
                     <strong>Doc1:</strong> {prestadorSelecionado.prestador.doc1}
                   </p>
-                  <p className="text-gray-700">
+                   <p className="text-gray-700">
                     <strong>Status Atual:</strong>
-                    <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                      Reprovado
+                    <span className={`ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${prestadorSelecionado.prestador.checagem === "excecao" ? "bg-purple-100 text-purple-800" : "bg-red-100 text-red-800"}`}>
+                      {prestadorSelecionado.prestador.checagem === "excecao" ? "Exceção (Renovação)" : "Reprovado"}
                     </span>
                   </p>
                 </div>
@@ -747,6 +834,23 @@ export default function ConsultaSolicitacoesGestor() {
                     Esta ação criará uma exceção que permitirá acesso temporário ao clube.
                   </p>
                 </div>
+              </div>
+              
+              {/* Seletor de Data de Validade */}
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Calendar className="h-5 w-5 text-purple-600" />
+                  <h4 className="font-semibold text-purple-800">📅 Validade desta Exceção</h4>
+                </div>
+                <p className="text-sm text-purple-700 mb-3">
+                  Defina até quando esta exceção será aceita pelo sistema (padrão: 6 meses):
+                </p>
+                <Input
+                  type="date"
+                  value={dataValidadeExcecao}
+                  onChange={(e) => setDataValidadeExcecao(e.target.value)}
+                  className="max-w-xs border-purple-300 focus:border-purple-500 focus:ring-purple-500"
+                />
               </div>
 
               {/* Campo de justificativa */}
@@ -789,11 +893,17 @@ export default function ConsultaSolicitacoesGestor() {
                   ❌ Não, Cancelar
                 </Button>
                 <Button
-                  onClick={confirmarExcecao}
+                  onClick={() => {
+                    if (prestadorSelecionado.solicitacao.statusGeral === "pendente_gestor") {
+                      handleAprovarRenovacao(prestadorSelecionado.solicitacao.id, novaJustificativa)
+                    } else {
+                      confirmarExcecao()
+                    }
+                  }}
                   disabled={!novaJustificativa.trim()}
                   className="bg-orange-600 hover:bg-orange-700 px-6"
                 >
-                  ✅ Sim, Confirmar Exceção
+                  {prestadorSelecionado.solicitacao.statusGeral === "pendente_gestor" ? "✅ Confirmar Renovação" : "✅ Sim, Confirmar Exceção"}
                 </Button>
               </div>
             </div>

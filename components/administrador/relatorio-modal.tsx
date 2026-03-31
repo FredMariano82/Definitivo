@@ -1,4 +1,6 @@
 "use client"
+import jsPDF from "jspdf"
+import autoTable from "jspdf-autotable"
 
 import { useState } from "react"
 import { Download, FileText, Table } from "lucide-react"
@@ -16,13 +18,21 @@ interface RelatorioModalProps {
   filtroSolicitante: string
   filtroDepartamento: string
   filtroTipo: string
-  solicitacoesReais: any[] // ADICIONAR esta prop
+  filtroStatus?: string
+  filtroCadastro?: string
+  filtroAcoes?: string
+  filtroEvento?: string
+  solicitacoesReais: any[]
 }
 
 export default function RelatorioModal({
   filtroSolicitante,
   filtroDepartamento,
   filtroTipo,
+  filtroStatus = "todos",
+  filtroCadastro = "todos",
+  filtroAcoes = "todos",
+  filtroEvento = "todos",
   solicitacoesReais,
 }: RelatorioModalProps) {
   const [open, setOpen] = useState(false)
@@ -38,8 +48,11 @@ export default function RelatorioModal({
     solicitante: true,
     departamento: true,
     local: true,
+    evento: true,
     empresa: true,
     prestadores: true,
+    doc1: true,
+    doc2: true,
     dataInicial: true,
     dataFinal: true,
     status: true,
@@ -67,7 +80,9 @@ export default function RelatorioModal({
         const dadosRelatorio = (solicitacoesReais || []).filter((s) => {
           const solicitanteMatch = filtroSolicitante === "todos" || s.solicitante === filtroSolicitante
           const departamentoMatch = filtroDepartamento === "todos" || s.departamento === filtroDepartamento
+          const eventoMatch = filtroEvento === "todos" || s.local === filtroEvento
 
+          // Filtro por tipo (legado)
           let tipoMatch = true
           if (filtroTipo === "economia") {
             tipoMatch = s.economia === "economia1" || s.economia === "economia2"
@@ -77,15 +92,15 @@ export default function RelatorioModal({
           }
 
           // Filtro por data se especificado
+          let dataMatch = true
           if (dataInicial && dataFinal) {
             const dataSol = new Date(s.dataSolicitacao.split("/").reverse().join("-"))
             const dataIni = new Date(dataInicial)
             const dataFim = new Date(dataFinal)
-            const dataMatch = dataSol >= dataIni && dataSol <= dataFim
-            return solicitanteMatch && departamentoMatch && tipoMatch && dataMatch
+            dataMatch = dataSol >= dataIni && dataSol <= dataFim
           }
 
-          return solicitanteMatch && departamentoMatch && tipoMatch
+          return solicitanteMatch && departamentoMatch && eventoMatch && tipoMatch && dataMatch
         })
 
         // Calcular totais reais
@@ -124,8 +139,10 @@ export default function RelatorioModal({
             <th class="header">Departamento</th>
             <th class="header">Local</th>
             <th class="header">Empresa</th>
+            <th class="header">Evento</th>
             <th class="header">Nome Prestador</th>
-            <th class="header">Documento</th>
+            <th class="header">Doc1</th>
+            <th class="header">Doc2</th>
             <th class="header">Data Inicial</th>
             <th class="header">Data Final</th>
             <th class="header">Status</th>
@@ -144,8 +161,8 @@ export default function RelatorioModal({
               const tipoEconomia =
                 s.economia === "economia1" ? "Checagem Válida" : s.economia === "economia2" ? "Data Extrapolada" : "-"
 
-              // Custo por prestador baseado no tipo de solicitação
-              const custoPorPrestador = s.tipoSolicitacao === "checagem_liberacao" ? 20.0 : 0.0
+              // Custo por prestador baseado no tipo de solicitação - APENAS SE JÁ INTERAGIU (não pendente)
+              const custoPorPrestador = (s.tipoSolicitacao === "checagem_liberacao" && prestador.cadastro !== "pendente") ? 20.0 : 0.0
               const economiaPorPrestador = s.economiaGerada ? s.economiaGerada / s.prestadores.length : 0
 
               htmlContent += `
@@ -155,9 +172,11 @@ export default function RelatorioModal({
           <td class="data">${s.solicitante}</td>
           <td class="data">${s.departamento}</td>
           <td class="data">${s.local}</td>
-          <td class="data">${s.empresa}</td>
+          <td class="data">${s.local || "-"}</td>
+          <td class="data">${s.empresa || "-"}</td>
           <td class="data">${prestador.nome}</td>
           <td class="data">${prestador.doc1 || "-"}</td>
+          <td class="data">${prestador.doc2 || "-"}</td>
           <td class="data">${s.dataInicial}</td>
           <td class="data">${s.dataFinal}</td>
           <td class="data">${statusFormatado}</td>
@@ -197,8 +216,11 @@ export default function RelatorioModal({
               }
             }
 
-            // Contar apenas prestadores que geraram custo (checagem_liberacao)
-            const prestadoresComCusto = s.tipoSolicitacao === "checagem_liberacao" ? s.prestadores.length : 0
+            // Contar apenas prestadores que geraram custo (checagem_liberacao e já decidido)
+            const prestadoresComCusto = s.tipoSolicitacao === "checagem_liberacao" 
+              ? s.prestadores.filter((p: any) => p.cadastro !== "pendente").length 
+              : 0
+            
             resumoPorDepartamento[s.departamento].prestadores += prestadoresComCusto
             resumoPorDepartamento[s.departamento].custo += prestadoresComCusto * 20
             resumoPorDepartamento[s.departamento].economia += s.economiaGerada || 0
@@ -265,7 +287,97 @@ export default function RelatorioModal({
             `• Resumo consolidado por departamento`,
           )
         } else {
-          alert("Funcionalidade PDF será implementada em breve. Use Excel por enquanto.")
+          // GERAR PDF
+          const doc = new jsPDF("l", "mm", "a4") // Landscape for more columns
+          const now = new Date()
+          const dataRelatorio = now.toLocaleDateString("pt-BR")
+          const horaRelatorio = now.toLocaleTimeString("pt-BR")
+
+          // Título e logo simulado
+          doc.setFontSize(18)
+          doc.setTextColor(30, 64, 175) // #1e40af
+          doc.text("RELATÓRIO DE SOLICITAÇÕES E PRESTADORES", 14, 15)
+          
+          doc.setFontSize(10)
+          doc.setTextColor(100)
+          doc.text(`Gerado em: ${dataRelatorio} às ${horaRelatorio}`, 14, 22)
+          doc.text(`Filtros: Solicitante: ${filtroSolicitante} | Dept: ${filtroDepartamento} | Período: ${dataInicial || 'Início'} a ${dataFinal || 'Fim'}`, 14, 27)
+
+          // Preparar dados para a tabela detalhada
+          const head = [["Nº", "Data Sol.", "Depto", "Local", "Evento", "Empresa", "Prestador", "Doc1", "Doc2", "Status", "Custo (R$)", "Economia (R$)"]]
+          const body: any[] = []
+
+          dadosRelatorio.forEach((s) => {
+            s.prestadores.forEach((p: any) => {
+              const custo = (s.tipoSolicitacao === "checagem_liberacao" && p.cadastro !== "pendente") ? 20.0 : 0.0
+              const economia = s.economiaGerada ? (s.economiaGerada / s.prestadores.length) : 0
+              
+              body.push([
+                s.numero,
+                s.dataSolicitacao,
+                s.departamento,
+                s.local || "-",
+                s.local || "-", // Evento
+                s.empresa || "-",
+                p.nome,
+                p.doc1 || "-",
+                p.doc2 || "-",
+                (p.checagem || "pendente").toUpperCase(),
+                custo.toFixed(2),
+                economia.toFixed(2)
+              ])
+            })
+          })
+
+          autoTable(doc, {
+            head,
+            body,
+            startY: 35,
+            theme: 'grid',
+            headStyles: { fillColor: [30, 64, 175] },
+            styles: { fontSize: 8 },
+            columnStyles: {
+              10: { halign: 'right' },
+              11: { halign: 'right' }
+            }
+          })
+
+          // Adicionar Resumo por Departamento em uma nova página
+          doc.addPage()
+          doc.setFontSize(16)
+          doc.setTextColor(30, 64, 175)
+          doc.text("RESUMO CONSOLIDADO POR DEPARTAMENTO", 14, 15)
+
+          const resumoHead = [["Departamento", "Qtd Prestadores (Pagos)", "Custo Total (R$)", "Economia Total (R$)"]]
+          const resumoBody: any[] = []
+          
+          const resumo: Record<string, any> = {}
+          dadosRelatorio.forEach(s => {
+            if (!resumo[s.departamento]) resumo[s.departamento] = { qtd: 0, custo: 0, economia: 0 }
+            const qtdPagos = s.tipoSolicitacao === "checagem_liberacao" ? s.prestadores.filter((p: any) => p.cadastro !== "pendente").length : 0
+            resumo[s.departamento].qtd += qtdPagos
+            resumo[s.departamento].custo += qtdPagos * 20
+            resumo[s.departamento].economia += (s.economiaGerada || 0)
+          })
+
+          let totalQtd = 0, totalCusto = 0, totalEcon = 0
+          Object.entries(resumo).sort().forEach(([dept, vals]) => {
+            totalQtd += vals.qtd; totalCusto += vals.custo; totalEcon += vals.economia
+            resumoBody.push([dept, vals.qtd, vals.custo.toFixed(2), vals.economia.toFixed(2)])
+          })
+
+          resumoBody.push([{ content: 'TOTAIS', styles: { fontStyle: 'bold', fillColor: [243, 244, 246] } }, totalQtd, totalCusto.toFixed(2), totalEcon.toFixed(2)])
+
+          autoTable(doc, {
+            head: resumoHead,
+            body: resumoBody,
+            startY: 25,
+            theme: 'striped',
+            headStyles: { fillColor: [30, 64, 175] },
+            styles: { fontSize: 10 }
+          })
+
+          doc.save(`Relatorio_Admin_${now.getTime()}.pdf`)
         }
 
         setCarregando(false)
@@ -284,8 +396,11 @@ export default function RelatorioModal({
     { id: "solicitante", label: "Solicitante", obrigatorio: true },
     { id: "departamento", label: "Departamento", obrigatorio: true },
     { id: "local", label: "Local", obrigatorio: false },
+    { id: "evento", label: "Evento", obrigatorio: false },
     { id: "empresa", label: "Empresa", obrigatorio: false },
     { id: "prestadores", label: "Prestadores", obrigatorio: false },
+    { id: "doc1", label: "Doc1", obrigatorio: false },
+    { id: "doc2", label: "Doc2", obrigatorio: false },
     { id: "dataInicial", label: "Data Inicial", obrigatorio: false },
     { id: "dataFinal", label: "Data Final", obrigatorio: false },
     { id: "status", label: "Status", obrigatorio: false },

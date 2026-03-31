@@ -53,6 +53,7 @@ export function StatusChecagemBadge({ status }: { status: StatusChecagem }) {
     excecao: "bg-purple-100 text-purple-800 border-purple-200",
     erro_rg: "bg-orange-100 text-orange-800 border-orange-200",
     revisar: "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200",
+    pendente_gestor: "bg-indigo-100 text-indigo-800 border-indigo-200",
   }
 
   const labels: Record<string, string> = {
@@ -65,6 +66,7 @@ export function StatusChecagemBadge({ status }: { status: StatusChecagem }) {
     excecao: "Exceção",
     erro_rg: "Erro RG",
     revisar: "Revisar",
+    pendente_gestor: "Aguardando Gestor",
   }
 
   // Normalizar o status para garantir compatibilidade
@@ -92,6 +94,7 @@ export function StatusLiberacaoBadge({ status }: { status: StatusLiberacao }) {
     urgente: "bg-red-100 text-red-800 border-red-200",
     vencida: "bg-gray-100 text-gray-800 border-gray-200",
     negada: "bg-red-100 text-red-800 border-red-200",
+    pendente_gestor: "bg-indigo-100 text-indigo-800 border-indigo-200 animate-pulse",
   }
 
   const labels: Record<string, string> = {

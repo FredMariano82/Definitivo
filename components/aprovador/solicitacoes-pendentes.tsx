@@ -13,6 +13,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  ShieldAlert,
 } from "lucide-react"
 import PageHeader from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -97,6 +98,8 @@ export default function SolicitacoesPendentes() {
         return <Badge className="bg-fuchsia-100 text-fuchsia-800 hover:bg-fuchsia-100 border-fuchsia-200">Revisar</Badge>
       case "parcial":
         return <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">Parcial</Badge>
+      case "excecao":
+        return <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100 border-purple-200">Exceção</Badge>
       default:
         return <Badge variant="secondary">{status}</Badge>
     }
@@ -114,6 +117,8 @@ export default function SolicitacoesPendentes() {
         return <AlertTriangle className="h-3 w-3 text-fuchsia-600" />
       case "parcial":
         return <AlertTriangle className="h-3 w-3 text-orange-600" />
+      case "excecao":
+        return <ShieldAlert className="h-3 w-3 text-purple-600" />
       default:
         return null
     }
@@ -707,6 +712,12 @@ export default function SolicitacoesPendentes() {
                             <>
                               <AlertTriangle className="h-4 w-4 text-fuchsia-600" />
                               <Badge className="bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200">Revisar</Badge>
+                            </>
+                          )}
+                          {prestador.checagem === "excecao" && (
+                            <>
+                              <ShieldAlert className="h-4 w-4 text-purple-600" />
+                              <Badge className="bg-purple-100 text-purple-800 border-purple-200">Exceção</Badge>
                             </>
                           )}
                         </div>

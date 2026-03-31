@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase"
 import type { Solicitacao } from "@/types"
+import { EconomiasService } from "./economias-service"
 
 export class SolicitacoesService {
   // Criar nova solicitação
@@ -16,7 +17,7 @@ export class SolicitacoesService {
     dataFinal: string
     dataSolicitacao?: string
     horaSolicitacao?: string
-    modoAprovacaoDireta?: "padrao" | "solo_liberacao" | "solo_checagem" | "lib_checagem_ok"
+    modoAprovacaoDireta?: "padrao" | "solo_liberacao" | "solo_checagem" | "lib_checagem_ok" | "solo_excecao"
     modoBiblioteca?: boolean
   }): Promise<{ sucesso: boolean; erro: string; solicitacao?: Solicitacao }> {
     try {
@@ -84,9 +85,10 @@ export class SolicitacoesService {
               empresa: dados.empresa,
               data_inicial: dados.dataInicial && dados.dataInicial.trim() !== "" ? dados.dataInicial.trim() : null,
               data_final: dados.dataFinal && dados.dataFinal.trim() !== "" ? dados.dataFinal.trim() : null,
-              status_geral: dados.modoBiblioteca ? "base" : ((dados.modoAprovacaoDireta === "solo_checagem" || dados.modoAprovacaoDireta === "lib_checagem_ok") ? "aprovado" : "pendente"),
+              status_geral: dados.modoBiblioteca ? "base" : (dados.modoAprovacaoDireta === "solo_excecao" ? "pendente_gestor" : (dados.modoAprovacaoDireta === "solo_checagem" || dados.modoAprovacaoDireta === "lib_checagem_ok" ? "aprovado" : "pendente")),
               custo_checagem: (dados.tipoSolicitacao === "checagem_liberacao" && !dados.modoBiblioteca) ? dados.prestadores.length * 20 : 0,
-              economia_gerada: 0,
+              economia_gerada: (dados.tipoSolicitacao === "somente_liberacao") ? dados.prestadores.length * 20 : 0,
+              economia: (dados.tipoSolicitacao === "somente_liberacao") ? "economico" : "sustentavel",
             },
           ])
           .select()
@@ -127,6 +129,9 @@ export class SolicitacoesService {
           checagemStatus = "aprovado"
           validadeAte = (dados.dataInicial && dados.dataInicial.trim() !== "") ? validadeChecagemISO : null
           dataAvaliacao = agoraISO
+        } else if (dados.modoAprovacaoDireta === "solo_excecao") {
+          checagemStatus = "excecao"
+          liberacaoStatus = "pendente"
         }
 
         return {
@@ -152,6 +157,21 @@ export class SolicitacoesService {
         console.error("PRODUÇÃO REAL: Erro ao criar prestadores:", prestadoresError)
         await supabase.from("solicitacoes").delete().eq("id", solicitacao.id)
         return { sucesso: false, erro: `Erro ao criar prestadores: ${prestadoresError.message}` }
+      }
+
+      // 💰 CONTABILIZAR ECONOMIA se for renovação
+      if (dados.tipoSolicitacao === "somente_liberacao") {
+        dados.prestadores.forEach((p) => {
+          EconomiasService.contabilizarEconomia({
+            solicitante: dados.solicitante,
+            prestadorNome: p.nome,
+            prestadorDocumento: p.doc1,
+            tipoEconomia: "operacional",
+            valorEconomizado: 20,
+            detalhes: `Renovação de acesso com checagem válida (Solicitação ${numeroSolicitacao})`,
+            solicitacaoOrigem: solicitacao.id,
+          })
+        })
       }
 
       return {
@@ -225,7 +245,7 @@ export class SolicitacoesService {
         })),
         dataInicial: new Date(solicitacao.data_inicial + "T00:00:00").toLocaleDateString("pt-BR"),
         dataFinal: new Date(solicitacao.data_final + "T00:00:00").toLocaleDateString("pt-BR"),
-        statusGeral: solicitacao.status_geral as "pendente" | "aprovado" | "reprovado" | "parcial",
+        statusGeral: solicitacao.status_geral as any,
         observacoesGerais: solicitacao.observacoes_gerais || undefined,
         economia: solicitacao.economia as "sustentavel" | "dispendioso" | "economico" | null,
         custoChecagem: solicitacao.custo_checagem,
@@ -507,10 +527,10 @@ export class SolicitacoesService {
 // Funções individuais para compatibilidade com outros imports
 
 // Buscar todas as solicitações (para administrador)
-export async function getAllSolicitacoes() {
+export async function getAllSolicitacoes(filtros?: { dataInicial?: string; dataFinal?: string }) {
   try {
-    const solicitacoes = await SolicitacoesService.listarSolicitacoes()
-    console.log("✅ PRODUÇÃO REAL: getAllSolicitacoes executado com sucesso")
+    const solicitacoes = await SolicitacoesService.listarSolicitacoes(filtros)
+    console.log("✅ PRODUÇÃO REAL: getAllSolicitacoes executado com sucesso", filtros)
     return solicitacoes
   } catch (error: any) {
     console.error("PRODUÇÃO REAL: Erro ao buscar todas solicitações:", error)

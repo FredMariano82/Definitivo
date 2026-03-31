@@ -154,12 +154,6 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
       case "administrador":
         return [
           {
-            href: "/admin/dashboard",
-            label: "Dashboard",
-            icon: BarChart3,
-            className: getButtonClass("/admin/dashboard"),
-          },
-          {
             href: "/admin/todas-solicitacoes",
             label: "Todas as Solicitações",
             icon: FileText,
@@ -170,18 +164,6 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
             label: "Nova Solicitação",
             icon: FileText,
             className: getButtonClass("/admin/nova-solicitacao"),
-          },
-          {
-            href: "/admin/upload",
-            label: "Upload Histórico",
-            icon: Users,
-            className: getButtonClass("/admin/upload"),
-          },
-          {
-            href: "/admin/produtividade",
-            label: "Produtividade",
-            icon: BarChart3,
-            className: getButtonClass("/admin/produtividade"),
           },
           {
             href: "/op/tatico",
@@ -254,12 +236,6 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
             className: getButtonClass("/superadmin/painel"),
           },
           {
-            href: "/admin/dashboard", // Reutiliza rota de admin
-            label: "Dashboard",
-            icon: BarChart3,
-            className: getButtonClass("/admin/dashboard"),
-          },
-          {
             href: "/admin/todas-solicitacoes",
             label: "Todas as Solicitações",
             icon: FileText,
@@ -270,12 +246,6 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
             label: "Nova Solicitação",
             icon: FileText,
             className: getButtonClass("/admin/nova-solicitacao"),
-          },
-          {
-            href: "/admin/upload",
-            label: "Upload Histórico",
-            icon: Users,
-            className: getButtonClass("/admin/upload"),
           },
           {
             href: "/op/tatico",
@@ -315,12 +285,12 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
       <style jsx>{`
         @keyframes pulse-glow {
           0%, 100% {
-            box-shadow: 0 0 5px rgba(220, 38, 38, 0.4);
-            border-color: rgba(220, 38, 38, 0.5);
+            box-shadow: 0 0 5px rgba(255, 255, 255, 0.4);
+            border-color: rgba(255, 255, 255, 0.5);
           }
           50% {
-            box-shadow: 0 0 15px rgba(220, 38, 38, 0.7);
-            border-color: rgba(220, 38, 38, 0.8);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.7);
+            border-color: rgba(255, 255, 255, 0.8);
           }
         }
         
@@ -371,7 +341,7 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
                   ${isActive
                     ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20"
                     : "bg-transparent text-slate-300 hover:bg-white/5 hover:text-white border-transparent"}
-                  ${button.hasAlert && !isActive ? "animate-pulse-glow border-red-500/50" : ""}
+                  ${button.hasAlert && !isActive ? "animate-pulse-glow border-white/50" : ""}
                 `}
                 variant="ghost"
                 asChild
@@ -381,8 +351,8 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
                   {!isCollapsed && <span className="font-medium tracking-wide">{button.label}</span>}
                   {button.hasAlert && !isCollapsed && (
                     <span className="ml-auto relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
                     </span>
                   )}
                 </span>

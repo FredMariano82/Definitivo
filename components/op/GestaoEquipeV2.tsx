@@ -237,23 +237,6 @@ export default function GestaoEquipeV2() {
         }
     }
 
-    const handleClearTests = async () => {
-        if (!confirm("Deseja realmente limpar todos os testes e alterações manuais deste mês? A escala voltará ao padrão teórico.")) return
-        
-        setLoading(true)
-        try {
-            const startStr = format(monthStart, 'yyyy-MM-dd')
-            const endStr = format(monthEnd, 'yyyy-MM-dd')
-            await OpServiceV2.clearManualScaleOverrides(startStr, endStr)
-            toast.success("Testes limpos. Escala resetada com sucesso.")
-            loadData()
-        } catch (error) {
-            console.error("Erro ao limpar testes:", error)
-            toast.error("Erro ao limpar testes")
-        } finally {
-            setLoading(false)
-        }
-    }
 
 
     if (loading && equipe.length === 0) {
@@ -366,15 +349,6 @@ export default function GestaoEquipeV2() {
                             </div>
                             <Button variant="ghost" size="icon" onClick={nextMonth} className="hover:bg-slate-100 rounded-xl h-10 w-10">
                                 <ChevronRight className="h-6 w-6 text-slate-600" />
-                            </Button>
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={handleClearTests}
-                                className="h-10 px-4 rounded-xl border-rose-200 text-rose-600 hover:bg-rose-50 font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all active:scale-95"
-                            >
-                                <Trash2 className="h-4 w-4" />
-                                Limpar Testes
                             </Button>
                         </div>
                     </div>

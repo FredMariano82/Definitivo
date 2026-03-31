@@ -104,7 +104,8 @@ export class EconomiasService {
       }
 
       if (filtros?.dataFinal) {
-        query = query.lte("data_deteccao", filtros.dataFinal)
+        // Garantir que o último dia seja incluído até o final (23:59:59)
+        query = query.lte("data_deteccao", `${filtros.dataFinal} 23:59:59`)
       }
 
       const { data: economias, error } = await query.order("data_deteccao", { ascending: false })
@@ -218,6 +219,59 @@ export class EconomiasService {
     } catch (error: any) {
       console.error("💥 Erro ao buscar histórico:", error)
       return []
+    }
+  }
+
+  // Sincronizar dados antigos (Retroativo)
+  static async sincronizarDadosAntigos(): Promise<{ processados: number; erros: number }> {
+    try {
+      console.log("🔄 Iniciando sincronização retroativa de economias...")
+      
+      // 1. Buscar todas as solicitações de renovação
+      const { data: solicitacoes, error: sError } = await supabase
+        .from("solicitacoes")
+        .select("id, solicitante, tipo_solicitacao, numero")
+        .eq("tipo_solicitacao", "somente_liberacao")
+
+      if (sError) throw sError
+      if (!solicitacoes || solicitacoes.length === 0) return { processados: 0, erros: 0 }
+
+      let processados = 0
+      let erros = 0
+
+      // 2. Para cada solicitação, buscar os prestadores e contabilizar
+      for (const s of solicitacoes) {
+        const { data: prestadores, error: pError } = await supabase
+          .from("prestadores")
+          .select("nome, doc1")
+          .eq("solicitacao_id", s.id)
+
+        if (pError) {
+          erros++
+          continue
+        }
+
+        for (const p of prestadores || []) {
+          const res = await this.contabilizarEconomia({
+            solicitante: s.solicitante,
+            prestadorNome: p.nome,
+            prestadorDocumento: p.doc1,
+            tipoEconomia: "operacional",
+            valorEconomizado: 20,
+            detalhes: `Sincronização Retroativa (Solicitação ${s.numero})`,
+            solicitacaoOrigem: s.id
+          })
+          
+          if (res.sucesso) processados++
+          else erros++
+        }
+      }
+
+      console.log(`✅ Sincronização concluída: ${processados} sucessos, ${erros} erros.`)
+      return { processados, erros }
+    } catch (error) {
+      console.error("💥 Erro na sincronização:", error)
+      return { processados: 0, erros: 0 }
     }
   }
 

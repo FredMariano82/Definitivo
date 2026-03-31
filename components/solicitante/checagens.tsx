@@ -60,12 +60,9 @@ export default function Checagens() {
   // Filtrar e organizar dados por status de checagem
   const dadosPorStatus = solicitacoesReais
     .filter((solicitacao) => solicitacao.departamento === usuario?.departamento)
-    .filter((solicitacao) =>
-      solicitacao.prestadores.some((p: any) => getLiberacaoStatus(p, solicitacao.dataFinal) === "ok"),
-    )
     .flatMap((solicitacao) =>
       solicitacao.prestadores
-        .filter((prestador: any) => getLiberacaoStatus(prestador, solicitacao.dataFinal) === "ok")
+        .filter((prestador: any) => prestador.liberacao !== "pendente")
         .map((prestador: any) => ({
           solicitacao,
           prestador,

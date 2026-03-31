@@ -55,7 +55,7 @@ export interface Solicitacao {
   prestadores: PrestadorAvaliacao[]
   dataInicial: string
   dataFinal: string
-  statusGeral: "pendente" | "aprovado" | "reprovado" | "parcial" | "base"
+  statusGeral: "pendente" | "aprovado" | "reprovado" | "parcial" | "base" | "pendente_gestor"
   observacoesGerais?: string
   economia?: "sustentavel" | "dispendioso" | "economico" | null
   custoChecagem: number

@@ -6,6 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { supabase } from "@/lib/supabase"
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select"
 import { useAuth } from "../../contexts/auth-context"
 import { SolicitacoesService } from "../../services/solicitacoes-service"
 import { PrestadoresService } from "../../services/prestadores-service"
@@ -96,6 +104,23 @@ export default function NovaSolicitacaoAdmin({
 
   // 🎯 MODO BIBLIOTECA (APENAS CADASTRO)
   const [modoBiblioteca, setModoBiblioteca] = useState(false)
+
+  const [listaDepartamentos, setListaDepartamentos] = useState<string[]>([])
+
+  // Buscar departamentos do Supabase
+  useEffect(() => {
+    const fetchDepartamentos = async () => {
+      const { data, error } = await supabase
+        .from("departamentos")
+        .select("nome")
+        .order("nome", { ascending: true })
+      
+      if (!error && data) {
+        setListaDepartamentos(data.map(d => d.nome))
+      }
+    }
+    fetchDepartamentos()
+  }, [])
 
   const dadosAutomaticos = {
     solicitante: nomesolicitante,
@@ -471,23 +496,25 @@ export default function NovaSolicitacaoAdmin({
                 <div className="w-24 h-1 bg-blue-600 mx-auto md:mx-0 rounded-full"></div>
               </div>
 
-              {/* 🎯 SWITCH MODO BIBLIOTECA */}
-              <div className={`flex items-center space-x-3 p-3 rounded-lg border-2 transition-all ${modoBiblioteca ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
-                <div className={`p-2 rounded-full ${modoBiblioteca ? 'bg-amber-100 text-amber-600' : 'bg-slate-200 text-slate-500'}`}>
-                  <Library className="h-5 w-5" />
+              {/* 🎯 SWITCH MODO BIBLIOTECA - APENAS SUPERADMIN */}
+              {usuario?.perfil === "superadmin" && (
+                <div className={`flex items-center space-x-3 p-3 rounded-lg border-2 transition-all ${modoBiblioteca ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
+                  <div className={`p-2 rounded-full ${modoBiblioteca ? 'bg-amber-100 text-amber-600' : 'bg-slate-200 text-slate-500'}`}>
+                    <Library className="h-5 w-5" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className={`text-sm font-bold leading-none ${modoBiblioteca ? 'text-amber-700' : 'text-slate-700'}`}>
+                      Modo Biblioteca
+                    </span>
+                    <span className="text-[10px] text-slate-500 mt-1">Apenas alimentar base de dados</span>
+                  </div>
+                  <Switch 
+                    checked={modoBiblioteca} 
+                    onCheckedChange={setModoBiblioteca}
+                    className="data-[state=checked]:bg-amber-500"
+                  />
                 </div>
-                <div className="flex flex-col">
-                  <span className={`text-sm font-bold leading-none ${modoBiblioteca ? 'text-amber-700' : 'text-slate-700'}`}>
-                    Modo Biblioteca
-                  </span>
-                  <span className="text-[10px] text-slate-500 mt-1">Apenas alimentar base de dados</span>
-                </div>
-                <Switch 
-                  checked={modoBiblioteca} 
-                  onCheckedChange={setModoBiblioteca}
-                  className="data-[state=checked]:bg-amber-500"
-                />
-              </div>
+              )}
             </div>
           </CardHeader>
 
@@ -506,12 +533,21 @@ export default function NovaSolicitacaoAdmin({
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-slate-700">Departamento *</Label>
-                  <Input
-                    value={departamentoSolicitante}
-                    onChange={(e) => setDepartamentoSolicitante(e.target.value)}
-                    placeholder="Digite o departamento"
-                    className="border-slate-300 focus:border-blue-600 focus:ring-blue-600"
-                  />
+                  <Select 
+                    value={departamentoSolicitante} 
+                    onValueChange={(val) => setDepartamentoSolicitante(val)}
+                  >
+                    <SelectTrigger className="border-slate-300 focus:border-blue-600 focus:ring-blue-600">
+                      <SelectValue placeholder="Selecione o departamento" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {listaDepartamentos.map((depto) => (
+                        <SelectItem key={depto} value={depto}>
+                          {depto}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-slate-700">Data e Hora da Solicitação</Label>
@@ -584,16 +620,6 @@ export default function NovaSolicitacaoAdmin({
                     >
                       <MessageSquare className="h-4 w-4 mr-2" />
                       Texto de Whatsapp
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={() => setMostrarUploadHistorico(true)}
-                      variant="outline"
-                      size="sm"
-                      className="border-slate-600 text-slate-600 hover:bg-slate-50"
-                    >
-                      <FileSpreadsheet className="h-4 w-4 mr-2" />
-                      Upload Histórico
                     </Button>
                     <Button
                       type="button"

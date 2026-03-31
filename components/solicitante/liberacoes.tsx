@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   Search,
   CheckCircle,
@@ -21,11 +21,12 @@ import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuth } from "../../contexts/auth-context"
-import { getSolicitacoesByDepartamento } from "../../services/solicitacoes-service"
+import { getSolicitacoesByDepartamento, SolicitacoesService } from "../../services/solicitacoes-service"
 import {
   StatusLiberacaoBadge,
   StatusLiberacaoIcon,
   getLiberacaoStatus,
+  getChecagemStatus,
 } from "../ui/status-badges"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -41,6 +42,9 @@ export default function Liberacoes() {
   const [dataInicialRenovacao, setDataInicialRenovacao] = useState("")
   const [dataFinalRenovacao, setDataFinalRenovacao] = useState("")
   const [paginaAtual, setPaginaAtual] = useState(1)
+  const [enviando, setEnviando] = useState(false)
+  const [erroRenovacao, setErroRenovacao] = useState<string | null>(null)
+  const processandoRef = useRef(false)
   const PRESTADORES_POR_PAGINA = 10
 
   const buscarSolicitacoesDepartamento = async () => {
@@ -77,12 +81,9 @@ export default function Liberacoes() {
   // Filtrar e organizar dados por status de liberação
   const dadosPorStatus = solicitacoesReais
     .filter((solicitacao) => solicitacao.departamento === usuario?.departamento)
-    .filter((solicitacao) =>
-      solicitacao.prestadores.some((p: any) => getLiberacaoStatus(p, solicitacao.dataFinal) === "ok"),
-    )
     .flatMap((solicitacao) =>
       solicitacao.prestadores
-        .filter((prestador: any) => getLiberacaoStatus(prestador, solicitacao.dataFinal) === "ok")
+        .filter((prestador: any) => prestador.liberacao !== "pendente")
         .map((prestador: any) => ({
           solicitacao,
           prestador,
@@ -209,12 +210,63 @@ export default function Liberacoes() {
     }
   }
 
-  const confirmarRenovacao = () => {
-    // Lógica de renovação será implementada
-    console.log("Renovar prestador:", prestadorSelecionado?.prestador.nome)
-    console.log("Data inicial:", dataInicialRenovacao)
-    console.log("Data final:", dataFinalRenovacao)
-    setModalRenovacao(false)
+
+  const confirmarRenovacao = async () => {
+    if (!prestadorSelecionado || !usuario || processandoRef.current) return
+
+    try {
+      processandoRef.current = true
+      setEnviando(true)
+      setErroRenovacao(null)
+
+      const statusChecagemAtual = getChecagemStatus(prestadorSelecionado.prestador)
+      
+      let modoDireto: "padrao" | "solo_checagem" | "solo_excecao" = "padrao"
+      if (statusChecagemAtual === "aprovada" || statusChecagemAtual === "aprovado") {
+        modoDireto = "solo_checagem"
+      } else if (statusChecagemAtual === "excecao") {
+        modoDireto = "solo_excecao"
+      }
+
+      const dados = {
+        solicitante: usuario.nome || usuario.email,
+        departamento: usuario.departamento,
+        usuarioId: usuario.id,
+        tipoSolicitacao: "somente_liberacao" as const, 
+        finalidade: prestadorSelecionado.solicitacao.finalidade || "obra",
+        local: prestadorSelecionado.solicitacao.local || "Clube",
+        empresa: prestadorSelecionado.prestador.empresa || prestadorSelecionado.solicitacao.empresa,
+        modoAprovacaoDireta: modoDireto,
+        prestadores: [
+          {
+            nome: prestadorSelecionado.prestador.nome,
+            doc1: prestadorSelecionado.prestador.doc1,
+            doc2: prestadorSelecionado.prestador.doc2,
+            empresa: prestadorSelecionado.prestador.empresa,
+          },
+        ],
+        dataInicial: dataInicialRenovacao,
+        dataFinal: dataFinalRenovacao,
+      }
+
+      console.log("🚀 RENOVAÇÃO: Enviando nova solicitação...", dados)
+
+      const resultado = await SolicitacoesService.criarSolicitacao(dados)
+
+      if (resultado.sucesso) {
+        alert("✅ Solicitação de renovação enviada com sucesso! Aguarde a aprovação da ADM.")
+        setModalRenovacao(false)
+        buscarSolicitacoesDepartamento() // Atualizar lista
+      } else {
+        setErroRenovacao(resultado.erro)
+      }
+    } catch (error: any) {
+      console.error("Erro ao renovar:", error)
+      setErroRenovacao("Erro inesperado ao processar renovação.")
+    } finally {
+      setEnviando(false)
+      processandoRef.current = false
+    }
   }
 
   return (
@@ -450,15 +502,27 @@ export default function Liberacoes() {
                 <p className="text-xs text-gray-500 mt-1">Limite: {prestadorSelecionado.prestador.checagemValidaAte}</p>
               )}
             </div>
+
+            {erroRenovacao && (
+              <Alert variant="destructive">
+                <AlertDescription>{erroRenovacao}</AlertDescription>
+              </Alert>
+            )}
+
             <div className="flex gap-2 pt-4">
               <Button
                 onClick={confirmarRenovacao}
-                disabled={!dataInicialRenovacao || !dataFinalRenovacao}
+                disabled={!dataInicialRenovacao || !dataFinalRenovacao || enviando}
                 className="flex-1 bg-red-600 hover:bg-red-700"
               >
-                Confirmar Renovação
+                {enviando ? "Enviando..." : "Confirmar Renovação"}
               </Button>
-              <Button variant="outline" onClick={() => setModalRenovacao(false)} className="flex-1">
+              <Button 
+                variant="outline" 
+                onClick={() => setModalRenovacao(false)} 
+                disabled={enviando}
+                className="flex-1"
+              >
                 Cancelar
               </Button>
             </div>

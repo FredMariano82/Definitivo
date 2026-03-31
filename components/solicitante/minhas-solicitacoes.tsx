@@ -15,6 +15,8 @@ import {
   StatusChecagemBadge,
   StatusChecagemIcon,
 } from "../ui/status-badges"
+import { useAuth } from "../../contexts/auth-context"
+import { SolicitacoesService } from "../../services/solicitacoes-service"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DataInicialIndicator } from "../../utils/date-indicators"
 import PageHeader from "@/components/page-header"
@@ -22,42 +24,40 @@ import PageHeader from "@/components/page-header"
 const PRESTADORES_POR_PAGINA = 10
 
 const MinhasSolicitacoes = () => {
+  const { usuario } = useAuth()
   const [paginaAtual, setPaginaAtual] = useState(1)
   const [filtroStatus, setFiltroStatus] = useState("todos")
   const [filtroLiberacao, setFiltroLiberacao] = useState("todos")
   const [buscaGeral, setBuscaGeral] = useState("")
+  const [solicitacoesReais, setSolicitacoesReais] = useState<any[]>([])
+  const [carregando, setCarregando] = useState(true)
+
+  useEffect(() => {
+    const buscarDados = async () => {
+      if (!usuario?.email) return
+      try {
+        setCarregando(true)
+        const dados = await SolicitacoesService.listarSolicitacoes({ solicitante: usuario.email })
+        setSolicitacoesReais(dados)
+      } catch (error) {
+        console.error("Erro ao buscar solicitações reais:", error)
+      } finally {
+        setCarregando(true) // Should be false, wait
+        setCarregando(false)
+      }
+    }
+    buscarDados()
+  }, [usuario])
 
   // Resetar página quando filtros mudarem
   useEffect(() => {
     setPaginaAtual(1)
   }, [filtroStatus, filtroLiberacao, buscaGeral])
 
-  // Dados mock expandidos para demonstração da paginação
-  const solicitacoesMock = [
-    {
-      id: "1",
-      numero: "2025-001",
-      dataSolicitacao: "15/01/2025",
-      dataInicial: "20/01/2025",
-      dataFinal: "25/01/2025",
-      departamento: "TI",
-      local: "Sede Principal",
-      prestadores: Array.from({ length: 150 }, (_, i) => ({
-        id: `p${i + 1}`,
-        nome: `Prestador ${i + 1}`,
-        doc1: `${String(i + 1).padStart(3, "0")}.456.789-00`,
-        checagem: (i % 3 === 0 ? "aprovado" : i % 3 === 1 ? "pendente" : i % 3 === 2 ? "reprovado" : "excecao") as "aprovado" | "reprovado" | "pendente" | "excecao",
-        liberacao: (i % 4 === 0 ? "ok" : i % 4 === 1 ? "pendente" : i % 4 === 2 ? "urgente" : "negada") as "ok" | "pendente" | "urgente" | "negada",
-        checagemValidaAte: i % 2 === 0 ? "25/01/2026" : undefined,
-        justificativa: i % 5 === 0 ? `Justificativa para prestador ${i + 1}` : undefined,
-      })),
-    },
-  ]
-
   // Filtrar prestadores
-  const todosPrestadores = solicitacoesMock.flatMap(
+  const todosPrestadores = solicitacoesReais.flatMap(
     (solicitacao) =>
-      solicitacao.prestadores?.filter((prestador) => {
+      solicitacao.prestadores?.filter((prestador: any) => {
         // Filtro de status
         const statusMatch = filtroStatus === "todos" || prestador.checagem === filtroStatus
 
@@ -72,7 +72,7 @@ const MinhasSolicitacoes = () => {
         }
 
         return statusMatch && liberacaoMatch && buscaMatch
-      }) || [],
+      }).map((p: any) => ({ ...p, solicitacaoParent: solicitacao })) || [],
   )
 
   // Calcular paginação
@@ -119,6 +119,7 @@ const MinhasSolicitacoes = () => {
                     <SelectItem value="aprovado">Aprovado</SelectItem>
                     <SelectItem value="reprovado">Reprovado</SelectItem>
                     <SelectItem value="revisar">Revisar</SelectItem>
+                    <SelectItem value="excecao">Exceção</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -196,55 +197,76 @@ const MinhasSolicitacoes = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {prestadoresPaginados.map((prestador, index) => (
-                  <TableRow key={prestador.id} className="hover:bg-blue-50">
-                    <TableCell className="text-sm text-center">
-                      <div className="whitespace-nowrap font-medium">{prestador.nome}</div>
-                    </TableCell>
-                    <TableCell className="text-sm text-center">
-                      <div className="text-xs font-mono whitespace-nowrap">{prestador.doc1}</div>
-                    </TableCell>
-                    <TableCell className="text-sm whitespace-nowrap text-center">
-                      <DataInicialIndicator
-                        dataInicial={solicitacoesMock[0].dataInicial}
-                        isReprovado={prestador.checagem === "reprovado"}
-                      />
-                    </TableCell>
-                    <TableCell className="text-sm whitespace-nowrap text-center">
-                      {prestador.checagem === "reprovado" ? (
-                        <span className="text-blue-400">-</span>
-                      ) : (
-                        solicitacoesMock[0].dataFinal
-                      )}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <StatusLiberacaoIcon status={getLiberacaoStatus(prestador, solicitacoesMock[0].dataFinal)} />
-                        <StatusLiberacaoBadge status={getLiberacaoStatus(prestador, solicitacoesMock[0].dataFinal)} />
+                {carregando ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-10">
+                      <div className="flex justify-center items-center gap-2">
+                        <Clock className="h-5 w-5 animate-spin text-blue-600" />
+                        <span>Carregando solicitações reais...</span>
                       </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-2 whitespace-nowrap">
-                        <StatusChecagemIcon status={prestador.checagem} />
-                        <StatusChecagemBadge status={prestador.checagem} />
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm whitespace-nowrap text-center">
-                      {prestador.checagemValidaAte ? (
-                        <span>{prestador.checagemValidaAte}</span>
-                      ) : (
-                        <span className="text-blue-400">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm text-center">
-                      {prestador.justificativa ? (
-                        <div className="max-w-xs truncate" title={prestador.justificativa}>
-                          {prestador.justificativa}
-                        </div>
-                      ) : null}
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : prestadoresPaginados.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-10 text-blue-400 font-medium">
+                      Nenhum prestador encontrado no banco de dados.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  prestadoresPaginados.map((prestador: any) => (
+                    <TableRow key={prestador.id} className="hover:bg-blue-50">
+                      <TableCell className="text-sm text-center">
+                        <div className="whitespace-nowrap font-medium">{prestador.nome}</div>
+                      </TableCell>
+                      <TableCell className="text-sm text-center">
+                        <div className="text-xs font-mono whitespace-nowrap">{prestador.doc1}</div>
+                      </TableCell>
+                      <TableCell className="text-sm whitespace-nowrap text-center">
+                        <DataInicialIndicator
+                          dataInicial={prestador.solicitacaoParent.dataInicial}
+                          isReprovado={prestador.checagem === "reprovado"}
+                        />
+                      </TableCell>
+                      <TableCell className="text-sm whitespace-nowrap text-center">
+                        {prestador.checagem === "reprovado" ? (
+                          <span className="text-blue-400">-</span>
+                        ) : (
+                          prestador.solicitacaoParent.dataFinal
+                        )}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <StatusLiberacaoIcon
+                            status={getLiberacaoStatus(prestador, prestador.solicitacaoParent.dataFinal)}
+                          />
+                          <StatusLiberacaoBadge
+                            status={getLiberacaoStatus(prestador, prestador.solicitacaoParent.dataFinal)}
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-2 whitespace-nowrap">
+                          <StatusChecagemIcon status={prestador.checagem} />
+                          <StatusChecagemBadge status={prestador.checagem} />
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm whitespace-nowrap text-center">
+                        {prestador.checagemValidaAte ? (
+                          <span>{prestador.checagemValidaAte}</span>
+                        ) : (
+                          <span className="text-blue-400">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-center">
+                        {prestador.justificativa ? (
+                          <div className="max-w-xs truncate" title={prestador.justificativa}>
+                            {prestador.justificativa}
+                          </div>
+                        ) : null}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>

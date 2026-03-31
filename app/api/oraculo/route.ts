@@ -24,7 +24,7 @@ export async function POST(req: Request) {
         }
 
         // Chamada direta para a API do Gemini via Fetch (evita dependências pesadas)
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -45,6 +45,8 @@ export async function POST(req: Request) {
         })
 
         const data = await response.json()
+        console.log("🔍 Resposta brura do Gemini:", JSON.stringify(data, null, 2))
+        
         const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Desculpe, não consegui processar essa resposta no momento."
 
         return NextResponse.json({ reply })
