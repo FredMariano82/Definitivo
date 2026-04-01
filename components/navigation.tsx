@@ -6,7 +6,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "../contexts/auth-context"
-import { CheckCircle, FileText, Users, BarChart3, HeadphonesIcon, Crown, DollarSign, Crosshair, ChevronLeft, ChevronRight } from "lucide-react"
+import { CheckCircle, FileText, Users, BarChart3, HeadphonesIcon, Crown, DollarSign, Crosshair, ChevronLeft, ChevronRight, Key } from "lucide-react"
 import { getSolicitacoesByDepartamento } from "../services/solicitacoes-service"
 import { getLiberacaoStatus } from "./ui/status-badges"
 import { converterDataBrParaDate, getCurrentDate } from "../utils/date-helpers"
@@ -166,6 +166,12 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
             className: getButtonClass("/admin/nova-solicitacao"),
           },
           {
+            href: "/admin/controle-chaves",
+            label: "Controle de Chaves",
+            icon: Key,
+            className: getButtonClass("/admin/controle-chaves"),
+          },
+          {
             href: "/op/tatico",
             label: "Painel Tático",
             icon: Crosshair,
@@ -246,6 +252,12 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
             label: "Nova Solicitação",
             icon: FileText,
             className: getButtonClass("/admin/nova-solicitacao"),
+          },
+          {
+            href: "/admin/controle-chaves",
+            label: "Controle de Chaves",
+            icon: Key,
+            className: getButtonClass("/admin/controle-chaves"),
           },
           {
             href: "/op/tatico",

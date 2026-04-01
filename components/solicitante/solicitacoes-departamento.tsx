@@ -149,28 +149,34 @@ export default function SolicitacoesDepartamento() {
     }
   }
   const [carregandoDownload, setCarregandoDownload] = useState(false)
+  // Estado inicial das colunas: todas visíveis por padrão
   const [colunasVisiveis, setColunasVisiveis] = useState<Record<string, boolean>>(() => {
-    // Tentar carregar do localStorage
-    if (typeof window !== "undefined") {
-      const salvas = localStorage.getItem("solicitante-departamento-colunas-visiveis")
-      if (salvas) {
-        return JSON.parse(salvas)
-      }
-    }
-    // Estado inicial: todas as colunas visíveis
-    const estadoInicial = COLUNAS_DISPONIVEIS.reduce(
-      (acc, coluna) => {
-        acc[coluna.key] = true
-        return acc
-      },
-      {} as Record<string, boolean>,
-    )
-    return estadoInicial
+    return COLUNAS_DISPONIVEIS.reduce((acc, col) => {
+      acc[col.key] = true
+      return acc
+    }, {} as Record<string, boolean>)
   })
 
-  // Salvar preferências no localStorage sempre que mudar
+  // Carregar preferências do localStorage apenas APÓS o componente montar (lado do cliente)
   useEffect(() => {
     if (typeof window !== "undefined") {
+      try {
+        const salvas = localStorage.getItem("solicitante-departamento-colunas-visiveis")
+        if (salvas) {
+          const parsed = JSON.parse(salvas)
+          if (parsed && typeof parsed === 'object') {
+            setColunasVisiveis(prev => ({ ...prev, ...parsed }))
+          }
+        }
+      } catch (error) {
+        console.error("❌ SOLICITANTE: Falha ao carregar colunas do localStorage:", error)
+      }
+    }
+  }, [])
+
+  // Salvar preferências no localStorage apenas quando mudarem (e se houver dados)
+  useEffect(() => {
+    if (typeof window !== "undefined" && Object.keys(colunasVisiveis).length > 0) {
       localStorage.setItem("solicitante-departamento-colunas-visiveis", JSON.stringify(colunasVisiveis))
     }
   }, [colunasVisiveis])

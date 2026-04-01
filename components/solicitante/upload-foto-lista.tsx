@@ -28,6 +28,7 @@ export default function UploadFotoLista({ onListaProcessada }: UploadFotoListaPr
         prestadores: PrestadorExcelSolicitante[]
     } | null>(null)
 
+    const [aceitouTermo, setAceitouTermo] = useState(false)
     const [mostrarPreview, setMostrarPreview] = useState(false)
     const inputRef = useRef<HTMLInputElement>(null)
 
@@ -114,6 +115,49 @@ export default function UploadFotoLista({ onListaProcessada }: UploadFotoListaPr
         }
     }
 
+    if (!aceitouTermo) {
+        return (
+            <Card className="w-full max-w-4xl mx-auto shadow-none border-0 sm:border sm:shadow-sm">
+                <CardHeader className="pb-4">
+                    <CardTitle className="flex items-center gap-2 text-orange-600">
+                        <AlertTriangle className="h-5 w-5" />
+                        Termo de Responsabilidade - Leitura Visual
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="bg-orange-50 border border-orange-200 p-6 rounded-xl space-y-4">
+                        <p className="text-orange-900 font-bold leading-relaxed">
+                            Atenção: Este recurso de Leitura de Foto (OCR) é apenas um <span className="underline italic">facilitador de último recurso</span>.
+                        </p>
+                        <ul className="space-y-2 text-sm text-orange-800">
+                            <li className="flex items-start gap-2">
+                                <div className="h-1.5 w-1.5 rounded-full bg-orange-400 mt-1.5 shrink-0" />
+                                <span>A tecnologia de leitura ótica possui uma **taxa de erro existe** e variável dependendo da nitidez da imagem.</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                                <div className="h-1.5 w-1.5 rounded-full bg-orange-400 mt-1.5 shrink-0" />
+                                <span>É **obrigatório** que o usuário revise e repasse todos os nomes e documentos extraídos para conferência.</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                                <div className="h-1.5 w-1.5 rounded-full bg-orange-400 mt-1.5 shrink-0" />
+                                <span className="font-bold text-red-700 uppercase tracking-tight">Responsabilidade Total do Usuário!</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                        <Button
+                            onClick={() => setAceitouTermo(true)}
+                            className="bg-orange-600 hover:bg-orange-700 text-white font-bold h-12 rounded-xl"
+                        >
+                            Estou Ciente e Sou Responsável
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+        )
+    }
+
     return (
         <Card className="w-full max-w-4xl mx-auto shadow-none border-0 sm:border sm:shadow-sm">
             <CardHeader className="pb-4">
@@ -128,11 +172,11 @@ export default function UploadFotoLista({ onListaProcessada }: UploadFotoListaPr
                     <ImageIcon className="h-4 w-4 text-[#D24726]" />
                     <AlertDescription className="text-orange-900 text-sm">
                         <div className="space-y-2">
-                            <p><strong>💡 Facilitador de Cadastro:</strong> Este recurso utiliza inteligência artificial para tentar ler nomes e documentos de fotos ou prints.</p>
-                            <p className="text-[12px] text-orange-800">⚠️ <strong>Atenção:</strong> A precisão depende da nitidez da imagem. Sempre revise os dados extraídos antes de confirmar.</p>
+                            <p><strong>💡 Facilitador:</strong> Este recurso tenta ler nomes e documentos de fotos de listas físicas.</p>
+                            <p className="text-[12px] text-orange-800">⚠️ <strong>Atenção:</strong> Sempre revise os dados extraídos. Responsabilidade total do usuário!</p>
                             <div className="bg-white/50 p-2 rounded border border-orange-100 mt-2">
-                                <p className="text-[11px] font-bold text-orange-900 uppercase tracking-wider mb-1">Formato Recomendado:</p>
-                                <p className="text-[11px] font-mono text-orange-700">NOME DO PRESTADOR - 00.000.000-0 - EMPRESA</p>
+                                <p className="text-[11px] font-bold text-orange-900 uppercase tracking-wider mb-1">Reconhecimento na Sequência:</p>
+                                <p className="text-[11px] font-mono text-orange-700">NOME / RG (DOC GERAL) / EMPRESA</p>
                             </div>
                         </div>
                     </AlertDescription>
@@ -149,7 +193,7 @@ export default function UploadFotoLista({ onListaProcessada }: UploadFotoListaPr
                                 className="border-orange-200 text-[#D24726] hover:bg-orange-50 h-12 w-full sm:w-auto px-8"
                             >
                                 <Camera className="h-5 w-5 mr-2" />
-                                Tirar Foto / Anexar Imagem
+                                Tirar Foto da Lista
                             </Button>
                         ) : (
                             <div className="flex flex-col w-full gap-4">
@@ -174,10 +218,10 @@ export default function UploadFotoLista({ onListaProcessada }: UploadFotoListaPr
                                     <Button
                                         onClick={processarImagem}
                                         disabled={carregando}
-                                        className="bg-[#D24726] hover:bg-[#B73E21] text-white w-full"
+                                        className="bg-[#D24726] hover:bg-[#B73E21] text-white w-full h-12"
                                     >
                                         <Wand2 className="h-4 w-4 mr-2" />
-                                        {carregando ? "Olhando para a foto..." : "Ler Nomes e Documentos da Foto"}
+                                        {carregando ? "Processando imagem..." : "Ler Nomes e Documentos"}
                                     </Button>
                                 )}
                             </div>
@@ -209,7 +253,7 @@ export default function UploadFotoLista({ onListaProcessada }: UploadFotoListaPr
                                 {resultado.sucesso ? (
                                     <>
                                         <p className="font-semibold text-emerald-700">
-                                            Mágica Feita! Lemos a foto e encontramos {resultado.totalProcessados} pessoas.
+                                            Leitura concluída! Encontramos {resultado.totalProcessados} pessoas na foto.
                                         </p>
                                         {resultado.erro && <p className="text-xs text-emerald-600/80 italic">{resultado.erro}</p>}
 
@@ -218,17 +262,17 @@ export default function UploadFotoLista({ onListaProcessada }: UploadFotoListaPr
                                                 onClick={usarListaNaSolicitacao}
                                                 className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
                                             >
-                                                Carregar na Solicitação
+                                                Cadastrar na Solicitação
                                             </Button>
 
                                             <Button onClick={() => setMostrarPreview(!mostrarPreview)} variant="outline" className="border-emerald-200 text-emerald-700 hover:bg-emerald-100">
-                                                {mostrarPreview ? "Ocultar" : "Ver"} Lista Encontrada
+                                                {mostrarPreview ? "Ocultar" : "Ver"} Resultados
                                             </Button>
                                         </div>
                                     </>
                                 ) : (
                                     <>
-                                        <p className="font-semibold text-red-700">Ops, falha na leitura Visual:</p>
+                                        <p className="font-semibold text-red-700">Falha na extração de dados:</p>
                                         <p className="text-sm">{resultado.erro}</p>
                                     </>
                                 )}
@@ -241,7 +285,7 @@ export default function UploadFotoLista({ onListaProcessada }: UploadFotoListaPr
                 {mostrarPreview && resultado?.prestadores && (
                     <div className="mt-4 border border-emerald-100 rounded-lg overflow-hidden bg-white shadow-sm">
                         <div className="bg-emerald-50 px-4 py-2 border-b border-emerald-100">
-                            <h4 className="font-medium text-emerald-800 text-sm">Preview da Leitura da Foto:</h4>
+                            <h4 className="font-medium text-emerald-800 text-sm">Dados Extraídos (CONFIRA TUDO!):</h4>
                         </div>
                         <div className="p-4 space-y-2 text-sm max-h-[300px] overflow-y-auto">
                             {resultado.prestadores.map((prestador, index) => (
@@ -250,8 +294,15 @@ export default function UploadFotoLista({ onListaProcessada }: UploadFotoListaPr
                                         <User className="h-3 w-3 inline mr-2 text-slate-400" />
                                         {prestador.nome}
                                     </div>
-                                    <div className="font-mono text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">
-                                        Doc: {prestador.doc1}
+                                    <div className="flex gap-2">
+                                        <div className="font-mono text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">
+                                            Doc: {prestador.doc1}
+                                        </div>
+                                        {prestador.empresa && (
+                                            <div className="font-mono text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">
+                                                Emp: {prestador.empresa}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ))}

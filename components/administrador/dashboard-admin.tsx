@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
 import { useAuth } from "../../contexts/auth-context"
 
-export default function DashboardAdmin() {
+export default function DashboardAdmin({ hideHeader = false }: { hideHeader?: boolean }) {
   const { usuario } = useAuth()
   const [solicitacoes, setSolicitacoes] = useState<any[]>([])
   const [filtroSolicitante, setFiltroSolicitante] = useState<string>("todos")
@@ -193,7 +193,7 @@ export default function DashboardAdmin() {
   return (
     <div className="space-y-6 pt-2">
       <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.xlsx,.xls" onChange={handleFileChange} onClick={(e) => (e.currentTarget.value = "")} />
-      <PageHeader title="Dashboard Administrativo" subtitle="Controle total do sistema" />
+      {!hideHeader && <PageHeader title="Dashboard Administrativo" subtitle="Controle total do sistema" />}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card><CardHeader><CardTitle className="text-sm">Total</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{metricas.total}</div></CardContent></Card>

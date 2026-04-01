@@ -29,8 +29,9 @@ import ModalPreviaSolicitacao from "../solicitante/modal-previa-solicitacao"
 import UploadHistoricoExcel from "./upload-historico-excel"
 import { Switch } from "@/components/ui/switch"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Library } from "lucide-react"
+import { Library, Camera } from "lucide-react"
 import { AutocompleteRG } from "@/components/ui/autocomplete-rg"
+import UploadFotoLista from "../solicitante/upload-foto-lista"
 
 interface NovaSolicitacaoAdminProps {
   dadosPrePreenchidos?: {
@@ -81,6 +82,7 @@ export default function NovaSolicitacaoAdmin({
   // Adicionar estado para controlar modal de upload
   const [mostrarUploadLista, setMostrarUploadLista] = useState(false)
   const [mostrarUploadTexto, setMostrarUploadTexto] = useState(false)
+  const [mostrarUploadFoto, setMostrarUploadFoto] = useState(false)
   const [mostrarPrevia, setMostrarPrevia] = useState(false)
   const [dadosVieramDoExcel, setDadosVieramDoExcel] = useState(false)
 
@@ -623,6 +625,15 @@ export default function NovaSolicitacaoAdmin({
                     </Button>
                     <Button
                       type="button"
+                      onClick={() => setMostrarUploadFoto(true)}
+                      size="sm"
+                      className="bg-orange-600 hover:bg-orange-700 text-white shadow-[0_0_15px_rgba(234,88,12,0.2)] transition-all"
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      Foto da Lista
+                    </Button>
+                    <Button
+                      type="button"
                       onClick={() => setMostrarUploadLista(true)}
                       size="sm"
                       className="bg-[#1e293b] hover:bg-[#0f172a] text-white shadow-[0_0_15px_rgba(30,41,59,0.2)] transition-all"
@@ -930,6 +941,36 @@ export default function NovaSolicitacaoAdmin({
             </div>
             <div className="p-4">
               <UploadListaExcel onListaProcessada={processarListaExcel} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mostrarUploadFoto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white rounded-lg shadow-xl relative">
+            <button
+              onClick={() => setMostrarUploadFoto(false)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 z-10"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <div className="p-4">
+              <UploadFotoLista
+                onListaProcessada={(novosPrestadores) => {
+                  const prestadoresComId = novosPrestadores.map((p, index) => ({
+                    ...p,
+                    id: `foto_${Date.now()}_${index}`,
+                  }))
+                  
+                  const listaBase = (prestadores.length === 1 && !prestadores[0].nome && !prestadores[0].doc1) 
+                    ? [] 
+                    : prestadores;
+                  
+                  setPrestadores([...listaBase, ...prestadoresComId])
+                  setMostrarUploadFoto(false)
+                }}
+              />
             </div>
           </div>
         </div>

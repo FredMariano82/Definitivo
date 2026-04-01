@@ -68,6 +68,14 @@ import {
     DialogDescription,
     DialogFooter,
 } from "@/components/ui/dialog"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 
 const styles = `
 @keyframes pulsate-suggested {
@@ -363,6 +371,24 @@ export default function PainelTaticoV2() {
         targetType: 'fixed'
     })
 
+    // Estado para o Modal de Download de Relatórios
+    const [downloadModal, setDownloadModal] = useState({
+        aberto: false,
+        dataInicio: format(new Date(), 'yyyy-MM-dd'),
+        dataFim: format(new Date(), 'yyyy-MM-dd'),
+        profissionalId: 'todos'
+    })
+
+    // Estado para o Modal de Equipamentos (Rádio/Colete)
+    const [equipamentoModal, setEquipamentoModal] = useState({
+        aberto: false,
+        profissionalId: '',
+        targetId: '',
+        targetType: '',
+        radioHT: '',
+        colete: false
+    })
+
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 3 } }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -472,32 +498,49 @@ export default function PainelTaticoV2() {
         }
     }, [activeTab])
 
-    const handleExportarExcel = () => {
-        if (historico.length === 0) return
+    const handleExportarFiltrado = async () => {
+        try {
+            const logs = await OpServiceV2.getHistoricoFiltrado({
+                startDate: downloadModal.dataInicio,
+                endDate: downloadModal.dataFim,
+                colaborador_id: downloadModal.profissionalId
+            })
 
-        const headers = ["Horário", "Ação", "Profissional", "Origem", "Destino", "Rendeu Quem", "Duração (min)"]
-        const csvContent = [
-            headers.join(";"),
-            ...historico.map(log => [
-                format(parseISO(log.created_at), 'dd/MM/yyyy HH:mm:ss'),
-                log.acao,
-                log.colaborador_nome,
-                log.posto_origem || "",
-                log.posto_destino || "",
-                log.rendeu_quem_nome || "",
-                log.duracao_prevista ? Math.floor(log.duracao_prevista/60) : ""
-            ].join(";"))
-        ].join("\n")
+            if (logs.length === 0) {
+                alert("Nenhum dado encontrado para o período/profissional selecionado.")
+                return
+            }
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-        const link = document.createElement("a")
-        const url = URL.createObjectURL(blob)
-        link.setAttribute("href", url)
-        link.setAttribute("download", `relatorio_tatico_${format(new Date(), 'dd-MM-yyyy')}.csv`)
-        link.style.visibility = 'hidden'
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
+            const headers = ["Horário", "Ação", "Profissional", "Origem", "Destino", "Rendeu Quem", "Duração (min)", "Rádio HT", "Colete"]
+            const csvContent = [
+                "\ufeff" + headers.join(";"), // Adiciona BOM para UTF-8 no Excel
+                ...logs.map(log => [
+                    format(parseISO(log.created_at), 'dd/MM/yyyy HH:mm:ss'),
+                    log.acao,
+                    log.colaborador_nome,
+                    log.posto_origem || "",
+                    log.posto_destino || "",
+                    log.rendeu_quem_nome || "",
+                    log.duracao_prevista ? Math.floor(log.duracao_prevista/60) : "",
+                    log.radio_ht || "",
+                    log.possui_colete ? "SIM" : "NÃO"
+                ].join(";"))
+            ].join("\n")
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+            const link = document.createElement("a")
+            const url = URL.createObjectURL(blob)
+            link.setAttribute("href", url)
+            link.setAttribute("download", `relatorio_tatico_filtrado_${downloadModal.dataInicio}_a_${downloadModal.dataFim}.csv`)
+            link.style.visibility = 'hidden'
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            setDownloadModal(prev => ({ ...prev, aberto: false }))
+        } catch (err) {
+            console.error("Erro ao exportar relatório:", err)
+            alert("Erro ao gerar relatório.")
+        }
     }
 
     const handleDragStart = (event: DragStartEvent) => {
@@ -557,6 +600,20 @@ export default function PainelTaticoV2() {
                     targetType: type
                 })
                 return // Aguarda decisão do modal
+            }
+
+            // NOVO: Se está vindo do POOL (Reserva) para um POSTO, pede equipamentos
+            const alocAtual = alocacoes.find(a => a.colaborador_id === profissionalId)
+            if (!alocAtual) {
+                setEquipamentoModal({
+                    aberto: true,
+                    profissionalId,
+                    targetId,
+                    targetType: type,
+                    radioHT: '',
+                    colete: false
+                })
+                return
             }
         }
 
@@ -683,6 +740,54 @@ export default function PainelTaticoV2() {
         }
 
         setRendicaoData(prev => ({ ...prev, aberto: false }))
+        await fetchData()
+    }
+
+    const handleConfirmarEquipamento = async () => {
+        const { profissionalId, targetId, targetType, radioHT, colete } = equipamentoModal
+        
+        try {
+            const prof = equipe.find(p => p.id === profissionalId)
+            let finalTargetId = targetId
+            
+            // Autocura de ID do posto (similar ao handleDragEnd)
+            if (targetId === 'rendicionista' || (targetId && targetId.length < 30)) {
+                const pNome = (targetId === 'rendicionista' || targetId?.trim().toUpperCase() === 'RENDICIONISTA') 
+                    ? 'RENDICIONISTA' 
+                    : targetId
+                finalTargetId = await OpServiceV2.ensurePostoExists(pNome)
+            }
+
+            if (targetType === 'event') {
+                const evento = eventos.find(e => e.id === targetId)
+                if (evento?.posto_id) {
+                    await OpServiceV2.salvarAlocacao(profissionalId, evento.posto_id, radioHT, colete)
+                    await OpServiceV2.logMovimentacao({
+                        colaborador_id: profissionalId,
+                        colaborador_nome: prof?.nome_completo || 'Desconhecido',
+                        acao: 'ALOCAÇÃO EVENTO',
+                        posto_destino: evento.titulo,
+                        radio_ht: radioHT,
+                        possui_colete: colete
+                    })
+                }
+            } else {
+                await OpServiceV2.salvarAlocacao(profissionalId, finalTargetId, radioHT, colete)
+                const postoDest = postos.find(p => p.id === finalTargetId)
+                await OpServiceV2.logMovimentacao({
+                    colaborador_id: profissionalId,
+                    colaborador_nome: prof?.nome_completo || 'Desconhecido',
+                    acao: 'ALOCAÇÃO DIRETA',
+                    posto_destino: postoDest?.nome_posto || 'Posto',
+                    radio_ht: radioHT,
+                    possui_colete: colete
+                })
+            }
+        } catch (err) {
+            console.error("Erro ao salvar equipamentos:", err)
+        }
+
+        setEquipamentoModal(prev => ({ ...prev, aberto: false }))
         await fetchData()
     }
 
@@ -1053,10 +1158,9 @@ export default function PainelTaticoV2() {
                                 <Button 
                                     variant="outline" 
                                     className="rounded-xl border-slate-200 text-slate-600 font-bold hover:bg-slate-50 gap-2"
-                                    onClick={() => handleExportarExcel()}
-                                    disabled={historico.length === 0}
+                                    onClick={() => setDownloadModal(prev => ({ ...prev, aberto: true }))}
                                 >
-                                    <FileDown className="h-4 w-4" /> Exportar Planilha (CSV)
+                                    <FileDown className="h-4 w-4" /> Download
                                 </Button>
                                 <Button 
                                     variant="outline" 
@@ -1231,6 +1335,142 @@ export default function PainelTaticoV2() {
                             Cancelar Operação
                         </button>
                     </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* MODAL DE DOWNLOAD COM FILTROS */}
+            <Dialog open={downloadModal.aberto} onOpenChange={(open) => !open && setDownloadModal(prev => ({ ...prev, aberto: false }))}>
+                <DialogContent className="max-w-md bg-white border-slate-200 text-slate-900 rounded-[32px] overflow-hidden p-0 shadow-2xl">
+                    <DialogHeader className="bg-slate-50 p-8 border-b border-slate-100">
+                        <div className="flex items-center gap-4">
+                            <div className="h-12 w-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg">
+                                <FileDown className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <DialogTitle className="text-xl font-black uppercase tracking-tight italic">Download de Relatório</DialogTitle>
+                                <DialogDescription className="text-slate-500 font-medium">Selecione os filtros para exportação</DialogDescription>
+                            </div>
+                        </div>
+                    </DialogHeader>
+
+                    <div className="p-8 space-y-6">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Data Início</label>
+                                <Input 
+                                    type="date" 
+                                    className="rounded-xl border-slate-200 h-11 font-bold"
+                                    value={downloadModal.dataInicio}
+                                    onChange={(e) => setDownloadModal(prev => ({ ...prev, dataInicio: e.target.value }))}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Data Fim</label>
+                                <Input 
+                                    type="date" 
+                                    className="rounded-xl border-slate-200 h-11 font-bold"
+                                    value={downloadModal.dataFim}
+                                    onChange={(e) => setDownloadModal(prev => ({ ...prev, dataFim: e.target.value }))}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Filtrar por Profissional</label>
+                            <Select 
+                                value={downloadModal.profissionalId} 
+                                onValueChange={(val) => setDownloadModal(prev => ({ ...prev, profissionalId: val }))}
+                            >
+                                <SelectTrigger className="rounded-xl border-slate-200 h-11 font-bold">
+                                    <SelectValue placeholder="Selecione um profissional" />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-xl border-slate-200">
+                                    <SelectItem value="todos" className="font-bold">Todos os profissionais</SelectItem>
+                                    {equipe.map((p) => (
+                                        <SelectItem key={p.id} value={p.id} className="font-bold">
+                                            {p.nome_completo}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    <DialogFooter className="p-8 pt-0 flex gap-3">
+                        <Button 
+                            variant="ghost" 
+                            className="flex-1 rounded-xl font-black uppercase text-[10px] tracking-widest h-12"
+                            onClick={() => setDownloadModal(prev => ({ ...prev, aberto: false }))}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button 
+                            className="flex-1 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-[10px] tracking-widest h-12 shadow-lg shadow-blue-200"
+                            onClick={() => handleExportarFiltrado()}
+                        >
+                            Gerar Relatório
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <Dialog open={equipamentoModal.aberto} onOpenChange={(val) => setEquipamentoModal(prev => ({ ...prev, aberto: val }))}>
+                <DialogContent className="fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-[95vw] max-w-[440px] p-0 overflow-hidden border-none shadow-2xl rounded-3xl bg-white">
+                    <DialogHeader className="p-8 pb-0 flex flex-col gap-2 relative">
+                        <div className="flex items-center gap-4">
+                            <div className="h-14 w-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-inner">
+                                <ShieldCheck className="h-7 w-7" />
+                            </div>
+                            <div>
+                                <DialogTitle className="text-xl font-black uppercase tracking-tight italic">Controle de Equipamento</DialogTitle>
+                                <DialogDescription className="text-slate-500 font-medium">Informe os itens entregues ao profissional</DialogDescription>
+                            </div>
+                        </div>
+                    </DialogHeader>
+
+                    <div className="p-8 space-y-6">
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                                    Rádio HT <span className="text-[8px] font-medium opacity-60">(Opcional)</span>
+                                </label>
+                                <Input 
+                                    placeholder="Nº ou Nome do Rádio" 
+                                    className="rounded-xl border-slate-200 h-11 font-bold bg-slate-50/50"
+                                    value={equipamentoModal.radioHT}
+                                    onChange={(e) => setEquipamentoModal(prev => ({ ...prev, radioHT: e.target.value }))}
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/30">
+                                <div className="space-y-0.5">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                        Colete Balístico
+                                    </label>
+                                    <p className="text-[9px] text-slate-400 font-medium">O profissional está com o colete?</p>
+                                </div>
+                                <Switch 
+                                    checked={equipamentoModal.colete}
+                                    onCheckedChange={(val) => setEquipamentoModal(prev => ({ ...prev, colete: val }))}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <DialogFooter className="p-8 pt-0 flex gap-3">
+                        <Button 
+                            variant="ghost" 
+                            className="flex-1 rounded-xl font-black uppercase text-[10px] tracking-widest h-12"
+                            onClick={() => setEquipamentoModal(prev => ({ ...prev, aberto: false }))}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button 
+                            className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[10px] tracking-widest h-12 shadow-lg shadow-emerald-200"
+                            onClick={() => handleConfirmarEquipamento()}
+                        >
+                            Confirmar Alocação
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 

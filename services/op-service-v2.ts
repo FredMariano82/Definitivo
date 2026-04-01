@@ -230,7 +230,7 @@ export class OpServiceV2 {
                     else if (horasTotais <= 8) valorMembro = 170
                     else valorMembro = 240
                 } 
-                else if (patrocinador === 'OR') {
+                else if (patrocinador === 'OR' || patrocinador === 'Paulão Restaurante') {
                     valorMembro = 130
                 }
                 else if (patrocinador === 'Hagana') {
@@ -573,7 +573,7 @@ export class OpServiceV2 {
     /**
      * Salva ou atualiza uma alocação
      */
-    static async salvarAlocacao(colaborador_id: string, posto_id: string | null) {
+    static async salvarAlocacao(colaborador_id: string, posto_id: string | null, radio_ht?: string, possui_colete?: boolean) {
         const hoje = format(new Date(), 'yyyy-MM-dd')
         
         // Sempre encerra pausas vigentes ao realizar qualquer movimentação de alocação/base
@@ -599,7 +599,9 @@ export class OpServiceV2 {
                 colaborador_id,
                 posto_id,
                 data_alocacao: hoje,
-                horario_alocacao: format(new Date(), 'HH:mm:ss')
+                horario_alocacao: format(new Date(), 'HH:mm:ss'),
+                radio_ht,
+                possui_colete
             }, { onConflict: 'colaborador_id,data_alocacao' })
         
         if (error) throw error
@@ -819,7 +821,9 @@ export class OpServiceV2 {
         posto_destino?: string,
         rendeu_quem_id?: string,
         rendeu_quem_nome?: string,
-        duracao_prevista?: number
+        duracao_prevista?: number,
+        radio_ht?: string,
+        possui_colete?: boolean
     }) {
         const { error } = await supabase
             .from('op_historico_movimentacoes')
@@ -834,21 +838,30 @@ export class OpServiceV2 {
     }
 
     /**
-     * Busca o histórico de movimentações de um dia (ou hoje)
+     * Busca o histórico de movimentações filtrado por data e opcionalmente por colaborador
      */
-    static async getHistoricoMovimentacoes(data?: string): Promise<any[]> {
-        const hoje = data || format(new Date(), 'yyyy-MM-dd')
-        const { data: logs, error } = await supabase
+    static async getHistoricoFiltrado(params: {
+        startDate: string,
+        endDate: string,
+        colaborador_id?: string
+    }): Promise<any[]> {
+        let query = supabase
             .from('op_historico_movimentacoes')
             .select('*')
-            .gte('created_at', `${hoje}T00:00:00Z`)
-            .lte('created_at', `${hoje}T23:59:59Z`)
+            .gte('created_at', `${params.startDate}T00:00:00.000Z`)
+            .lte('created_at', `${params.endDate}T23:59:59.999Z`)
             .order('created_at', { ascending: false })
         
-        if (error) {
-            console.error("Erro ao buscar histórico:", error)
-            return []
+        if (params.colaborador_id && params.colaborador_id !== 'todos') {
+            query = query.eq('colaborador_id', params.colaborador_id)
         }
-        return logs || []
+
+        const { data, error } = await query
+        
+        if (error) {
+            console.error("Erro ao buscar histórico filtrado:", error)
+            throw error
+        }
+        return data || []
     }
 }

@@ -29,5 +29,5 @@ INSERT INTO op_guia_turno (turno, horario_alvo, titulo, instrucao, postos_sugeri
 
 -- TURNO NOITE
 INSERT INTO op_guia_turno (turno, horario_alvo, titulo, instrucao, postos_sugeridos, cor_alerta) VALUES
-('Noite', '18:00', 'Entrada e Rendições (18h)', 'Gean rende a 42, John rende a 57. Fábio assume a 43 até as 20h.', ARRAY['42 - Angelina', '57 - Raio X Alceu', '43 - Hungria'], 'amber'),
-('Noite', '20:00', 'Fechamento e Loop Noturno', 'A 43 fecha. Fábio (43) rende a Marta (44) para o café. Início do loop 43/44.', ARRAY['44 - Funcionários', '43 - Hungria'], 'blue');
+('Noite', '18:00', 'Entrada e Rendições (18h)', 'O profissional rende a 42, outro profissional rende a 57. Profissional assume a 43 até as 20h.', ARRAY['42 - Angelina', '57 - Raio X Alceu', '43 - Hungria'], 'amber'),
+('Noite', '20:00', 'Fechamento e Loop Noturno', 'A 43 fecha. O profissional da 43 rende o profissional da 44 para o café. Início do loop 43/44.', ARRAY['44 - Funcionários', '43 - Hungria'], 'blue');

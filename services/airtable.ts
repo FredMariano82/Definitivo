@@ -18,7 +18,9 @@ export class AirtableService {
 
     async getRecords(): Promise<AirtableRecord[]> {
         if (!this.apiKey || !this.baseId || !this.tableName) {
-            throw new Error('Airtable configuration is missing');
+            console.warn('Configuração do Airtable ausente. Verifique as variáveis de ambiente.');
+            // Retorna vazio ou lança erro capturável fora do build
+            return [];
         }
 
         const allRecords: AirtableRecord[] = [];

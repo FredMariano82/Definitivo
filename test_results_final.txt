@@ -1,0 +1,8 @@
+﻿--- OCR PARSER TEST START ---
+[PASS] Case 1: Name="Joao da Silva" Doc="123456789" Emp="Abc"
+[PASS] Case 2: Name="Maria Oliveira" Doc="11122233344" Emp="Google"
+[PASS] Case 3: Name="Pedro Santos" Doc="99888777X" Emp="Microsoft"
+[FAIL] Case 4: N├úo conseguimos ler os nomes e documentos nesta imagem. Tente uma foto mais n├¡tida ou aproximada.
+[PASS] Case 5: Name="Jose Souza" Doc="00011122233" Emp="Amazon"
+[PASS] Case 6: Name="Carlos Alberto" Doc="554443332" Emp="Facebook"
+--- OCR PARSER TEST END ---

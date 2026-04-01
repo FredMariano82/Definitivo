@@ -107,37 +107,18 @@ export default function TodasSolicitacoes() {
   const [novaHoraSolicitacao, setNovaHoraSolicitacao] = useState("")
   const [salvandoEdicao, setSalvandoEdicao] = useState(false)
 
-  // Estado para controlar colunas visíveis
+  // Estado inicial das colunas: todas visíveis por padrão (Sempre reseta ao carregar)
   const [colunasVisiveis, setColunasVisiveis] = useState<Record<string, boolean>>(() => {
-    // Tentar carregar do localStorage
-    if (typeof window !== "undefined") {
-      const salvas = localStorage.getItem("admin-colunas-visiveis")
-      if (salvas) {
-        return JSON.parse(salvas)
-      }
-    }
-    // Estado inicial: todas as colunas visíveis
-    const estadoInicial = COLUNAS_DISPONIVEIS.reduce(
-      (acc, coluna) => {
-        acc[coluna.key] = true
-        return acc
-      },
-      {} as Record<string, boolean>,
-    )
-    return estadoInicial
+    return COLUNAS_DISPONIVEIS.reduce((acc, col) => {
+      acc[col.key] = true
+      return acc
+    }, {} as Record<string, boolean>)
   })
 
   // Carregar solicitações do banco
   useEffect(() => {
     buscarSolicitacoes()
   }, [])
-
-  // Salvar preferências no localStorage sempre que mudar
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("admin-colunas-visiveis", JSON.stringify(colunasVisiveis))
-    }
-  }, [colunasVisiveis])
 
   // Resetar página quando filtros mudarem
   useEffect(() => {

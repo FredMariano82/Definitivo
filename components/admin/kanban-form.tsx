@@ -33,7 +33,7 @@ const kanbanSchema = z.object({
   titulo: z.string().min(3, "O título deve ter no mínimo 3 caracteres."),
   descricao: z.string().optional(),
   foto_url: z.string().optional(),
-  categoria: z.enum(["imagem", "os", "ocorrencia", "autorizacao_chaves", "achados_perdidos", "eventos", "uniforme"], {
+  categoria: z.enum(["imagem", "os", "ocorrencia", "autorizacao_chaves", "achados_perdidos", "eventos", "uniforme", "servico_noturno"], {
     required_error: "Selecione uma categoria.",
   }),
   // Campos dinâmicos (Imagem)
@@ -252,6 +252,7 @@ export function KanbanForm({ onSuccess, defaultValues }: KanbanFormProps) {
                     <SelectItem value="achados_perdidos">Achados e Perdidos</SelectItem>
                     <SelectItem value="eventos">Eventos</SelectItem>
                     <SelectItem value="uniforme">Uniforme</SelectItem>
+                    <SelectItem value="servico_noturno">Serviço Noturno</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormDescription>

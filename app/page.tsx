@@ -8,7 +8,7 @@ export default function RootPage() {
   const router = useRouter()
 
   useEffect(() => {
-    router.push("/op/painel")
+    router.push("/admin/controle-chaves")
   }, [router])
 
   return (

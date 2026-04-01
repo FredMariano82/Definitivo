@@ -73,26 +73,12 @@ export default function ConsultarSolicitacoes() {
   const [salvandoEdicao, setSalvandoEdicao] = useState(false)
   const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null)
 
-  // Estado para controlar colunas visíveis
+  // Estado inicial das colunas: todas visíveis por padrão (Sempre reseta ao carregar)
   const [colunasVisiveis, setColunasVisiveis] = useState<Record<string, boolean>>(() => {
-    // Tentar carregar do localStorage
-    if (typeof window !== "undefined") {
-      const salvas = localStorage.getItem("suporte-colunas-visiveis")
-      if (salvas) {
-        console.log("📂 CARREGADO DO LOCALSTORAGE:", JSON.parse(salvas))
-        return JSON.parse(salvas)
-      }
-    }
-    // Estado inicial: todas as colunas visíveis
-    const estadoInicial = COLUNAS_DISPONIVEIS.reduce(
-      (acc, coluna) => {
-        acc[coluna.key] = true
-        return acc
-      },
-      {} as Record<string, boolean>,
-    )
-    console.log("🆕 ESTADO INICIAL:", estadoInicial)
-    return estadoInicial
+    return COLUNAS_DISPONIVEIS.reduce((acc, col) => {
+      acc[col.key] = true
+      return acc
+    }, {} as Record<string, boolean>)
   })
 
   // Estados para download
@@ -107,14 +93,6 @@ export default function ConsultarSolicitacoes() {
   useEffect(() => {
     buscarSolicitacoes()
   }, [])
-
-  // Salvar preferências no localStorage sempre que mudar
-  useEffect(() => {
-    console.log("💾 SALVANDO NO LOCALSTORAGE:", colunasVisiveis)
-    if (typeof window !== "undefined") {
-      localStorage.setItem("suporte-colunas-visiveis", JSON.stringify(colunasVisiveis))
-    }
-  }, [colunasVisiveis])
 
   const buscarSolicitacoes = async () => {
     try {

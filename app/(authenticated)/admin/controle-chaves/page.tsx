@@ -1,6 +1,6 @@
 import dynamic from "next/dynamic"
 
-const TodasSolicitacoes = dynamic(() => import("@/components/administrador/todas-solicitacoes"), {
+const ChavesInventory = dynamic(() => import("@/components/admin/chaves-inventory").then(mod => mod.ChavesInventory), {
     ssr: false,
     loading: () => (
         <div className="flex items-center justify-center min-h-[400px]">
@@ -9,6 +9,10 @@ const TodasSolicitacoes = dynamic(() => import("@/components/administrador/todas
     )
 })
 
-export default function TodasSolicitacoesPage() {
-    return <TodasSolicitacoes />
+export default function ControleChavesPage() {
+  return (
+    <div className="p-6">
+      <ChavesInventory />
+    </div>
+  )
 }
