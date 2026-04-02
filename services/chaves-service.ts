@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase"
 
 export type ChaveModelo = 'amarela' | 'prata'
-export type ChaveStatus = 'disponivel' | 'emprestada' | 'manutencao' | 'extraviada' | 'nao_devolvida'
+export type ChaveStatus = 'disponivel' | 'emprestada' | 'manutencao' | 'extraviada' | 'nao_devolvida' | 'avariada'
 
 export interface ChaveInventario {
   id: string
@@ -125,7 +125,6 @@ export const ChavesService = {
 
     if (error) throw error
 
-    // 3. Registrar no histórico como uma ação especial
     if (chave) {
         await supabase.from('chaves_movimentacoes').insert({
           chave_id: id,
@@ -139,6 +138,51 @@ export const ChavesService = {
           data_evento: new Date().toISOString()
         })
     }
+  },
+
+  async marcarAvariada(id: string, obs: string, operador_nome: string = "Operador") {
+    // 1. Buscar dados atuais
+    const { data: chave } = await supabase.from('chaves_inventario').select('*').eq('id', id).single()
+
+    // 2. Atualizar inventário
+    const { error } = await supabase
+      .from('chaves_inventario')
+      .update({
+        status: 'avariada' as ChaveStatus,
+        obs: obs,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+
+    if (error) throw error
+
+    // 3. Registrar no histórico
+    if (chave) {
+        await supabase.from('chaves_movimentacoes').insert({
+          chave_id: id,
+          numero: chave.numero,
+          modelo: chave.modelo,
+          local: chave.local,
+          tipo: 'AVARIA',
+          responsavel_nome: chave.responsavel_nome || null,
+          responsavel_setor: chave.responsavel_setor || null,
+          operador_nome: operador_nome,
+          data_evento: new Date().toISOString(),
+          obs: obs
+        })
+    }
+  },
+
+  async atualizarObs(id: string, obs: string) {
+    const { error } = await supabase
+      .from('chaves_inventario')
+      .update({ 
+        obs: obs,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+    
+    if (error) throw error
   },
 
   async getSugestoes() {

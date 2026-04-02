@@ -36,6 +36,7 @@ import {
     RefreshCcw,
     Zap,
     Anchor,
+    Radio,
     Box,
     Lock, 
     Unlock, 
@@ -97,8 +98,31 @@ const styles = `
 }
 `
 
-function DraggableProfessional({ profissional, status, onCheckOut }: { profissional: OpEquipe, status: 'service' | 'off' | 'event', onCheckOut?: (id: string) => void }) {
+function DraggableProfessional({ profissional, status, pausa, horarioAlocacao, onCheckOut }: { profissional: OpEquipe, status: 'service' | 'off' | 'event' | 'break' | 'assigned', pausa?: any, horarioAlocacao?: string, onCheckOut?: (id: string) => void }) {
     const { isDarkMode } = useTheme()
+    
+    // Cálculo do Tempo de Permanência no Posto
+    const getStayTime = () => {
+        if (!horarioAlocacao) return null;
+        try {
+            const [h, m, s] = horarioAlocacao.split(':').map(Number);
+            const dataAloc = new Date();
+            dataAloc.setHours(h, m, s || 0);
+            
+            const diffMs = new Date().getTime() - dataAloc.getTime();
+            const diffMins = Math.floor(diffMs / (1000 * 60));
+            
+            if (diffMins < 0) return '0:00';
+            const hours = Math.floor(diffMins / 60);
+            const mins = diffMins % 60;
+            return `${hours}:${mins.toString().padStart(2, '0')}`;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    const stayTime = getStayTime();
+
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: profissional.id,
         data: {
@@ -137,7 +161,40 @@ function DraggableProfessional({ profissional, status, onCheckOut }: { profissio
             </div>
             
             <div className="flex items-center gap-2">
-                {status === 'service' && <Zap className="h-3 w-3 text-emerald-500 fill-emerald-500 shrink-0 animate-pulse" />}
+                {(() => {
+                    // 1. Se estiver OFF, não mostra nada
+                    if (status === 'off') return null;
+
+                    // 2. Se houver uma pausa ativa, ela tem PRIORIDADE MÁXIMA
+                    if (pausa) {
+                        const typeVal = pausa.type || pausa.tipo_pausa || '';
+                        const label = String(typeVal).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                        
+                        if (label.includes('cafe')) return <Coffee className="h-4 w-4 text-orange-500 animate-pulse shrink-0 fill-orange-500/10" />;
+                        if (label.includes('refeicao') || label.includes('janta') || label.includes('almoco')) return <Utensils className="h-4 w-4 text-blue-500 animate-pulse shrink-0 fill-blue-500/10" />;
+                        if (label.includes('ceia')) return <Moon className="h-4 w-4 text-purple-500 animate-pulse shrink-0 fill-purple-500/10" />;
+                        
+                        // Fallback para qualquer outra pausa
+                        return <TimerIcon className="h-4 w-4 text-amber-500 animate-pulse shrink-0" />;
+                    }
+
+                    // 3. Se não está em pausa nem no posto, e é service, mostra o RAIO (Reserva)
+                    if (status === 'service') {
+                        return <Zap className="h-3.5 w-3.5 text-emerald-500 fill-emerald-500 shrink-0 animate-pulse" />;
+                    }
+
+                    // 4. Se estiver alocado em POSTO ou EVENTO, mostra o tempo de PERMANÊNCIA (Legibilidade Aumentada)
+                    if ((status === 'assigned' || status === 'event') && stayTime) {
+                        return (
+                            <div className="absolute right-1.5 bottom-1.5 flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white/90 backdrop-blur-md border border-slate-200/50 shadow-sm z-10 transition-opacity group-hover:opacity-60">
+                                <TimerIcon className="h-3 w-3 text-slate-500" />
+                                <span className="text-[12px] font-black text-slate-700 font-mono tracking-tighter">{stayTime}</span>
+                            </div>
+                        );
+                    }
+
+                    return null;
+                })()}
                 {onCheckOut && (
                     <Button 
                         variant="ghost" 
@@ -156,7 +213,7 @@ function DraggableProfessional({ profissional, status, onCheckOut }: { profissio
     )
 }
 
-function DroppableZone({ id, title, icon: Icon, professionals, capacity, colorClass, type, isLocked, onToggleLock, onRemoveProfessional }: any) {
+function DroppableZone({ id, title, icon: Icon, professionals, alocacoes, capacity, colorClass, type, isLocked, onToggleLock, onRemoveProfessional }: any) {
     const { isDarkMode } = useTheme()
     const { isOver, setNodeRef } = useDroppable({
         id: id,
@@ -222,14 +279,18 @@ function DroppableZone({ id, title, icon: Icon, professionals, capacity, colorCl
                                 <span className="text-[9px] font-black uppercase tracking-tighter text-slate-400">Arraste para alocar</span>
                             </div>
                         ) : (
-                            professionals.map((p: OpEquipe) => (
-                                <DraggableProfessional 
-                                    key={p.id} 
-                                    profissional={p} 
-                                    status="event" 
-                                    onCheckOut={onRemoveProfessional} 
-                                />
-                            ))
+                            professionals.map((p: OpEquipe) => {
+                                const aloc = (alocacoes || []).find((a: any) => String(a.colaborador_id) === String(p.id))
+                                return (
+                                    <DraggableProfessional 
+                                        key={p.id} 
+                                        profissional={p} 
+                                        status="assigned" 
+                                        horarioAlocacao={aloc?.horario_alocacao}
+                                        onCheckOut={onRemoveProfessional} 
+                                    />
+                                )
+                            })
                         )}
                     </div>
                 </CardContent>
@@ -272,18 +333,24 @@ function PauseBanner({ title, color, icon: Icon, time, professionals, equipe, on
             </div>
 
             <div className="mt-4 space-y-2">
-                {professionals.map((p: { id: string; nome: string; type: string; seconds: number; timeLeft: string; }) => {
-                    const profData: OpEquipe = equipe.find((e: OpEquipe) => e.id === p.id) || { id: p.id, nome_completo: p.nome, funcao: 'Pausa', tipo_servico: '' }
+                {professionals.map((p: any) => {
+                    const profData: OpEquipe = equipe.find((e: OpEquipe) => e.id === p.id) || { id: p.id, nome_completo: (p as any).nome, funcao: 'Pausa', tipo_servico: '' }
+                    const isOverdue = p.seconds > p.limitSeconds
+                    const displaySeconds = isOverdue ? (p.seconds - p.limitSeconds) : p.seconds
+                    const displayTime = `${Math.floor(displaySeconds/60)}:${(displaySeconds%60).toString().padStart(2, '0')}`
+                    const timerColor = isOverdue ? 'text-rose-600' : 'text-emerald-500'
+                    const iconColor = isOverdue ? 'text-rose-500' : 'text-emerald-500'
+
                     return (
                         <div key={p.id} className="relative group">
                             <DraggableProfessional 
                                 profissional={profData} 
                                 status="event"
                             />
-                            {/* Overlay do Timer para não quebrar a padronização mas manter a informação */}
-                            <div className="absolute right-12 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none pr-2 border-r border-slate-100 mr-2">
-                                <TimerIcon className="h-3 w-3 text-rose-500 animate-pulse" />
-                                <span className="text-sm font-black text-rose-600 font-mono">{p.timeLeft}</span>
+                            {/* Overlay do Timer Dinâmico - Ajustado para o Canto Inferior Direito */}
+                            <div className="absolute right-4 bottom-2 flex items-center gap-1.5 pointer-events-none px-2 py-0.5 rounded-lg bg-white/50 backdrop-blur-sm shadow-sm border border-slate-100/50">
+                                <TimerIcon className={`h-2.5 w-2.5 ${iconColor} ${isOverdue ? 'animate-pulse' : ''}`} />
+                                <span className={`text-[11px] font-black ${timerColor} font-mono`}>{displayTime}</span>
                             </div>
                         </div>
                     )
@@ -296,7 +363,7 @@ function PauseBanner({ title, color, icon: Icon, time, professionals, equipe, on
     )
 }
 
-function DroppableSidebarArea({ id, reservaAguardando, handleCheckOut, searchTerm }: any) {
+function DroppableSidebarArea({ id, reservaAguardando, handleCheckOut, searchTerm, getStatusParaProfissional, pausasAtivas }: any) {
     const { isDarkMode } = useTheme()
     const { isOver, setNodeRef } = useDroppable({
         id: id,
@@ -313,9 +380,13 @@ function DroppableSidebarArea({ id, reservaAguardando, handleCheckOut, searchTer
                 Efetivo Escalado
             </h3>
             <div className="grid gap-2">
-                {reservaAguardando.map((p: OpEquipe) => (
-                    <DraggableProfessional key={p.id} profissional={p} status="service" onCheckOut={handleCheckOut} />
-                ))}
+                {reservaAguardando.map((p: OpEquipe) => {
+                    const status = getStatusParaProfissional(p.id);
+                    const pausa = pausasAtivas.find((pa: any) => 
+                        String(pa.colaborador_id) === String(p.id) || String(pa.id) === String(p.id)
+                    );
+                    return <DraggableProfessional key={p.id} profissional={p} status={status as any} pausa={pausa} onCheckOut={handleCheckOut} />
+                })}
                 {reservaAguardando.length === 0 && !searchTerm && (
                     <div className="text-[10px] text-slate-300 border border-dashed rounded-xl py-6 text-center flex flex-col items-center gap-2">
                         <ShieldAlert className="h-4 w-4 opacity-30" />
@@ -355,6 +426,20 @@ export default function PainelTaticoV2() {
     const [searchTerm, setSearchTerm] = useState("")
     const [activeTab, setActiveTab] = useState<'tatico' | 'relatorios'>('tatico')
     const [historico, setHistorico] = useState<any[]>([])
+    const [lastTick, setLastTick] = useState(Date.now())
+
+    // Expor alocações globalmente para componentes filhos menores poderem consultar sem prop drilling excessivo
+    if (typeof window !== 'undefined') {
+        (window as any).__v2_alocacoes = alocacoes;
+    }
+
+    // Ticker para atualizar timers a cada minuto
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setLastTick(Date.now())
+        }, 60000)
+        return () => clearInterval(timer)
+    }, [])
 
     // Estado para o Modal de Rendição
     const [rendicaoData, setRendicaoData] = useState<{
@@ -431,16 +516,20 @@ export default function PainelTaticoV2() {
 
                 return {
                     id: p.colaborador_id,
-                    nome: prof?.nome_completo || 'Desconhecido', // Fallback for name
+                    nome: prof?.nome_completo || 'Desconhecido',
                     type: tipoExibicao,
-                    seconds: restante,
-                    timeLeft: `${Math.floor(restante/60)}:${(restante%60).toString().padStart(2, '0')}`
+                    seconds: decorrido, // Agora armazenamos o tempo decorrido
+                    limitSeconds: p.segundos_duracao, // E o limite máximo
+                    timeLeft: `${Math.floor(decorrido/60)}:${(decorrido%60).toString().padStart(2, '0')}`
                 }
             })
             setPausasAtivas(pAtivas)
 
             // Buscar histórico se estiver na aba de relatórios
-            const histData = await OpServiceV2.getHistoricoMovimentacoes()
+            const histData = await OpServiceV2.getHistoricoFiltrado({
+                startDate: hojeStr,
+                endDate: hojeStr
+            })
             setHistorico(histData)
         } catch (error) {
             console.error("Erro ao carregar dados táticos:", error)
@@ -475,11 +564,14 @@ export default function PainelTaticoV2() {
     useEffect(() => {
         // Mock de timers de pausa para a interface
         const interval = setInterval(() => {
-            setPausasAtivas(prev => prev.map(p => ({
-                ...p,
-                timeLeft: p.seconds > 0 ? `${Math.floor((p.seconds - 1)/60)}:${((p.seconds - 1)%60).toString().padStart(2, '0')}` : '00:00',
-                seconds: Math.max(0, p.seconds - 1)
-            })))
+            setPausasAtivas(prev => prev.map(p => {
+                const newSeconds = p.seconds + 1
+                return {
+                    ...p,
+                    seconds: newSeconds,
+                    timeLeft: `${Math.floor(newSeconds/60)}:${(newSeconds%60).toString().padStart(2, '0')}`
+                }
+            }))
         }, 1000)
         return () => clearInterval(interval)
     }, [])
@@ -565,14 +657,15 @@ export default function PainelTaticoV2() {
                 const alocAntiga = alocacoes.find(a => a.colaborador_id === profissionalId)
                 const postoAntigo = postos.find(p => p.id === alocAntiga?.posto_id)
 
-                await OpServiceV2.salvarAlocacao(profissionalId, null)
+                const { atraso } = await OpServiceV2.salvarAlocacao(profissionalId, null)
                 setPausasAtivas(prev => prev.filter(p => p.id !== profissionalId))
                 
                 await OpServiceV2.logMovimentacao({
                     colaborador_id: profissionalId,
                     colaborador_nome: prof?.nome_completo || 'Desconhecido',
                     acao: 'RETORNO À BASE',
-                    posto_origem: postoAntigo?.nome_posto || 'Posto'
+                    posto_origem: postoAntigo?.nome_posto || 'Posto',
+                    tempo_atraso: atraso
                 })
 
                 await fetchData()
@@ -586,6 +679,11 @@ export default function PainelTaticoV2() {
             const isRendicionista = postoAlvo?.nome_posto?.trim().toUpperCase() === 'RENDICIONISTA'
             const profsNoPosto = alocacoes.filter(a => a.posto_id === targetId)
             
+            // BUSCAR MEMÓRIA DE EQUIPAMENTO (Último rádio usado hoje)
+            const lastLogEq = historico.find(h => h.colaborador_id === profissionalId && (h.radio_ht || h.possui_colete))
+            const radioSugerido = lastLogEq?.radio_ht || ''
+            const coleteSugerido = lastLogEq?.possui_colete || false
+
             // Aborda rendição apenas se não for rendicionista E já houver alguém
             if (!isRendicionista && profsNoPosto.length > 0) {
                 const entrando = equipe.find(p => p.id === profissionalId)
@@ -610,8 +708,8 @@ export default function PainelTaticoV2() {
                     profissionalId,
                     targetId,
                     targetType: type,
-                    radioHT: '',
-                    colete: false
+                    radioHT: radioSugerido,
+                    colete: coleteSugerido
                 })
                 return
             }
@@ -655,23 +753,25 @@ export default function PainelTaticoV2() {
                 else if (type === 'event') {
                     const evento = eventos.find(e => e.id === targetId)
                     if (evento?.posto_id) {
-                        await OpServiceV2.salvarAlocacao(profissionalId, evento.posto_id)
+                        const { atraso } = await OpServiceV2.salvarAlocacao(profissionalId, evento.posto_id)
                         await OpServiceV2.logMovimentacao({
                             colaborador_id: profissionalId,
                             colaborador_nome: prof?.nome_completo || 'Desconhecido',
                             acao: 'ALOCAÇÃO EVENTO',
-                            posto_destino: evento.titulo
+                            posto_destino: evento.titulo,
+                            tempo_atraso: atraso
                         })
                     }
                 } else {
-                    await OpServiceV2.salvarAlocacao(profissionalId, finalTargetId)
+                    const { atraso } = await OpServiceV2.salvarAlocacao(profissionalId, finalTargetId)
                     const postoDest = postos.find(p => p.id === finalTargetId)
                     await OpServiceV2.logMovimentacao({
                         colaborador_id: profissionalId,
                         colaborador_nome: prof?.nome_completo || 'Desconhecido',
                         acao: 'ALOCAÇÃO DIRETA',
                         posto_origem: postoAntigo?.nome_posto || 'Reserva',
-                        posto_destino: postoDest?.nome_posto || 'Posto'
+                        posto_destino: postoDest?.nome_posto || 'Posto',
+                        tempo_atraso: atraso
                     })
                 }
         } catch (err: any) {
@@ -694,8 +794,14 @@ export default function PainelTaticoV2() {
         try {
             const postoAlvo = postos.find(p => p.id === targetPostoId)
 
-            // 1. Aloca o novo profissional no posto
-            await OpServiceV2.salvarAlocacao(profissionalEntrando.id, targetPostoId)
+            // 1. Aloca o novo profissional no posto (Lembrando o rádio dele)
+            const lastLogEntrando = historico.find(h => h.colaborador_id === profissionalEntrando.id && (h.radio_ht || h.possui_colete))
+            const { atraso: atrasoEntrando } = await OpServiceV2.salvarAlocacao(
+                profissionalEntrando.id, 
+                targetPostoId, 
+                lastLogEntrando?.radio_ht, 
+                lastLogEntrando?.possui_colete
+            )
             
             await OpServiceV2.logMovimentacao({
                 colaborador_id: profissionalEntrando.id,
@@ -703,17 +809,19 @@ export default function PainelTaticoV2() {
                 acao: 'RENDIÇÃO (ENTRADA)',
                 posto_destino: postoAlvo?.nome_posto || 'Posto',
                 rendeu_quem_id: profissionalSaindo.id,
-                rendeu_quem_nome: profissionalSaindo.nome_completo
+                rendeu_quem_nome: profissionalSaindo.nome_completo,
+                tempo_atraso: atrasoEntrando
             })
 
             // 2. Destina o profissional que saiu
             if (destinoSaindo === 'Reserva') {
-                await OpServiceV2.salvarAlocacao(profissionalSaindo.id, null)
+                const { atraso: atrasoSaindo } = await OpServiceV2.salvarAlocacao(profissionalSaindo.id, null)
                 await OpServiceV2.logMovimentacao({
                     colaborador_id: profissionalSaindo.id,
                     colaborador_nome: profissionalSaindo.nome_completo,
                     acao: 'RENDIÇÃO (SAÍDA PARA RESERVA)',
-                    posto_origem: postoAlvo?.nome_posto || 'Posto'
+                    posto_origem: postoAlvo?.nome_posto || 'Posto',
+                    tempo_atraso: atrasoSaindo
                 })
             } else {
                 // Inicia pausa (Café, Refeição, etc.)
@@ -723,7 +831,7 @@ export default function PainelTaticoV2() {
                 // IMPORTANTE: Primeiro remove a alocação (que encerra pausas antigas)
                 // e DEPOIS inicia a nova pausa.
                 const agoraIso = new Date().toISOString()
-                await OpServiceV2.salvarAlocacao(profissionalSaindo.id, null)
+                const { atraso: atrasoSaindo } = await OpServiceV2.salvarAlocacao(profissionalSaindo.id, null)
                 await OpServiceV2.startPause(profissionalSaindo.id, destinoSaindo, mins * 60, undefined, agoraIso)
 
                 await OpServiceV2.logMovimentacao({
@@ -732,7 +840,8 @@ export default function PainelTaticoV2() {
                     acao: `RENDIÇÃO (SAÍDA PARA ${destinoSaindo.toUpperCase()})`,
                     posto_origem: postoAlvo?.nome_posto || 'Posto',
                     posto_destino: destinoSaindo,
-                    duracao_prevista: mins * 60
+                    duracao_prevista: mins * 60,
+                    tempo_atraso: atrasoSaindo
                 })
             }
         } catch (err) {
@@ -745,46 +854,58 @@ export default function PainelTaticoV2() {
 
     const handleConfirmarEquipamento = async () => {
         const { profissionalId, targetId, targetType, radioHT, colete } = equipamentoModal
+        console.log('--- CONFIRMANDO EQUIPAMENTOS ---')
+        console.log('Profissional:', profissionalId)
+        console.log('ID Alvo Inicial:', targetId)
         
         try {
             const prof = equipe.find(p => p.id === profissionalId)
             let finalTargetId = targetId
             
-            // Autocura de ID do posto (similar ao handleDragEnd)
+            // Autocura de ID do posto
             if (targetId === 'rendicionista' || (targetId && targetId.length < 30)) {
+                console.log('Resolvendo ID não-UUID...')
                 const pNome = (targetId === 'rendicionista' || targetId?.trim().toUpperCase() === 'RENDICIONISTA') 
                     ? 'RENDICIONISTA' 
                     : targetId
                 finalTargetId = await OpServiceV2.ensurePostoExists(pNome)
             }
 
+            console.log('ID Alvo Final:', finalTargetId)
+
             if (targetType === 'event') {
                 const evento = eventos.find(e => e.id === targetId)
                 if (evento?.posto_id) {
-                    await OpServiceV2.salvarAlocacao(profissionalId, evento.posto_id, radioHT, colete)
+                    const { atraso } = await OpServiceV2.salvarAlocacao(profissionalId, evento.posto_id, radioHT, colete)
                     await OpServiceV2.logMovimentacao({
                         colaborador_id: profissionalId,
                         colaborador_nome: prof?.nome_completo || 'Desconhecido',
                         acao: 'ALOCAÇÃO EVENTO',
                         posto_destino: evento.titulo,
                         radio_ht: radioHT,
-                        possui_colete: colete
+                        possui_colete: colete,
+                        tempo_atraso: atraso
                     })
                 }
             } else {
-                await OpServiceV2.salvarAlocacao(profissionalId, finalTargetId, radioHT, colete)
+                const { atraso } = await OpServiceV2.salvarAlocacao(profissionalId, finalTargetId, radioHT, colete)
                 const postoDest = postos.find(p => p.id === finalTargetId)
+                console.log('Posto localizado na lista:', postoDest?.nome_posto)
+                
                 await OpServiceV2.logMovimentacao({
                     colaborador_id: profissionalId,
                     colaborador_nome: prof?.nome_completo || 'Desconhecido',
                     acao: 'ALOCAÇÃO DIRETA',
                     posto_destino: postoDest?.nome_posto || 'Posto',
                     radio_ht: radioHT,
-                    possui_colete: colete
+                    possui_colete: colete,
+                    tempo_atraso: atraso
                 })
             }
-        } catch (err) {
-            console.error("Erro ao salvar equipamentos:", err)
+            console.log('Alocação concluída com sucesso.')
+        } catch (err: any) {
+            console.error("ERRO CRÍTICO NA ALOCAÇÃO:", err)
+            alert("Erro ao salvar alocação: " + (err.message || 'Erro desconhecido'))
         }
 
         setEquipamentoModal(prev => ({ ...prev, aberto: false }))
@@ -803,10 +924,15 @@ export default function PainelTaticoV2() {
     }
 
     const getStatusParaProfissional = (id: string) => {
-        const prof = equipe.find((p: OpEquipe) => p.id === id)
+        const prof = equipe.find((p: OpEquipe) => String(p.id) === String(id))
         if (!prof) return 'off'
 
-        const estaAlocado = alocacoes.find(a => a.colaborador_id === id)
+        const emPausa = pausasAtivas.find(p => 
+            String(p.colaborador_id) === String(id) || String(p.id) === String(id)
+        )
+        if (emPausa) return 'break'
+
+        const estaAlocado = alocacoes.find(a => String(a.colaborador_id) === String(id))
         if (estaAlocado) return 'assigned'
 
         const trabalhaHoje = OpServiceV2.getTrabalhaNoDia(prof, new Date(), escalasHoje)
@@ -822,11 +948,14 @@ export default function PainelTaticoV2() {
     // Quem deveria estar trabalhando hoje (Escala Automática + Manual)
     const efetivoTotalHoje = equipeFiltrada.filter(p => {
         const status = getStatusParaProfissional(p.id)
-        return status === 'service' || status === 'assigned'
+        return status === 'service' || status === 'assigned' || status === 'break'
     })
 
-    // Quem está no efetivo mas ainda não foi para um posto (Reserva)
-    const reservaAguardando = efetivoTotalHoje.filter(p => !alocacoes.some(a => a.colaborador_id === p.id))
+    // Quem está no efetivo mas ainda não foi para um posto (Reserva + Pausa)
+    const reservaAPonteat = efetivoTotalHoje.filter(p => {
+        const s = getStatusParaProfissional(p.id)
+        return s === 'service' || s === 'break'
+    })
 
     const getProfisNoPosto = (postoId: string) => {
         const ids = alocacoes.filter(a => a.posto_id === postoId).map(a => a.colaborador_id)
@@ -922,7 +1051,14 @@ export default function PainelTaticoV2() {
 
                         <CardContent className="p-5 pt-0 space-y-6">
                             <div className="space-y-6 overflow-y-auto max-h-[700px] pr-2 custom-scrollbar">
-                                <DroppableSidebarArea id="pool" reservaAguardando={reservaAguardando} handleCheckOut={handleCheckOut} searchTerm={searchTerm} />
+                                <DroppableSidebarArea 
+                                    id="pool" 
+                                    reservaAguardando={reservaAPonteat} 
+                                    handleCheckOut={handleCheckOut} 
+                                    searchTerm={searchTerm} 
+                                    getStatusParaProfissional={getStatusParaProfissional}
+                                    pausasAtivas={pausasAtivas} 
+                                />
                             </div>
                         </CardContent>
                     </Card>
@@ -1051,6 +1187,7 @@ export default function PainelTaticoV2() {
                                         title="RENDICIONISTA" 
                                         icon={Users} 
                                         professionals={getProfisNoPosto(rendId)} 
+                                        alocacoes={alocacoes}
                                         capacidade={99} 
                                         colorClass="text-blue-600 bg-blue-600" 
                                         type="fixed" 
@@ -1095,6 +1232,7 @@ export default function PainelTaticoV2() {
                                             title={posto.nome_posto} 
                                             icon={MapPin} 
                                             professionals={getProfisNoPosto(posto.id)}
+                                            alocacoes={alocacoes}
                                             capacity={posto.capacity || 1}
                                             colorClass={isSuggested ? 'text-amber-500 bg-amber-500 ring-4 ring-amber-400/40 scale-105 z-10 pulsate-suggested' : borderColor}
                                             type="fixed"
@@ -1130,6 +1268,7 @@ export default function PainelTaticoV2() {
                                         title={ev.titulo} 
                                         icon={Calendar} 
                                         professionals={getProfisNoPosto(ev.id)}
+                                        alocacoes={alocacoes}
                                         capacity={0}
                                         colorClass="text-blue-500 bg-blue-500"
                                         onRemoveProfessional={async (profId: string) => {
@@ -1150,8 +1289,8 @@ export default function PainelTaticoV2() {
                                 <div className="h-10 w-1 rounded-full bg-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.4)]" />
                                 <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3 italic">
                                     RELATÓRIOS
-                                    <span className="text-slate-200 not-italic">/</span>
-                                    <span className="text-slate-400 text-lg uppercase tracking-[0.1em] not-italic font-black">Histórico de Movimentações</span>
+                                    <span className={isDarkMode ? 'text-slate-700' : 'text-slate-200'}>/</span>
+                                    <span className={`text-lg uppercase tracking-[0.1em] not-italic font-black ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Monitoramento de Efetivo (Live)</span>
                                 </h2>
                             </div>
                             <div className="flex items-center gap-2">
@@ -1172,92 +1311,186 @@ export default function PainelTaticoV2() {
                             </div>
                         </header>
 
-                        <Card className="border-none shadow-xl shadow-slate-200/50 bg-white/90 backdrop-blur-sm overflow-hidden rounded-3xl">
+                        <Card className={`border-none shadow-xl shadow-slate-200/50 overflow-hidden rounded-3xl ${isDarkMode ? 'bg-slate-900/80 shadow-black/20' : 'bg-white/90 backdrop-blur-sm'}`}>
                             <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
+                                <table className="w-full text-left border-collapse table-fixed">
                                     <thead>
-                                        <tr className="bg-slate-50/50 border-b border-slate-100">
-                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Horário</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Profissional</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ação Realizada</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Origem</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Destino</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Rendeu Quem?</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Duração</th>
+                                        <tr className={`border-b ${isDarkMode ? 'bg-slate-800/50 border-white/5' : 'bg-slate-50/50 border-slate-100'}`}>
+                                            <th className="w-[200px] px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Profissional</th>
+                                            <th className="w-[180px] px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status / Local Atual</th>
+                                            <th className="w-[150px] px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Equipamento Ativo</th>
+                                            <th className="w-[120px] px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Pausas realizadas</th>
+                                            <th className="w-[150px] px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Atrasos (Hoje)</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Última Atividade</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
-                                        {historico.length === 0 ? (
+                                        {equipeFiltrada.filter(p => {
+                                            const s = getStatusParaProfissional(p.id)
+                                            return s === 'assigned' || s === 'break'
+                                        }).length === 0 ? (
                                             <tr>
-                                                <td colSpan={7} className="px-6 py-20 text-center text-slate-300 italic font-medium">
-                                                    Nenhuma movimentação registrada hoje.
+                                                <td colSpan={6} className="px-6 py-20 text-center text-slate-300 italic font-medium">
+                                                    Nenhum profissional em atividade (Posto ou Pausa).
                                                 </td>
                                             </tr>
                                         ) : (
-                                            historico.map((log, i) => (
-                                                <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex flex-col">
-                                                            <span className="text-sm font-black text-slate-700">{format(parseISO(log.created_at), 'HH:mm:ss')}</span>
-                                                            <span className="text-[9px] text-slate-400 font-bold">{format(parseISO(log.created_at), 'dd/MM/yyyy')}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="h-8 w-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-black text-xs">
-                                                                {log.colaborador_nome?.charAt(0)}
+                                            equipeFiltrada
+                                                .filter(p => {
+                                                    const s = getStatusParaProfissional(p.id)
+                                                    return s === 'assigned' || s === 'break'
+                                                })
+                                                .map((prof) => {
+                                                const aloc = alocacoes.find(a => a.colaborador_id === prof.id)
+                                                const pausa = pausasAtivas.find(p => p.colaborador_id === prof.id)
+                                                const logsProf = (historico || []).filter(h => h.colaborador_id === prof.id)
+                                                const somaAtrasos = logsProf.reduce((acc, current) => acc + (current.tempo_atraso || 0), 0)
+                                                const ultimaLog = logsProf[0]
+                                                const postoAtual = postos.find(p => p.id === aloc?.posto_id)
+
+                                                // Formatar descrição rica da atividade
+                                                const getDescAtividade = (log: any) => {
+                                                    if (!log) return '-'
+                                                    let desc = log.acao || 'Ação'
+                                                    if (log.posto_origem && log.posto_destino) desc = `${log.posto_origem} → ${log.posto_destino}`
+                                                    else if (log.posto_destino) desc = `Para ${log.posto_destino}`
+                                                    else if (log.posto_origem) desc = `Saindo de ${log.posto_origem}`
+                                                    return desc
+                                                }
+
+                                                return (
+                                                    <tr key={prof.id} className={`transition-colors group ${isDarkMode ? 'hover:bg-white/5' : 'hover:bg-slate-50/50'}`}>
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`h-10 w-10 min-w-10 rounded-xl flex items-center justify-center font-black text-xs shadow-sm ${isDarkMode ? 'bg-slate-800 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
+                                                                    {prof.nome_completo?.charAt(0)}
+                                                                </div>
+                                                                <div className="flex flex-col min-w-0">
+                                                                    <span className={`text-sm font-black truncate ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{prof.nome_completo}</span>
+                                                                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight truncate">{prof.funcao}</span>
+                                                                </div>
                                                             </div>
-                                                            <span className="text-sm font-black text-slate-800">{log.colaborador_nome}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <Badge 
-                                                            variant="outline" 
-                                                            className={`
-                                                                font-black border-none px-3 py-1 text-[9px] uppercase tracking-tighter
-                                                                ${log.acao?.includes('RENDIÇÃO') ? 'bg-amber-100 text-amber-700' : 
-                                                                  log.acao?.includes('PAUSA') ? 'bg-blue-100 text-blue-700' : 
-                                                                  log.acao?.includes('POSTO') ? 'bg-emerald-100 text-emerald-700' : 
-                                                                  'bg-slate-100 text-slate-700'}
-                                                            `}
-                                                        >
-                                                            {log.acao}
-                                                        </Badge>
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex items-center gap-2 text-slate-500">
-                                                            <MapPin className="h-3 w-3 opacity-30" />
-                                                            <span className="text-xs font-bold truncate max-w-[120px]">{log.posto_origem || '-'}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex items-center gap-2 text-slate-900 font-black italic">
-                                                            <ArrowRightLeft className="h-3 w-3 text-blue-500" />
-                                                            <span className="text-xs">{log.posto_destino || '-'}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        {log.rendeu_quem_nome ? (
-                                                            <div className="flex items-center gap-2 text-rose-600 font-black">
-                                                                <User className="h-3 w-3" />
-                                                                <span className="text-xs">{log.rendeu_quem_nome}</span>
+                                                        </td>
+
+                                                        <td className="px-6 py-4">
+                                                            {pausa ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
+                                                                    <Badge variant="outline" className="bg-orange-50 text-orange-700 border-none font-black text-[9px] uppercase px-2">EM {pausa.tipo_pausa?.toUpperCase() || 'PAUSA'}</Badge>
+                                                                </div>
+                                                            ) : aloc ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                                                                    <div className="flex flex-col">
+                                                                        <span className={`text-xs font-black italic ${isDarkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>{postoAtual?.nome_posto || 'Posto'}</span>
+                                                                        <span className="text-[9px] text-slate-400 font-bold uppercase">ALOCADO</span>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex items-center gap-2 opacity-50">
+                                                                    <div className="h-2 w-2 rounded-full bg-slate-300" />
+                                                                    <span className="text-xs font-black text-slate-400 italic">Reserva</span>
+                                                                </div>
+                                                            )}
+                                                        </td>
+
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {aloc?.radio_ht ? (
+                                                                    <div className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-lg border border-blue-100" title="Rádio HT">
+                                                                        <Radio className="h-3.5 w-3.5" />
+                                                                        <span className="text-[11px] font-black italic">{aloc.radio_ht}</span>
+                                                                    </div>
+                                                                ) : <span className="text-slate-300 text-xs px-2">-</span>}
+                                                                {aloc?.possui_colete && (
+                                                                    <div className="flex items-center gap-1 bg-slate-50 text-slate-700 px-2 py-1 rounded-lg border border-slate-200" title="Colete Balístico">
+                                                                        <ShieldCheck className="h-3.5 w-3.5" />
+                                                                    </div>
+                                                                )}
                                                             </div>
-                                                        ) : (
-                                                            <span className="text-slate-300 text-xs">-</span>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        {log.duracao_prevista ? (
-                                                            <div className="flex items-center gap-2 text-slate-500 font-mono text-xs">
-                                                                <Clock className="h-3 w-3" />
-                                                                <span>{Math.floor(log.duracao_prevista/60)}min</span>
+                                                        </td>
+
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex items-center justify-center gap-2">
+                                                                {(() => {
+                                                                    const countCafe = logsProf.filter(l => l.acao?.includes('PARA CAFÉ')).length;
+                                                                    const hasAlmoco = logsProf.some(l => l.acao?.includes('PARA REFEIÇÃO') || l.acao?.includes('PARA ALMOÇO'));
+                                                                    const hasJanta = logsProf.some(l => l.acao?.includes('PARA JANTA'));
+                                                                    const hasCeia = logsProf.some(l => l.acao?.includes('PARA CEIA'));
+
+                                                                    return (
+                                                                        <>
+                                                                            <TooltipProvider>
+                                                                                <Tooltip>
+                                                                                    <TooltipTrigger asChild>
+                                                                                        <div className="relative group/pause">
+                                                                                            <Coffee className={`h-4 w-4 transition-all ${countCafe > 0 ? 'text-amber-500 fill-amber-500/20' : 'text-slate-200'}`} />
+                                                                                            {countCafe > 1 && (
+                                                                                                <span className="absolute -top-2 -right-2 bg-amber-500 text-white text-[8px] font-black px-1 rounded-full border border-white">x{countCafe}</span>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    </TooltipTrigger>
+                                                                                    <TooltipContent><p>Cafés: {countCafe}</p></TooltipContent>
+                                                                                </Tooltip>
+
+                                                                                <Tooltip>
+                                                                                    <TooltipTrigger asChild>
+                                                                                        <Utensils className={`h-4 w-4 transition-all ${hasAlmoco ? 'text-orange-500 fill-orange-500/20' : 'text-slate-200'}`} />
+                                                                                    </TooltipTrigger>
+                                                                                    <TooltipContent><p>Almoço/Refeição</p></TooltipContent>
+                                                                                </Tooltip>
+
+                                                                                <Tooltip>
+                                                                                    <TooltipTrigger asChild>
+                                                                                        <Moon className={`h-4 w-4 transition-all ${hasJanta ? 'text-blue-500 fill-blue-500/20' : 'text-slate-200'}`} />
+                                                                                    </TooltipTrigger>
+                                                                                    <TooltipContent><p>Janta</p></TooltipContent>
+                                                                                </Tooltip>
+
+                                                                                <Tooltip>
+                                                                                    <TooltipTrigger asChild>
+                                                                                        <Sunrise className={`h-4 w-4 transition-all ${hasCeia ? 'text-purple-500 fill-purple-500/20' : 'text-slate-200'}`} />
+                                                                                    </TooltipTrigger>
+                                                                                    <TooltipContent><p>Ceia</p></TooltipContent>
+                                                                                </Tooltip>
+                                                                            </TooltipProvider>
+                                                                        </>
+                                                                    )
+                                                                })()}
                                                             </div>
-                                                        ) : (
-                                                            <span className="text-slate-300 text-xs">-</span>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            ))
+                                                        </td>
+
+                                                        <td className="px-6 py-4">
+                                                            {somaAtrasos > 0 ? (
+                                                                <div className="flex flex-col">
+                                                                    <div className="flex items-center gap-2 text-rose-600 font-black">
+                                                                        <Zap className="h-3 w-3 animate-pulse" />
+                                                                        <span className="text-xs">{Math.floor(somaAtrasos/60)}m {(somaAtrasos%60).toString().padStart(2, '0')}s acumulado</span>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-slate-300 text-[10px] uppercase font-bold">Sem atrasos</span>
+                                                            )}
+                                                        </td>
+
+                                                        <td className="px-6 py-4 text-right">
+                                                            {ultimaLog ? (
+                                                                <div className="flex items-center justify-end gap-3 text-right">
+                                                                    <div className="flex flex-col items-end min-w-0">
+                                                                        <span className={`text-xs font-black ${isDarkMode ? 'text-blue-400' : 'text-blue-700'}`}>{format(parseISO(ultimaLog.created_at), 'HH:mm:ss')}</span>
+                                                                        <span className="text-[10px] text-slate-400 font-bold uppercase truncate max-w-[200px]" title={ultimaLog.acao}>
+                                                                            {getDescAtividade(ultimaLog)}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center opacity-20 ${isDarkMode ? 'bg-white/10' : 'bg-slate-200'}`}>
+                                                                        <Calendar className="h-4 w-4" />
+                                                                    </div>
+                                                                </div>
+                                                            ) : <span className="text-slate-300 text-[10px]">-</span>}
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })
                                         )}
                                     </tbody>
                                 </table>

@@ -154,28 +154,16 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
       case "administrador":
         return [
           {
+            href: "/admin/kanban",
+            label: "Tarefas",
+            icon: BarChart3,
+            className: getButtonClass("/admin/kanban"),
+          },
+          {
             href: "/admin/todas-solicitacoes",
             label: "Todas as Solicitações",
             icon: FileText,
             className: getButtonClass("/admin/todas-solicitacoes"),
-          },
-          {
-            href: "/admin/nova-solicitacao",
-            label: "Nova Solicitação",
-            icon: FileText,
-            className: getButtonClass("/admin/nova-solicitacao"),
-          },
-          {
-            href: "/admin/controle-chaves",
-            label: "Controle de Chaves",
-            icon: Key,
-            className: getButtonClass("/admin/controle-chaves"),
-          },
-          {
-            href: "/op/tatico",
-            label: "Painel Tático",
-            icon: Crosshair,
-            className: getButtonClass("/op/tatico"),
           },
           {
             href: "/op/painel",
@@ -184,10 +172,16 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
             className: getButtonClass("/op/painel"),
           },
           {
-            href: "/admin/kanban",
-            label: "Kanban",
-            icon: BarChart3,
-            className: getButtonClass("/admin/kanban"),
+            href: "/op/tatico",
+            label: "Painél Tático",
+            icon: Crosshair,
+            className: getButtonClass("/op/tatico"),
+          },
+          {
+            href: "/admin/controle-chaves",
+            label: "Controle de Chaves",
+            icon: Key,
+            className: getButtonClass("/admin/controle-chaves"),
           },
           {
             href: "/admin/financeiro",
@@ -242,28 +236,16 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
             className: getButtonClass("/superadmin/painel"),
           },
           {
+            href: "/admin/kanban",
+            label: "Tarefas",
+            icon: BarChart3,
+            className: getButtonClass("/admin/kanban"),
+          },
+          {
             href: "/admin/todas-solicitacoes",
             label: "Todas as Solicitações",
             icon: FileText,
             className: getButtonClass("/admin/todas-solicitacoes"),
-          },
-          {
-            href: "/admin/nova-solicitacao",
-            label: "Nova Solicitação",
-            icon: FileText,
-            className: getButtonClass("/admin/nova-solicitacao"),
-          },
-          {
-            href: "/admin/controle-chaves",
-            label: "Controle de Chaves",
-            icon: Key,
-            className: getButtonClass("/admin/controle-chaves"),
-          },
-          {
-            href: "/op/tatico",
-            label: "Painel Tático",
-            icon: Crosshair,
-            className: getButtonClass("/op/tatico"),
           },
           {
             href: "/op/painel",
@@ -272,10 +254,16 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
             className: getButtonClass("/op/painel"),
           },
           {
-            href: "/admin/kanban",
-            label: "Kanban",
-            icon: BarChart3,
-            className: getButtonClass("/admin/kanban"),
+            href: "/op/tatico",
+            label: "Painél Tático",
+            icon: Crosshair,
+            className: getButtonClass("/op/tatico"),
+          },
+          {
+            href: "/admin/controle-chaves",
+            label: "Controle de Chaves",
+            icon: Key,
+            className: getButtonClass("/admin/controle-chaves"),
           },
           {
             href: "/admin/financeiro",

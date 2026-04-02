@@ -12,7 +12,7 @@ export class SolicitacoesService {
     finalidade: "evento" | "obra"
     local: string
     empresa: string
-    prestadores: Array<{ nome: string; doc1: string; doc2?: string; empresa?: string }>
+    prestadores: Array<{ nome: string; doc1: string; doc2?: string; empresa?: string; checagemValidaAte?: string | null }>
     dataInicial: string
     dataFinal: string
     dataSolicitacao?: string
@@ -132,6 +132,8 @@ export class SolicitacoesService {
         } else if (dados.modoAprovacaoDireta === "solo_excecao") {
           checagemStatus = "excecao"
           liberacaoStatus = "pendente"
+          // MANTÉM VALIDADE ORIGINAL SE DISPONÍVEL (NÃO ESTENDE OS 6 MESES)
+          validadeAte = p.checagemValidaAte || null
         }
 
         return {

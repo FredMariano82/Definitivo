@@ -25,8 +25,10 @@ import {
   List,
   FileSpreadsheet,
   Download,
-  RefreshCw
+  RefreshCw,
+  Plus
 } from "lucide-react"
+import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import DashboardAdmin from "./dashboard-admin"
 import RelatorioModal from "./relatorio-modal"
@@ -745,7 +747,15 @@ export default function TodasSolicitacoes() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 pt-6">
+                    <div className="flex items-center gap-2 pt-6 ml-auto">
+                      <Link href="/admin/nova-solicitacao">
+                        <Button className="bg-blue-600 hover:bg-blue-700 text-white h-10 rounded-xl shadow-lg shadow-blue-500/20">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Nova Solicitação
+                        </Button>
+                      </Link>
+                      
+                      <div className="h-6 w-[1px] bg-slate-300 mx-2"></div>
                       <Button
                         onClick={() => setMostrarFiltros(!mostrarFiltros)}
                         variant="outline"

@@ -5,7 +5,7 @@ import { ChaveInventario, ChavesService, ChaveStatus } from "@/services/chaves-s
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, Loader2, LogOut, LogIn, History, ListCheck } from "lucide-react"
+import { Search, Loader2, LogOut, LogIn, History, ListCheck, AlertTriangle } from "lucide-react"
 import { toast } from "sonner"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -40,6 +40,11 @@ export function ChavesInventory() {
   const [returnModalOpen, setReturnModalOpen] = useState(false)
   const [chaveParaDevolver, setChaveParaDevolver] = useState<ChaveInventario | null>(null)
   const [quemDevolveu, setQuemDevolveu] = useState("")
+
+  // Modal de Avaria
+  const [damageModalOpen, setDamageModalOpen] = useState(false)
+  const [chaveParaAvariar, setChaveParaAvariar] = useState<ChaveInventario | null>(null)
+  const [motivoAvaria, setMotivoAvaria] = useState("")
 
   useEffect(() => {
     fetchChaves()
@@ -99,6 +104,24 @@ export function ChavesInventory() {
     }
   }
 
+  const handleConfirmarAvaria = async () => {
+    if (!chaveParaAvariar || !motivoAvaria.trim()) {
+        toast.error("Informe o motivo da avaria")
+        return
+    }
+    
+    try {
+        await ChavesService.marcarAvariada(chaveParaAvariar.id, motivoAvaria, usuario?.nome || "Operador")
+        toast.success(`Chave ${chaveParaAvariar.numero} marcada como avariada!`)
+        setDamageModalOpen(false)
+        setMotivoAvaria("")
+        fetchChaves()
+        fetchHistorico()
+    } catch (e: any) {
+        toast.error("Erro ao registrar avaria: " + e.message)
+    }
+  }
+
   const initialFiltered = chaves.filter(c => {
     const searchString = (c.numero + c.local + (c.responsavel_nome || '') + (c.responsavel_setor || '')).toLowerCase()
     const matchSearch = searchString.includes(searchTerm.toLowerCase())
@@ -131,6 +154,7 @@ export function ChavesInventory() {
       case 'emprestada': return <Badge className="bg-[#ff8c00] hover:bg-[#ff8c00] text-white border-0 px-2 py-0.5 rounded-full text-[11px] font-normal">Emprestada</Badge>
       case 'nao_devolvida': return <Badge className="bg-[#d00000] hover:bg-[#d00000] text-white border-0 px-2 py-0.5 rounded-full text-[11px] font-normal">Não Devolvida</Badge>
       case 'manutencao': return <Badge variant="secondary" className="px-2 py-0.5 rounded-full text-[11px] font-normal">Manutenção</Badge>
+      case 'avariada': return <Badge className="bg-[#6d28d9] hover:bg-[#6d28d9] text-white border-0 px-2 py-0.5 rounded-full text-[11px] font-normal">Avariada</Badge>
       case 'extraviada': return <Badge variant="destructive" className="px-2 py-0.5 rounded-full text-[11px] font-normal">Extraviada</Badge>
       default: return null
     }
@@ -215,14 +239,15 @@ export function ChavesInventory() {
                   <th className="px-2 py-1.5 border border-slate-200">RESPONSÁVEL</th>
                   <th className="px-2 py-1.5 border border-slate-200">SETOR</th>
                   <th className="px-2 py-1.5 border border-slate-200">OPERADOR</th>
+                  <th className="px-2 py-1.5 border border-slate-200">OBSERVAÇÕES</th>
                   <th className="px-2 py-1.5 w-28 border border-slate-200 text-left">INÍCIO</th>
-                  <th className="px-2 py-1.5 w-20 border border-slate-200 text-center">AÇÃO</th>
+                  <th className="px-2 py-1.5 w-[88px] border border-slate-200 text-center">AÇÃO</th>
                 </tr>
               </thead>
               <tbody className="text-[12px]">
                 {filteredChaves.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-12 text-center text-slate-400">
+                    <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
                       Nenhuma chave encontrada com os filtros atuais.
                     </td>
                   </tr>
@@ -268,6 +293,22 @@ export function ChavesInventory() {
                       <td className="px-2 py-1 border border-slate-200 text-slate-600">
                         {chave.operador_nome || '-'}
                       </td>
+                      <td className="px-2 py-1 border border-slate-200">
+                        <Input 
+                          className="h-7 text-[12px] bg-transparent border-0 focus-visible:ring-1 focus-visible:ring-blue-400 px-1 text-slate-600"
+                          placeholder="Obs..."
+                          value={chave.obs || ''}
+                          onBlur={async (e) => {
+                            try {
+                              await ChavesService.atualizarObs(chave.id, e.target.value)
+                            } catch (err: any) { toast.error("Erro ao salvar obs") }
+                          }}
+                          onChange={(e) => {
+                            const novaObs = e.target.value
+                            setChaves(prev => prev.map(c => c.id === chave.id ? { ...c, obs: novaObs } : c))
+                          }}
+                        />
+                      </td>
                       <td className="px-2 py-1 border border-slate-200 text-left">
                         {chave.data_emprestimo ? (
                           <span className="text-slate-500 font-normal">
@@ -277,28 +318,42 @@ export function ChavesInventory() {
                       </td>
                       <td className="px-2 py-1 border border-slate-200 text-center">
                         {chave.status === 'disponivel' ? (
-                          <Button 
-                            size="sm" variant="ghost" 
-                            className={`h-6 w-6 p-0 rounded-full ${chave.responsavel_nome ? 'text-blue-600 bg-blue-50 ring-2 ring-blue-500/20' : 'text-emerald-600 hover:bg-emerald-50'}`}
-                            onClick={async () => {
-                              if (!chave.responsavel_nome || !chave.responsavel_setor) {
-                                toast.error("Preencha Responsável e Setor")
-                                return
-                              }
-                              try {
-                                await ChavesService.emprestar(chave.id, {
-                                  responsavel_nome: chave.responsavel_nome,
-                                  responsavel_setor: chave.responsavel_setor,
-                                  operador_nome: usuario?.nome || "Operador"
-                                })
-                                toast.success(`Chave ${chave.numero} emprestada!`)
-                                fetchChaves()
-                                fetchHistorico()
-                              } catch (e: any) { toast.error(e.message) }
-                            }}
-                          >
-                            <LogOut className="h-3 w-3" />
-                          </Button>
+                          <div className="flex items-center justify-center gap-1">
+                            <Button 
+                              size="sm" variant="ghost" 
+                              className={`h-6 w-6 p-0 rounded-full ${chave.responsavel_nome ? 'text-blue-600 bg-blue-50 ring-2 ring-blue-500/20' : 'text-emerald-600 hover:bg-emerald-50'}`}
+                              onClick={async () => {
+                                if (!chave.responsavel_nome || !chave.responsavel_setor) {
+                                  toast.error("Preencha Responsável e Setor")
+                                  return
+                                }
+                                try {
+                                  await ChavesService.emprestar(chave.id, {
+                                    responsavel_nome: chave.responsavel_nome,
+                                    responsavel_setor: chave.responsavel_setor,
+                                    operador_nome: usuario?.nome || "Operador"
+                                  })
+                                  toast.success(`Chave ${chave.numero} emprestada!`)
+                                  fetchChaves()
+                                  fetchHistorico()
+                                } catch (e: any) { toast.error(e.message) }
+                              }}
+                            >
+                              <LogOut className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              size="sm" variant="ghost" 
+                              className="h-6 w-6 p-0 text-purple-600 hover:bg-purple-50 rounded-full"
+                              onClick={() => {
+                                setChaveParaAvariar(chave)
+                                setMotivoAvaria(chave.obs || "")
+                                setDamageModalOpen(true)
+                              }}
+                              title="Marcar Avaria"
+                            >
+                              <AlertTriangle className="h-3 w-3" />
+                            </Button>
+                          </div>
                         ) : chave.status === 'emprestada' ? (
                           <div className="flex items-center justify-center gap-1">
                             <Button 
@@ -312,6 +367,18 @@ export function ChavesInventory() {
                               title="Registrar Devolução"
                             >
                               <LogIn className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              size="sm" variant="ghost" 
+                              className="h-6 w-6 p-0 text-purple-600 hover:bg-purple-50 rounded-full"
+                              onClick={() => {
+                                setChaveParaAvariar(chave)
+                                setMotivoAvaria(chave.obs || "")
+                                setDamageModalOpen(true)
+                              }}
+                              title="Marcar Avaria"
+                            >
+                              <AlertTriangle className="h-3 w-3" />
                             </Button>
                             <Button 
                               size="sm" variant="ghost" 
@@ -332,18 +399,32 @@ export function ChavesInventory() {
                             </Button>
                           </div>
                         ) : (
-                          <Button 
-                            size="sm" variant="ghost" 
-                            className="h-6 w-6 p-0 text-emerald-600 hover:bg-emerald-50 rounded-full"
-                            onClick={() => {
-                                setChaveParaDevolver(chave)
-                                setQuemDevolveu("")
-                                setReturnModalOpen(true)
-                            }}
-                            title="Registrar Devolução"
-                          >
-                            <LogIn className="h-3 w-3" />
-                          </Button>
+                          <div className="flex items-center justify-center gap-1">
+                            <Button 
+                              size="sm" variant="ghost" 
+                              className="h-6 w-6 p-0 text-emerald-600 hover:bg-emerald-50 rounded-full"
+                              onClick={() => {
+                                  setChaveParaDevolver(chave)
+                                  setQuemDevolveu("")
+                                  setReturnModalOpen(true)
+                              }}
+                              title="Registrar Devolução"
+                            >
+                              <LogIn className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              size="sm" variant="ghost" 
+                              className="h-6 w-6 p-0 text-purple-600 hover:bg-purple-50 rounded-full"
+                              onClick={() => {
+                                setChaveParaAvariar(chave)
+                                setMotivoAvaria(chave.obs || "")
+                                setDamageModalOpen(true)
+                              }}
+                              title="Marcar Avaria"
+                            >
+                              <AlertTriangle className="h-3 w-3" />
+                            </Button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -361,40 +442,42 @@ export function ChavesInventory() {
             <table className="w-full text-left border-collapse border border-slate-200">
               <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200">
                 <tr className="text-[10px] font-bold text-slate-500 uppercase">
-                  <th className="px-2 py-1.5 w-20 border border-slate-200 text-center">CHAVE</th>
-                  <th className="px-2 py-1.5 w-24 border border-slate-200">TIPO</th>
-                  <th className="px-2 py-1.5 w-[300px] border border-slate-200">DATA / HORA</th>
-                  <th className="px-2 py-1.5 border border-slate-200">RESPONSÁVEL</th>
-                  <th className="px-2 py-1.5 border border-slate-200">SETOR</th>
-                  <th className="px-2 py-1.5 border border-slate-200">OPERADOR</th>
-                  <th className="px-2 py-1.5 border border-slate-200">LOCAL / BLOCO</th>
+                  <th className="px-1.5 py-1 w-20 border border-slate-200 text-center">CHAVE</th>
+                  <th className="px-1.5 py-1 w-14 border border-slate-200 text-center">TIPO</th>
+                  <th className="px-1.5 py-1 w-[115px] border border-slate-200">DATA / HORA</th>
+                  <th className="px-1.5 py-1 border border-slate-200">RESPONSÁVEL</th>
+                  <th className="px-1.5 py-1 border border-slate-200">SETOR</th>
+                  <th className="px-1.5 py-1 border border-slate-200">OPERADOR</th>
+                  <th className="px-1.5 py-1 border border-slate-200">LOCAL / BLOCO</th>
+                  <th className="px-1.5 py-1 border border-slate-200">OBSERVAÇÕES</th>
                 </tr>
               </thead>
               <tbody className="text-[12px]">
                 {historicoLoading ? (
-                  <tr><td colSpan={7} className="px-4 py-8 text-center text-blue-500"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></td></tr>
+                  <tr><td colSpan={8} className="px-1.5 py-6 text-center text-blue-500"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></td></tr>
                 ) : historico.length === 0 ? (
-                  <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">Nenhum movimento registrado.</td></tr>
+                  <tr><td colSpan={8} className="px-1.5 py-6 text-center text-slate-400">Nenhum movimento registrado.</td></tr>
                 ) : (
                   historico.map((log) => (
                     <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                      <td className={`px-2 py-1 border border-slate-200 font-bold text-center ${getModeloStyle(log.modelo)}`}>{log.numero}</td>
-                      <td className="px-2 py-1 border border-slate-200 text-center">
-                        <Badge className={
+                      <td className={`px-1.5 py-0.5 border border-slate-200 font-bold text-center ${getModeloStyle(log.modelo)}`}>{log.numero}</td>
+                      <td className="px-1.5 py-0.5 border border-slate-200 text-center">
+                        <Badge className={`text-[10px] px-1 py-0 h-4 ${
                           log.tipo === 'SAIDA' ? "bg-orange-100 text-orange-700 hover:bg-orange-100 border-0" : 
                           log.tipo === 'NÃO DEVOLVIDA' ? "bg-rose-100 text-rose-700 hover:bg-rose-100 border-0" :
                           "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0"
-                        }>
+                        }`}>
                           {log.tipo}
                         </Badge>
                       </td>
-                      <td className="px-2 py-1 border border-slate-200 font-medium text-slate-600">
-                        {format(new Date(log.data_evento), "dd/MM/yyyy 'às' HH:mm:ss", { locale: ptBR })}
+                      <td className="px-1.5 py-0.5 border border-slate-200 font-medium text-slate-600">
+                        {format(new Date(log.data_evento), "dd/MM/yy HH:mm")}
                       </td>
-                      <td className="px-2 py-1 border border-slate-200 text-slate-700">{log.responsavel_nome}</td>
-                      <td className="px-2 py-1 border border-slate-200 text-slate-600">{log.responsavel_setor}</td>
-                      <td className="px-2 py-1 border border-slate-200 text-slate-500">{log.operador_nome}</td>
-                      <td className="px-2 py-1 border border-slate-200 text-slate-400 italic text-[11px]">{log.local}</td>
+                      <td className="px-1.5 py-0.5 border border-slate-200 text-slate-700">{log.responsavel_nome}</td>
+                      <td className="px-1.5 py-0.5 border border-slate-200 text-slate-600">{log.responsavel_setor}</td>
+                      <td className="px-1.5 py-0.5 border border-slate-200 text-slate-500">{log.operador_nome}</td>
+                      <td className="px-1.5 py-0.5 border border-slate-200 text-slate-400 italic text-[10px]">{log.local}</td>
+                      <td className="px-1.5 py-0.5 border border-slate-200 text-slate-500 text-[11px]">{log.obs || '-'}</td>
                     </tr>
                   ))
                 )}
@@ -450,6 +533,41 @@ export function ChavesInventory() {
             <Button variant="ghost" onClick={() => setReturnModalOpen(false)}>Cancelar</Button>
             <Button className="bg-orange-600 hover:bg-orange-700 text-white" onClick={handleConfirmarDevolucao}>
               Confirmar Baixa
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Registro de Avaria */}
+      <Dialog open={damageModalOpen} onOpenChange={setDamageModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-purple-600" />
+              Registrar Avaria
+            </DialogTitle>
+            <DialogDescription>
+              Descreva o problema encontrado na chave nº <strong>{chaveParaAvariar?.numero}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4 space-y-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Motivo/Descrição da Avaria</label>
+              <Input 
+                placeholder="Ex: Chave entortou, tag quebrou..." 
+                value={motivoAvaria}
+                onChange={(e) => setMotivoAvaria(e.target.value)}
+                autoFocus
+                onKeyDown={(e) => e.key === 'Enter' && handleConfirmarAvaria()}
+              />
+            </div>
+          </div>
+          
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setDamageModalOpen(false)}>Cancelar</Button>
+            <Button className="bg-purple-600 hover:bg-purple-700 text-white" onClick={handleConfirmarAvaria}>
+              Marcar como Avariada
             </Button>
           </div>
         </DialogContent>

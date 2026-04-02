@@ -244,6 +244,16 @@ export default function ConsultaSolicitacoesGestor() {
     setDialogAberto(true)
     setMostrandoConfirmacao(true)
     setNovaJustificativa("")
+    
+    // 🎯 PRE-PREENCHER DATA FINAL DA LIBERAÇÃO
+    if (item.solicitacao.dataFinal) {
+      if (item.solicitacao.dataFinal.includes("/")) {
+        const [d, m, a] = item.solicitacao.dataFinal.split("/")
+        setDataValidadeExcecao(`${a}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`)
+      } else if (item.solicitacao.dataFinal.includes("-")) {
+        setDataValidadeExcecao(item.solicitacao.dataFinal.split("T")[0])
+      }
+    }
 
     console.log("🔥 BOTÃO EXCEÇÃO CLICADO!")
     console.log("📋 Item selecionado:", item)
@@ -278,35 +288,46 @@ export default function ConsultaSolicitacoesGestor() {
 
       console.log("👤 Prestador encontrado:", prestadorExistente)
 
-      // SEGUNDO: Atualizar com o status correto
-      const { data, error } = await supabase
+      // SEGUNDO: Atualizar o PRESTADOR (A PESSOA) - Checagem de 6 meses automática
+      const dataHoje = new Date()
+      const dataSeisMeses = new Date(dataHoje)
+      dataSeisMeses.setMonth(dataHoje.getMonth() + 6)
+      const checagemValidaAte = dataSeisMeses.toISOString().split("T")[0]
+
+      const { error: errorPrestador } = await supabase
         .from("prestadores")
         .update({
-          checagem: "excecao", // Coluna: Checagem
-          liberacao: "pendente", // 🔥 PRODUÇÃO REAL: Alterado para PENDENTE (Admin deve fazer o cadastro manual)
+          checagem: "excecao",
+          liberacao: "pendente",
           justificativa: novaJustificativa,
-          checagem_valida_ate: dataValidadeExcecao, // Salvar data de validade da exceção
+          checagem_valida_ate: checagemValidaAte, // 🎯 CRÍTICO: +6 meses Automático (A PESSOA)
           data_avaliacao: new Date().toISOString(),
           aprovado_por: "Gestor - Exceção",
         })
         .eq("id", prestadorSelecionado.prestador.id)
-        .select()
 
-      if (error) {
-        console.error("❌ Erro detalhado ao atualizar status:", error)
-
-        // Se o erro for de constraint, mostrar mensagem específica
-        if (error.message.includes("prestadores_status_check")) {
-          alert(
-            `❌ ERRO DE BANCO: O status "excecao" não é permitido na tabela. Execute o script SQL para corrigir a constraint.`,
-          )
-        } else {
-          alert(`❌ Erro ao salvar exceção: ${error.message}`)
-        }
+      if (errorPrestador) {
+        console.error("❌ Erro ao atualizar prestador:", errorPrestador)
+        alert(`Erro ao salvar exceção: ${errorPrestador.message}`)
         return
       }
 
-      console.log("✅ Exceção salva com sucesso!", data)
+      // TERCEIRO: Atualizar a SOLICITAÇÃO (A LIBERAÇÃO/ACESSO) - Data via Modal
+      const { error: errorSolicitacao } = await supabase
+        .from("solicitacoes")
+        .update({
+          status_geral: "aprovado",
+          data_final: dataValidadeExcecao // 🎯 CRÍTICO: Data do Modal (O ACESSO)
+        })
+        .eq("id", prestadorSelecionado.solicitacao.id)
+
+      if (errorSolicitacao) {
+        console.error("❌ Erro ao atualizar solicitação:", errorSolicitacao)
+        alert(`Erro ao salvar liberação: ${errorSolicitacao.message}`)
+        return
+      }
+
+      console.log("✅ Exceção e Liberação salvas com sucesso!")
 
       // Atualizar estado local
       setPrestadoresReprovados((prev) =>
@@ -405,16 +426,24 @@ export default function ConsultaSolicitacoesGestor() {
 
       if (errorSolic) throw errorSolic
 
-      // Se passou nova justificativa, atualizar o prestador também
+      // Se passou nova justificativa, atualizar o prestador também (SEM TOCAR NA VALIDADE)
       if (novaJustif && prestadorSelecionado) {
         await supabase
           .from("prestadores")
           .update({ 
             justificativa: novaJustif,
-            checagem_valida_ate: dataValidadeExcecao 
+            // checagem_valida_ate REMOVIDO DAQUI - NÃO ALTERAR EM RENOVAÇÃO
           })
           .eq("id", prestadorSelecionado.prestador.id)
       }
+
+      // ATUALIZAR A DATA FINAL DA SOLICITAÇÃO (A LIBERAÇÃO/ACESSO)
+      await supabase
+        .from("solicitacoes")
+        .update({ 
+          data_final: dataValidadeExcecao 
+        })
+        .eq("id", solicitacaoId)
 
       setPrestadoresReprovados((prev) =>
         prev.map((item) => {
@@ -840,10 +869,10 @@ export default function ConsultaSolicitacoesGestor() {
               <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Calendar className="h-5 w-5 text-purple-600" />
-                  <h4 className="font-semibold text-purple-800">📅 Validade desta Exceção</h4>
+                  <h4 className="font-semibold text-purple-800">📅 Validade desta Liberação</h4>
                 </div>
                 <p className="text-sm text-purple-700 mb-3">
-                  Defina até quando esta exceção será aceita pelo sistema (padrão: 6 meses):
+                  Defina até quando esta liberação será aceita pelo sistema (padrão: 6 meses):
                 </p>
                 <Input
                   type="date"

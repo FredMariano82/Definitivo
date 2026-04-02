@@ -47,7 +47,7 @@ interface KanbanBoardProps {
   hideHeader?: boolean;
 }
 
-export function KanbanBoard({ title = "Gestão Kanban", subtitle = "Acompanhe e gerencie as tarefas do Centro de Segurança", initialCategory, hideHeader = false }: KanbanBoardProps) {
+export function KanbanBoard({ title = "Gestão de Tarefas", subtitle = "Acompanhe e gerencie as tarefas do Centro de Segurança", initialCategory, hideHeader = false }: KanbanBoardProps) {
   const { usuario } = useAuth()
   const [tarefas, setTarefas] = useState<KanbanTarefa[]>([])
   const [isFormOpen, setIsFormOpen] = useState(false)

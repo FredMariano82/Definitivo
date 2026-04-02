@@ -518,22 +518,34 @@ export default function NovaSolicitacao({
       }
 
       // Determinar empresa final para cada prestador SEM economia
-      const prestadoresComEmpresa = prestadoresSemEconomia.map((p) => {
+      // Determinar empresa final e capturar dados de exceção
+      const prestadoresParaEnviar = prestadoresSemEconomia.map((p) => {
+        const economia = economias.find((e) => e.prestadorId === p.id)
+        
         let empresaFinal = ""
         if (modoEmpresa === "geral") {
           empresaFinal = empresa
         } else if (modoEmpresa === "especifica") {
           empresaFinal = p.empresa || ""
         }
+        
         return {
           nome: p.nome,
           doc1: p.doc1,
           doc2: p.doc2,
           empresa: empresaFinal,
+          isExcecao: economia?.isExcecao || false,
+          checagemValidaAte: economia?.validadeISO || null
         }
       })
 
-      const empresaSolicitacao = modoEmpresa === "geral" ? empresa : prestadoresComEmpresa[0]?.empresa || ""
+      // REGRA: Se TODOS os prestadores sendo enviados forem "Exceção", a solicitação vai direto para o GESTOR
+      const todosSaoExcecao = prestadoresParaEnviar.every(p => p.isExcecao)
+      const modoAprovacao = todosSaoExcecao ? "solo_excecao" : "padrao"
+
+      console.log(`🎯 MODO DE APROVAÇÃO: ${modoAprovacao} (Todos exceção: ${todosSaoExcecao})`)
+
+      const empresaSolicitacao = modoEmpresa === "geral" ? empresa : prestadoresParaEnviar[0]?.empresa || ""
 
       // Criar solicitação APENAS com prestadores sem economia
       const {
@@ -548,7 +560,8 @@ export default function NovaSolicitacao({
         finalidade: finalidade as "evento" | "obra",
         local,
         empresa: empresaSolicitacao,
-        prestadores: prestadoresComEmpresa,
+        prestadores: prestadoresParaEnviar,
+        modoAprovacaoDireta: modoAprovacao as any,
         dataInicial: dataInicial,
         dataFinal: overrideDataFinal || dataFinal,
       })

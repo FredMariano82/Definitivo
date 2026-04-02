@@ -19,6 +19,8 @@ interface EconomiaCalculada {
   detalhes: string
   conflitoData?: boolean
   validadeCalculada?: string
+  isExcecao?: boolean
+  validadeISO?: string | null
 }
 
 interface ModalPreviaSolicitacaoProps {
@@ -108,6 +110,8 @@ export default function ModalPreviaSolicitacao({
             tipoEconomia: "nenhuma",
             valorEconomizado: 0,
             detalhes: "Prestador novo - primeira checagem necessária",
+            isExcecao: false,
+            validadeISO: null
           })
           continue
         }
@@ -125,6 +129,8 @@ export default function ModalPreviaSolicitacao({
           prestadorDoc1: doc1ParaValidar,
           tipoEconomia: "nenhuma",
           valorEconomizado: 0,
+          isExcecao: statusChecagem === "excecao",
+          validadeISO: (prestadorEncontrado as any).checagem_valida_ate || null,
           detalhes: "Sem economia detectada",
         }
 

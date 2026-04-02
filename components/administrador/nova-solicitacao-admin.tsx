@@ -92,7 +92,7 @@ export default function NovaSolicitacaoAdmin({
   const [mostrarUploadHistorico, setMostrarUploadHistorico] = useState(false)
 
   // 🎯 MODO DE APROVAÇÃO DIRETA (EXCLUSIVO SUPERADMIN)
-  const [modoAprovacaoDireta, setModoAprovacaoDireta] = useState<"padrao" | "solo_liberacao" | "solo_checagem" | "lib_checagem_ok">("padrao")
+  const [modoAprovacaoDireta, setModoAprovacaoDireta] = useState<"padrao" | "solo_liberacao" | "solo_checagem" | "lib_checagem_ok" | "solo_excecao">("padrao")
 
   const dataAtual = new Date()
 
@@ -302,23 +302,40 @@ export default function NovaSolicitacaoAdmin({
     try {
       console.log("🚀 ADM - ENVIANDO SOLICITAÇÃO")
 
-      // Determinar empresa final para cada prestador
-      const prestadoresComEmpresa = prestadores.map((p) => {
+      // Determinar empresa final e capturar dados de exceção
+      const prestadoresParaEnviar = prestadores.map((p) => {
+        const economia = economias.find((e) => e.prestadorId === p.id)
+        
         let empresaFinal = ""
         if (modoEmpresa === "geral") {
           empresaFinal = empresa
         } else if (modoEmpresa === "especifica") {
           empresaFinal = p.empresa || ""
         }
+        
         return {
           nome: p.nome,
           doc1: p.doc1,
           doc2: p.doc2,
           empresa: empresaFinal,
+          isExcecao: economia?.isExcecao || false,
+          checagemValidaAte: economia?.validadeISO || null
         }
       })
 
-      const empresaSolicitacao = modoEmpresa === "geral" ? empresa : prestadoresComEmpresa[0]?.empresa || ""
+      // REGRA: Se TODOS os prestadores forem "Exceção", a solicitação vai como "solo_excecao" (pendente_gestor)
+      const todosSaoExcecao = prestadoresParaEnviar.every(p => p.isExcecao)
+      
+      // Se for SuperAdmin e estiver no modo padrão, e detectamos exceção, forçar solo_excecao
+      // Se não for superadmin, sempre seguir a regra da detecção
+      let modoFinal = modoBiblioteca ? "padrao" : (usuario?.perfil === "superadmin" ? modoAprovacaoDireta : "padrao")
+      
+      if (modoFinal === "padrao" && todosSaoExcecao && !modoBiblioteca) {
+        console.log("🎯 ADM - Auto-detectada EXCEÇÃO, mudando modo para solo_excecao")
+        modoFinal = "solo_excecao"
+      }
+
+      const empresaSolicitacao = modoEmpresa === "geral" ? empresa : prestadoresParaEnviar[0]?.empresa || ""
 
       const {
         sucesso: sucessoEnvio,
@@ -332,12 +349,12 @@ export default function NovaSolicitacaoAdmin({
         finalidade: "obra",
         local,
         empresa: empresaSolicitacao,
-        prestadores: prestadoresComEmpresa,
+        prestadores: prestadoresParaEnviar,
         dataInicial: modoBiblioteca ? "" : dataInicial,
         dataFinal: modoBiblioteca ? "" : dataFinal,
         dataSolicitacao: usuario?.perfil === "superadmin" ? dataSolicitacaoManual : undefined,
         horaSolicitacao: usuario?.perfil === "superadmin" ? `${horaSolicitacaoManual}:00` : undefined,
-        modoAprovacaoDireta: modoBiblioteca ? "padrao" : (usuario?.perfil === "superadmin" ? modoAprovacaoDireta : "padrao"),
+        modoAprovacaoDireta: modoFinal as any,
         modoBiblioteca: modoBiblioteca,
       })
 

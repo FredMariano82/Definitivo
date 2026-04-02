@@ -4,6 +4,7 @@ import {
     parseISO, 
     differenceInCalendarDays,
     differenceInHours,
+    differenceInSeconds,
     isWeekend,
     getDay,
     isAfter,
@@ -545,16 +546,30 @@ export class OpServiceV2 {
     }
 
     /**
-     * Encerra todas as pausas ativas de um colaborador
+     * Encerra todas as pausas ativas de um colaborador e retorna o tempo de atraso (se houver)
      */
-    static async endPause(colaborador_id: string) {
+    static async endPause(colaborador_id: string): Promise<number> {
+        const { data: pause } = await supabase
+            .from('op_pausas')
+            .select('*')
+            .eq('colaborador_id', colaborador_id)
+            .eq('encerrada', false)
+            .maybeSingle()
+
+        if (!pause) return 0
+
+        const inicio = parseISO(pause.data_inicio)
+        const limite = pause.segundos_duracao
+        const decorrido = differenceInSeconds(new Date(), inicio)
+        const atraso = Math.max(0, decorrido - limite)
+
         const { error } = await supabase
             .from('op_pausas')
             .update({ encerrada: true })
-            .eq('colaborador_id', colaborador_id)
-            .eq('encerrada', false)
+            .eq('id', pause.id)
         
         if (error) throw error
+        return atraso
     }
 
     /**
@@ -577,7 +592,8 @@ export class OpServiceV2 {
         const hoje = format(new Date(), 'yyyy-MM-dd')
         
         // Sempre encerra pausas vigentes ao realizar qualquer movimentação de alocação/base
-        await this.endPause(colaborador_id)
+        // Retorna o atraso caso estivesse em pausa
+        const atraso = await this.endPause(colaborador_id)
 
         if (!posto_id) {
             // Remove alocação
@@ -587,7 +603,7 @@ export class OpServiceV2 {
                 .eq('colaborador_id', colaborador_id)
                 .eq('data_alocacao', hoje)
             if (error) throw error
-            return
+            return { atraso }
         }
 
         // Se for alocado em um posto (não é null), encerra pausas ativas
@@ -605,6 +621,7 @@ export class OpServiceV2 {
             }, { onConflict: 'colaborador_id,data_alocacao' })
         
         if (error) throw error
+        return { atraso }
     }
 
     /**
@@ -823,7 +840,8 @@ export class OpServiceV2 {
         rendeu_quem_nome?: string,
         duracao_prevista?: number,
         radio_ht?: string,
-        possui_colete?: boolean
+        possui_colete?: boolean,
+        tempo_atraso?: number
     }) {
         const { error } = await supabase
             .from('op_historico_movimentacoes')
