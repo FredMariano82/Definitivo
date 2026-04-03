@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase"
+import { KanbanService } from "./kanban-service"
 
 export interface DVR {
   id: string
@@ -48,15 +49,33 @@ export class CFTVService {
   }
 
   /**
-   * Salva um novo registro de ronda
+   * Salva um novo registro de ronda e opcionalmente cria um card no Kanban
    */
-  static async salvarRonda(registro: RondaRegistro) {
+  static async salvarRonda(registro: RondaRegistro, criarCardKanban = false) {
     const { data, error } = await supabase
       .from('cftv_rondas_historico')
       .insert(registro)
       .select()
     
     if (error) throw error
+
+    // Se solicitado, cadastrar no Kanban como tarefa finalizada
+    if (criarCardKanban && data?.[0]) {
+      await KanbanService.criarTarefa({
+        titulo: `RONDA CFTV: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`,
+        status: 'finalizado',
+        categoria: 'imagem',
+        descricao: registro.observacoes || 'Ronda de rotina realizada pelo sistema.',
+        created_by_name: registro.operador_nome || 'Operador',
+        dados_especificos: {
+          ronda_id: data[0].id,
+          tipo_ronda: 'DVR_CONSOLIDADO',
+          total_canais: registro.dados_ronda ? Object.keys(registro.dados_ronda).length : 0,
+          saude_sistema: registro.observacoes?.match(/Saúde: ([\d.]+)%/)?.[1] || 'N/A'
+        }
+      })
+    }
+
     return data?.[0]
   }
 
@@ -74,6 +93,8 @@ export class CFTVService {
     return data || []
   }
 }
+
+import { format } from "date-fns"
 
 // Aliases para compatibilidade com as melhorias de 03/04
 export const CftvService = CFTVService
