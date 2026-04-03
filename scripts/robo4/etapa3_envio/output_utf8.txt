@@ -1,0 +1,50 @@
+﻿[dotenv@17.3.1] injecting env (2) from ..\..\..\.env.local -- tip: ­ƒöÉ prevent committing .env to code: https://dotenvx.com/precommit
+==================================================
+­ƒñû ROBO 4: PASSO 3 - SINCRONIZA├ç├âO DE DATAS
+==================================================
+Buscando pr├│ximo prestador aprovado sem v├¡nculo...
+node : (node:6028) 
+Warning: Setting the NO
+DE_TLS_REJECT_UNAUTHORI
+ZED environment 
+variable to '0' makes 
+TLS connections and 
+HTTPS requests 
+insecure by disabling 
+certificate 
+verification.
+No linha:1 caractere:1
++ node despacho.js > 
+output.log 2>&1 ; cat 
+output.log
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: ((node:6028) W   
+ ar...e verificatio    
+n.:String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+(Use `node 
+--trace-warnings ...` 
+to show where the 
+warning was created)
+
+­ƒÄ» ALVO ENCONTRADO: [Thiago Barros]
+­ƒöù Link Supabase: 08373550-64a5-45ff-8766-b0331ba3321e
+­ƒôà VIG├èNCIA: 28/02/2026 at├® 31/10/2026
+Buscando lista de grupos oficial do ID Control...
+­ƒôè Carregados 439 grupos do servidor.
+­ƒÅó GRUPOS LOCALIZADOS: Empresa(Ambiente=2003) | Depto(Seguran├ºa=1104)
+Verificando exist├¬ncia no ID Control...
+
+­ƒöì Validando documentos para o ID Control T├®cnico: 10024266
+Ô£ö´©Å Match Sucesso (Regra RG): O RG do ID Control est├í vazio ou ├® igual ao do Supabase.
+­ƒöä Liberado para Atualiza├º├úo. Aplicando Carga Total...
+­ƒƒ® SUCESSO: Cadastro atualizado totalmente (Datas + Grupos)!
+
+Ô£à PROCESSO FINALIZADO!

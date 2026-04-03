@@ -1,0 +1,99 @@
+﻿[dotenv@17.3.1] injecting env (3) from ..\..\..\.env.local -- tip: ÔÜÖ´©Å  override existing env vars with { override: true }
+==================================================
+­ƒñû ROBO 4: PASSO 3 - MODO LOOP ROBUSTO
+==================================================
+Buscando fila de aprovados pendentes de sincroniza├º├úo...
+­ƒöù URL BUSCA: https://lwpqgyoownxwsrcowgke.supabase.co/rest/v1/prestadores?select=*,solicitacoes:solicitacao_id(*)&checagem=eq.aprovado&id_control_id=is.null&limit=1
+node : (node:18948) 
+Warning: Setting the NO
+DE_TLS_REJECT_UNAUTHORI
+ZED environment 
+variable to '0' makes 
+TLS connections and 
+HTTPS requests 
+insecure by disabling 
+certificate 
+verification.
+No linha:1 caractere:1
++ node despacho.js > 
+robo4_exec_log.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: ((node:18948)    
+ Wa...e verificatio    
+n.:String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+(Use `node 
+--trace-warnings ...` 
+to show where the 
+warning was created)
+­ƒôª REGISTROS RECEBIDOS: [
+  {
+    "id": "545e028e-b7f3-47eb-85fd-bb6ad3f9c416",
+    "solicitacao_id": "76fb047d-c778-4986-982d-dcd0f1a42315",
+    "nome": "Marcus Vinicius Mariano",
+    "doc1": "56996",
+    "doc2": "",
+    "empresa": "teste",
+    "checagem": "aprovado",
+    "checagem_valida_ate": "2026-09-26",
+    "liberacao": "ok",
+    "observacoes": null,
+    "aprovado_por": "SuperAdmin (Direto)",
+    "data_avaliacao": "2026-03-26",
+    "justificativa": null,
+    "criado_em": "2026-03-26T03:05:49.825728+00:00",
+    "integrado_id_control": false,
+    "id_control_id": null,
+    "data_integracao": null,
+    "solicitacoes": {
+      "id": "76fb047d-c778-4986-982d-dcd0f1a42315",
+      "local": "GERAL",
+      "numero": "2026-000001",
+      "empresa": "teste",
+      "economia": null,
+      "criado_em": "2026-03-26T03:05:49.479704+00:00",
+      "data_final": "2026-04-01",
+      "finalidade": "obra",
+      "usuario_id": "0002019a-6324-4ff1-822c-b0d0554b6562",
+      "solicitante": "Tio Chico",
+      "data_inicial": "2026-03-29",
+      "departamento": "Teste",
+      "status_geral": "aprovado",
+      "custo_checagem": 20,
+      "economia_gerada": 0,
+      "data_solicitacao": "2026-03-27",
+      "hora_solicitacao": "00:02:00",
+      "tipo_solicitacao": "checagem_liberacao",
+      "observacoes_gerais": null
+    }
+  }
+]
+­ƒôí FILA ENCONTRADA: [1] registros para processar.
+
+Autenticando no ID Control...
+­ƒöô Login efetuado com sucesso.
+Mapeando grupos do servidor...
+­ƒôè 449 grupos carregados.
+
+--------------------------------------------------
+­ƒæñ [1/1] PROCESSANDO: Marcus Vinicius Mariano
+--------------------------------------------------
+­ƒöì DEBUG [Marcus Vinicius Mariano]:
+   - ID Prestador: 545e028e-b7f3-47eb-85fd-bb6ad3f9c416
+   - ID Solicitacao: 76fb047d-c778-4986-982d-dcd0f1a42315
+   - Checagem V├ílida At├® (prestadores): 2026-09-26
+   - Data Inicial (solicitacoes): 2026-03-29
+   - Data Final (solicitacoes): 2026-04-01
+­ƒöä MODO INTELIGENTE: Solicitando cadastro completo do ID Control para preserva├º├úo...
+­ƒôÑ Dados carregados: Foto (SIM) | Biometria (0)
+­ƒöä Atualizando cadastro existente (ID: 10024265) com preserva├º├úo total...
+
+Ô£à CICLO DE SINCRONIZA├ç├âO FINALIZADO COM SUCESSO!
+­ƒöô Cadeado aberto. Sistema liberado para o pr├│ximo ciclo.

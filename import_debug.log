@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-03-25T11:15:43.643Z",
+  "env": {
+    "hasUrl": true,
+    "hasKey": true,
+    "hasAnon": true
+  },
+  "totalLinhas": 1717,
+  "colunas": [
+    "NOME",
+    "RG",
+    "DATA INICIAL",
+    "DATA FINAL",
+    "CHECAGEM"
+  ],
+  "primeiraLinha": {
+    "NOME": "Gabriel Henrique dos Santos",
+    "RG": "608362827",
+    "DATA INICIAL": "01/10/2025",
+    "DATA FINAL": "01/04/2026",
+    "CHECAGEM": "01/04/2026"
+  }
+}

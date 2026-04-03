@@ -1,0 +1,13 @@
+﻿[dotenv@17.3.1] injecting env (2) from ..\..\..\.env.local -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+==================================================
+🤖 ROBO 4: PASSO 3 - SINCRONIZAÇÃO DE DATAS
+==================================================
+Buscando próximo prestador aprovado sem vínculo...
+
+🎯 ALVO ENCONTRADO: [Thiago Barros]
+🔗 Link Supabase: 08373550-64a5-45ff-8766-b0331ba3321e
+📅 VIGÊNCIA: 28/02/2026 até 31/10/2026
+Buscando lista de grupos oficial do ID Control...
+📊 Carregados 439 grupos do servidor.
+🏢 GRUPOS LOCALIZADOS: Empresa(Ambiente=2003) | Depto(Segurança=1104)
+Verificando existência no ID Control com form data completo...

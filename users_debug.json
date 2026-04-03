@@ -1,0 +1,62 @@
+[
+  {
+    "id": "dae3e9a3-cf54-479d-9381-1a3069498a87",
+    "nome": "Fred Mariano",
+    "email": "mariano@mvm.com.br",
+    "departamento": "Diretoria",
+    "perfil": "administrador",
+    "criado_em": "2026-02-21T05:42:17.647984+00:00",
+    "senha": "123456",
+    "departamento_id": null
+  },
+  {
+    "id": "0002019a-6324-4ff1-822c-b0d0554b6562",
+    "nome": "Marcus Mariano",
+    "email": "mariano.marcus@gmail.com",
+    "departamento": "Diretoria",
+    "perfil": "superadmin",
+    "criado_em": "2026-02-21T08:01:27.153556+00:00",
+    "senha": "123",
+    "departamento_id": null
+  },
+  {
+    "id": "22c012eb-040e-49f5-a346-7a1c83d3207c",
+    "nome": "Administrador",
+    "email": "admin@mvm.com",
+    "departamento": "Administração",
+    "perfil": "administrador",
+    "criado_em": "2026-02-21T08:01:27.656507+00:00",
+    "senha": "123",
+    "departamento_id": null
+  },
+  {
+    "id": "45307b5f-2d7e-48b9-ade7-d82a9c220c37",
+    "nome": "Gestor",
+    "email": "gestor@mvm.com",
+    "departamento": "Gestão",
+    "perfil": "gestor",
+    "criado_em": "2026-02-21T08:01:27.945785+00:00",
+    "senha": "123",
+    "departamento_id": null
+  },
+  {
+    "id": "727a403f-1956-444b-9620-79b547e391e8",
+    "nome": "Aprovador Segurança",
+    "email": "aprovador@mvm.com",
+    "departamento": "Segurança",
+    "perfil": "aprovador",
+    "criado_em": "2026-02-21T08:01:28.226462+00:00",
+    "senha": "123",
+    "departamento_id": null
+  },
+  {
+    "id": "9d3b6b91-e346-4cb3-92ee-245a1c47237a",
+    "nome": "Solicitante Segurança",
+    "email": "solicitante@mvm.com",
+    "departamento": "Segurança",
+    "perfil": "solicitante",
+    "criado_em": "2026-02-21T07:21:50.372826+00:00",
+    "senha": "123",
+    "departamento_id": 1
+  }
+]

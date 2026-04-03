@@ -1,0 +1,36 @@
+﻿node : (node:16960) 
+Warning: Setting the NO
+DE_TLS_REJECT_UNAUTHORI
+ZED environment 
+variable to '0' makes 
+TLS connections and 
+HTTPS requests 
+insecure by disabling 
+certificate 
+verification.
+No linha:1 caractere:1
++ node scripts/robo1/in
+spect_marcus_v2.js > ma
+rcus_duplications.txt 
+2>& ...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: ((node:16960)    
+ Wa...e verificatio    
+n.:String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+(Use `node 
+--trace-warnings ...` 
+to show where the 
+warning was created)
+
+Marcus Vinicius Mariano - Encontrados 1 registros:
+ID: 10026960 | RG: 56996 | Foto: N├âO | Matr├¡cula: 20184397
