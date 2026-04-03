@@ -230,8 +230,23 @@ export default function GestaoEquipeV2() {
             await OpServiceV2.updateEquipe(editingColab.id, cleanedData)
             setIsEditModalOpen(false)
             loadData()
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleClearMonth = async () => {
+        if (!confirm("⚠️ ATENÇÃO: Isso irá apagar TODAS as marcações manuais (Faltas, Atestados, Folgas extras) do mês atual para toda a equipe. Deseja continuar?")) return
+        
+        setLoading(true)
+        try {
+            const startStr = format(monthStart, 'yyyy-MM-dd')
+            const endStr = format(monthEnd, 'yyyy-MM-dd')
+            await OpServiceV2.clearManualScaleOverrides(startStr, endStr)
+            toast.success("Escala mensal resetada com sucesso!")
+            loadData()
         } catch (error) {
-            console.error("Erro ao atualizar colaborador:", error)
+            toast.error("Erro ao resetar escala.")
         } finally {
             setLoading(false)
         }
@@ -350,6 +365,26 @@ export default function GestaoEquipeV2() {
                             <Button variant="ghost" size="icon" onClick={nextMonth} className="hover:bg-slate-100 rounded-xl h-10 w-10">
                                 <ChevronRight className="h-6 w-6 text-slate-600" />
                             </Button>
+
+                            <div className="h-6 w-px bg-slate-200 mx-2"></div>
+
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button 
+                                            variant="outline" 
+                                            size="icon" 
+                                            onClick={handleClearMonth} 
+                                            className="h-10 w-10 rounded-xl border-rose-200 text-rose-500 hover:bg-rose-50 hover:text-rose-600 transition-colors shadow-sm"
+                                        >
+                                            <Trash2 className="h-5 w-5" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="bg-rose-600 text-white font-black text-[10px] uppercase">
+                                        Zerar Escalas do Mês
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
                         </div>
                     </div>
                 </CardHeader>

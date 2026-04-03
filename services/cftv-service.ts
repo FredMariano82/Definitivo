@@ -30,6 +30,24 @@ export class CFTVService {
   }
 
   /**
+   * Busca a última ronda registrada para persistência visual
+   */
+  static async getUltimaRonda(): Promise<RondaRegistro | null> {
+    const { data, error } = await supabase
+      .from('cftv_rondas_historico')
+      .select('*')
+      .order('data_ronda', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    
+    if (error) {
+      console.error("Erro ao buscar última ronda:", error)
+      return null
+    }
+    return data as RondaRegistro
+  }
+
+  /**
    * Salva um novo registro de ronda
    */
   static async salvarRonda(registro: RondaRegistro) {
@@ -56,3 +74,7 @@ export class CFTVService {
     return data || []
   }
 }
+
+// Aliases para compatibilidade com as melhorias de 03/04
+export const CftvService = CFTVService
+export type RondaDVR = RondaRegistro

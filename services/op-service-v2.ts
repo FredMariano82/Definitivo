@@ -302,8 +302,12 @@ export class OpServiceV2 {
             }
         }
 
-        const refStr = colaborador.referencia_escala || '2024-01-01'
-        const refDate = parseISO(refStr)
+        // Se não houver referência de escala definida, não gera turno automático (evita parede azul em produção)
+        if (!colaborador.referencia_escala) {
+            return false
+        }
+
+        const refDate = parseISO(colaborador.referencia_escala)
         const diffDays = differenceInCalendarDays(dataAlvo, refDate)
         const tipoEscala = (colaborador.tipo_escala || '').toLowerCase().trim().replace(/\s/g, '')
 
@@ -317,7 +321,7 @@ export class OpServiceV2 {
         }
 
         if (tipoEscala === '5x2') {
-            const diaSemana = data.getDay()
+            const diaSemana = data.getDay() // 0 = Domingo, 6 = Sábado
             return diaSemana !== 0 && diaSemana !== 6
         }
 
