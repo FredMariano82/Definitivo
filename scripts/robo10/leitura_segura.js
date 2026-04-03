@@ -3,9 +3,9 @@ const https = require('https');
 // ============================================================================
 // CONFIGURAÇÕES (Preencha aqui os dados do seu equipamento)
 // ============================================================================
-const EQUIPAMENTO_IP = '192.168.100.x'; // <--- INSIRA O IP DO APARELHO AQUI
-const LOGIN = 'admin';
-const SENHA = 'admin';
+const EQUIPAMENTO_IP = '192.168.100.20'; // IP identificado no script de sincronização
+const LOGIN = 'mariano';
+const SENHA = '123456789';
 // ============================================================================
 
 /**
@@ -16,7 +16,7 @@ function request(path, data) {
         const payload = JSON.stringify(data);
         const options = {
             hostname: EQUIPAMENTO_IP,
-            port: 443,
+            port: 30443, // Porta identificada no script de sincronização
             path: path,
             method: 'POST',
             rejectUnauthorized: false, // Ignorar certificado conforme manual

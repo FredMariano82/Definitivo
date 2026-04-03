@@ -460,6 +460,7 @@ export default function ConfiguracoesOperacionais() {
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Escala</Label>
                                 <Select value={formData.tipo_escala} onValueChange={(v) => setFormData({...formData, tipo_escala: v})}>
                                     <SelectTrigger className="h-12 rounded-2xl border-slate-200 font-black text-sm bg-slate-50/50">
                                         <SelectValue />

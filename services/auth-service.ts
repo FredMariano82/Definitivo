@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase"
 import type { Usuario } from "@/types"
+import bcrypt from "bcryptjs"
 
 export class AuthService {
   // Login com email e senha
@@ -19,9 +20,16 @@ export class AuthService {
         return { usuario: null, sucesso: false, erro: "Email não encontrado" }
       }
 
-      // Verificar senha com o banco de dados
-      // Nota: Em produção, usaríamos hash (bcrypt/argon2). Por enquanto é texto simples.
-      if (senha !== usuario.senha) {
+      // Verificar se o usuário está ativo
+      if (usuario.ativo === false) {
+        console.log("❌ Usuário bloqueado:", email)
+        return { usuario: null, sucesso: false, erro: "Acesso bloqueado. Contate o administrador." }
+      }
+
+      // Verificar senha com o banco de dados usando HASH (Bcrypt)
+      const senhaCorreta = bcrypt.compareSync(senha, usuario.senha)
+
+      if (!senhaCorreta) {
         console.log("❌ Senha incorreta")
         return { usuario: null, sucesso: false, erro: "Senha incorreta" }
       }
@@ -35,7 +43,7 @@ export class AuthService {
           email: usuario.email,
           departamento: usuario.departamento,
           departamento_id: usuario.departamento_id,
-          perfil: usuario.perfil as "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte",
+          perfil: usuario.perfil as "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte" | "superadmin" | "operador",
         },
         sucesso: true,
         erro: "",
@@ -63,12 +71,17 @@ export class AuthService {
       }
 
       // Verificar senha atual
-      if (senhaAtual !== usuario.senha) {
+      const senhaCorreta = bcrypt.compareSync(senhaAtual, usuario.senha)
+      if (!senhaCorreta) {
         return { sucesso: false, erro: "Senha atual incorreta" }
       }
 
-      // Atualizar senha no banco (por enquanto salvando como texto)
-      const { error: updateError } = await supabase.from("usuarios").update({ senha: novaSenha }).eq("id", userId)
+      // Gerar HASH para a nova senha
+      const salt = bcrypt.genSaltSync(10)
+      const hashedSenha = bcrypt.hashSync(novaSenha, salt)
+
+      // Atualizar senha no banco
+      const { error: updateError } = await supabase.from("usuarios").update({ senha: hashedSenha }).eq("id", userId)
 
       if (updateError) {
         console.error("Erro ao atualizar senha:", updateError)
@@ -98,7 +111,7 @@ export class AuthService {
         email: usuario.email,
         departamento: usuario.departamento,
         departamento_id: usuario.departamento_id,
-        perfil: usuario.perfil as "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte",
+        perfil: usuario.perfil as "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte" | "superadmin" | "operador",
       }
     } catch (error) {
       console.error("Erro ao buscar usuário:", error)
@@ -112,10 +125,22 @@ export class AuthService {
     email: string
     departamento: string
     departamento_id?: number
-    perfil: "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte"
+    perfil: "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte" | "superadmin" | "operador"
+    senha?: string
   }): Promise<{ sucesso: boolean; erro: string; usuario?: Usuario }> {
     try {
-      const { data: usuario, error } = await supabase.from("usuarios").insert([dadosUsuario]).select().single()
+      // Usar a senha fornecida ou uma padrão se não houver (ex: 'Mudar@123')
+      const senhaFinal = dadosUsuario.senha || "Mudar@123"
+      const salt = bcrypt.genSaltSync(10)
+      const hashedSenha = bcrypt.hashSync(senhaFinal, salt)
+
+      const { senha, ...restoDados } = dadosUsuario as any
+      const payload = {
+        ...restoDados,
+        senha: hashedSenha
+      }
+
+      const { data: usuario, error } = await supabase.from("usuarios").insert([payload]).select().single()
 
       if (error) {
         console.error("Erro ao criar usuário:", error)
@@ -131,7 +156,7 @@ export class AuthService {
           email: usuario.email,
           departamento: usuario.departamento,
           departamento_id: usuario.departamento_id,
-          perfil: usuario.perfil as "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte",
+          perfil: usuario.perfil as "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte" | "superadmin" | "operador",
         },
       }
     } catch (error) {
@@ -155,11 +180,64 @@ export class AuthService {
         nome: u.nome,
         email: u.email,
         departamento: u.departamento,
-        perfil: u.perfil as "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte",
+        perfil: u.perfil as "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte" | "superadmin" | "operador",
       }))
     } catch (error) {
       console.error("Erro ao listar usuários:", error)
       return []
+    }
+  }
+
+  // Resetar senha de um usuário (para admin)
+  static async resetarSenha(userId: string, novaSenha: string): Promise<{ sucesso: boolean; erro: string }> {
+    try {
+      console.log("🔐 Resetando senha para usuário:", userId)
+
+      // Gerar HASH para a nova senha
+      const salt = bcrypt.genSaltSync(10)
+      const hashedSenha = bcrypt.hashSync(novaSenha, salt)
+
+      const { error } = await supabase.from("usuarios").update({ senha: hashedSenha }).eq("id", userId)
+
+      if (error) {
+        console.error("Erro ao resetar senha:", error)
+        return { sucesso: false, erro: "Erro ao atualizar senha no banco" }
+      }
+
+      return { sucesso: true, erro: "" }
+    } catch (error) {
+      console.error("💥 Erro ao resetar senha:", error)
+      return { sucesso: false, erro: "Erro interno do servidor" }
+    }
+  }
+
+  // Atualizar dados de um usuário (para admin)
+  static async atualizarUsuario(userId: string, dados: { 
+    nome?: string; 
+    email?: string; 
+    departamento?: string; 
+    perfil?: string 
+  }): Promise<{ sucesso: boolean; erro: string }> {
+    try {
+      const { error } = await supabase.from("usuarios").update(dados).eq("id", userId)
+      if (error) throw error
+      return { sucesso: true, erro: "" }
+    } catch (error) {
+      console.error("Erro ao atualizar usuário:", error)
+      return { sucesso: false, erro: "Erro ao atualizar usuário" }
+    }
+  }
+
+  // Alternar status de ativação (bloquear/desbloquear)
+  static async alternarStatusUsuario(userId: string, ativo: boolean): Promise<{ sucesso: boolean; erro: string }> {
+    try {
+      console.log(`🔐 Alterando status do usuário ${userId} para: ${ativo ? 'ATIVO' : 'BLOQUEADO'}`)
+      const { error } = await supabase.from("usuarios").update({ ativo }).eq("id", userId)
+      if (error) throw error
+      return { sucesso: true, erro: "" }
+    } catch (error) {
+      console.error("Erro ao alternar status do usuário:", error)
+      return { sucesso: false, erro: "Erro ao alterar status" }
     }
   }
 }

@@ -42,6 +42,9 @@ export default function PainelControle() {
       case "migracao-dados": router.push("/suporte/migracao"); break
       case "consultar-solicitacoes": router.push("/suporte/consulta"); break
       case "gestao-usuarios": router.push("/superadmin/usuarios"); break
+      case "cftv-manutencao": router.push("/admin/kanban?category=manutencao_cftv"); break
+      case "cftv-ronda": router.push("/admin/kanban?category=ronda_dvr"); break
+      case "cftv-checklist": router.push("/admin/kanban?category=checklist_central"); break
       default: console.warn(`Rota não encontrada: ${id}`)
     }
   }
@@ -119,6 +122,16 @@ export default function PainelControle() {
           { id: "dashboard", label: "Dashboard Geral", descricao: "Métricas e relatórios" },
         ],
       },
+    {
+      categoria: "Monitoramento CFTV",
+      cor: "bg-emerald-600",
+      icone: <Shield className="h-5 w-5" />,
+      itens: [
+        { id: "cftv-manutencao", label: "CFTV Manutenções", descricao: "Status de reparos" },
+        { id: "cftv-ronda", label: "Ronda dos DVR's", descricao: "Verificação de gravação" },
+        { id: "cftv-checklist", label: "Checklist Central", icon: <CheckCircle className="h-4 w-4" />, descricao: "Verificação diária" },
+      ],
+    },
   ]
 
   return (

@@ -18,7 +18,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Clock, User, Trash2Icon } from "lucide-react"
 
 type TarefaStatus = 'entrada' | 'andamento' | 'aguardando' | 'revisao' | 'finalizado'
-type TarefaCategoria = 'imagem' | 'os' | 'ocorrencia' | 'autorizacao_chaves' | 'achados_perdidos' | 'eventos' | 'uniforme'
+type TarefaCategoria = 'imagem' | 'os' | 'ocorrencia' | 'autorizacao_chaves' | 'achados_perdidos' | 'eventos' | 'uniforme' | 'servico_noturno' | 'manutencao_cftv' | 'ronda_dvr' | 'checklist_central'
 
 interface KanbanTarefa {
   id: string
@@ -54,15 +54,22 @@ export function KanbanDetailsModal({
 
   if (!tarefa) return null
 
-  const getCategoriaBadge = (categoria: string) => {
+  const getCategoriaBadge = (categoria: string, priority: string = 'baixa') => {
+    const isPriority = priority.toLowerCase() === 'urgente' || priority.toLowerCase() === 'alta'
+    const pulseClass = isPriority ? "animate-pulse" : ""
+
     switch (categoria) {
-      case 'imagem': return <Badge className="bg-blue-500">Busca de Imagem / CFTV</Badge>
-      case 'os': return <Badge className="bg-amber-500">Ordem de Serviço (OS)</Badge>
-      case 'autorizacao_chaves': return <Badge className="bg-emerald-600">Autorização de Chaves</Badge>
-      case 'achados_perdidos': return <Badge className="bg-purple-500">Achados & Perdidos</Badge>
-      case 'eventos': return <Badge className="bg-rose-500">Evento</Badge>
-      case 'uniforme': return <Badge className="bg-teal-600">Uniforme</Badge>
-      default: return <Badge variant="secondary">Ocorrência Padrão</Badge>
+      case 'imagem': return <Badge className={`bg-rose-600 ${pulseClass}`}>Imagem</Badge>
+      case 'os': return <Badge className={`bg-amber-500 ${pulseClass}`}>OS</Badge>
+      case 'autorizacao_chaves': return <Badge className={`bg-emerald-600 ${pulseClass}`}>Chaves</Badge>
+      case 'achados_perdidos': return <Badge className={`bg-purple-500 ${pulseClass}`}>Achados & Perdidos</Badge>
+      case 'eventos': return <Badge className={`bg-orange-600 ${pulseClass}`}>Evento</Badge>
+      case 'uniforme': return <Badge className={`bg-teal-600 ${pulseClass}`}>Uniforme</Badge>
+      case 'servico_noturno': return <Badge className={`bg-indigo-900 ${pulseClass}`}>S. Noturno</Badge>
+      case 'manutencao_cftv': return <Badge className={`bg-cyan-600 ${pulseClass}`}>Maint. CFTV</Badge>
+      case 'ronda_dvr': return <Badge className={`bg-stone-700 ${pulseClass}`}>Ronda DVR</Badge>
+      case 'checklist_central': return <Badge className={`bg-blue-600 ${pulseClass}`}>Checklist</Badge>
+      default: return <Badge variant="secondary" className={`bg-slate-500 text-white ${pulseClass}`}>Ocorrência</Badge>
     }
   }
 
@@ -74,6 +81,16 @@ export function KanbanDetailsModal({
       case 'revisao': return <Badge variant="outline" className="text-purple-500 border-purple-500">Revisão</Badge>
       case 'finalizado': return <Badge variant="outline" className="text-emerald-500 bg-emerald-50">Finalizado</Badge>
       default: return <Badge variant="outline">{status}</Badge>
+    }
+  }
+
+  const getPriorityBadge = (priority: string = 'baixa') => {
+    const p = priority.toLowerCase()
+    switch (p) {
+      case 'urgente': return <Badge variant="outline" className="bg-red-600 text-white border-none text-[10px] h-5 px-1.5 animate-pulse uppercase">Urgente</Badge>
+      case 'alta': return <Badge variant="outline" className="bg-orange-500 text-white border-none text-[10px] h-5 px-1.5 uppercase">Alta</Badge>
+      case 'media': return <Badge variant="outline" className="bg-yellow-400 text-slate-800 border-none text-[10px] h-5 px-1.5 uppercase">Média</Badge>
+      default: return <Badge variant="outline" className="bg-slate-200 text-slate-600 border-none text-[10px] h-5 px-1.5 uppercase">Baixa</Badge>
     }
   }
 
@@ -99,8 +116,9 @@ export function KanbanDetailsModal({
             <div className="space-y-1">
               <DialogTitle className="text-2xl leading-tight">{tarefa.titulo}</DialogTitle>
               <div className="flex flex-wrap items-center gap-2 mt-2">
-                {getCategoriaBadge(tarefa.categoria)}
+                {getCategoriaBadge(tarefa.categoria, tarefa.dados_especificos?.prioridade)}
                 {getStatusBadge(tarefa.status)}
+                {getPriorityBadge(tarefa.dados_especificos?.prioridade)}
               </div>
             </div>
             {onDelete && (

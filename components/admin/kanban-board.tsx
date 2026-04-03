@@ -24,7 +24,7 @@ import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 
 export type TarefaStatus = 'entrada' | 'andamento' | 'aguardando' | 'revisao' | 'finalizado'
-export type TarefaCategoria = 'imagem' | 'os' | 'ocorrencia' | 'autorizacao_chaves' | 'achados_perdidos' | 'eventos' | 'uniforme' | 'servico_noturno'
+export type TarefaCategoria = 'imagem' | 'os' | 'ocorrencia' | 'autorizacao_chaves' | 'achados_perdidos' | 'eventos' | 'uniforme' | 'servico_noturno' | 'manutencao_cftv' | 'ronda_dvr' | 'checklist_central'
 
 export interface KanbanTarefa {
   id: string
@@ -96,16 +96,22 @@ export function KanbanBoard({ title = "Gestão de Tarefas", subtitle = "Acompanh
     { id: 'finalizado', title: 'Finalizado' },
   ]
 
-  const getCategoriaBadge = (categoria: string) => {
+  const getCategoriaBadge = (categoria: string, priority: string = 'baixa') => {
+    const isPriority = priority.toLowerCase() === 'urgente' || priority.toLowerCase() === 'alta'
+    const pulseClass = isPriority ? "animate-pulse" : ""
+
     switch (categoria) {
-      case 'imagem': return <Badge variant="default" className="bg-blue-500">Imagem</Badge>
-      case 'os': return <Badge variant="default" className="bg-amber-500">OS</Badge>
-      case 'autorizacao_chaves': return <Badge variant="default" className="bg-emerald-600">Chaves</Badge>
-      case 'achados_perdidos': return <Badge variant="default" className="bg-purple-500">Achados & Perdidos</Badge>
-      case 'eventos': return <Badge variant="default" className="bg-rose-500">Eventos</Badge>
-      case 'uniforme': return <Badge variant="default" className="bg-teal-600">Uniforme</Badge>
-      case 'servico_noturno': return <Badge variant="default" className="bg-indigo-900">Serviço Noturno</Badge>
-      default: return <Badge variant="secondary">Ocorrência</Badge>
+      case 'imagem': return <Badge variant="default" className={`bg-rose-600 ${pulseClass}`}>Imagem</Badge>
+      case 'os': return <Badge variant="default" className={`bg-amber-500 ${pulseClass}`}>OS</Badge>
+      case 'autorizacao_chaves': return <Badge variant="default" className={`bg-emerald-600 ${pulseClass}`}>Chaves</Badge>
+      case 'achados_perdidos': return <Badge variant="default" className={`bg-purple-500 ${pulseClass}`}>Achados & Perdidos</Badge>
+      case 'eventos': return <Badge variant="default" className={`bg-orange-600 ${pulseClass}`}>Eventos</Badge>
+      case 'uniforme': return <Badge variant="default" className={`bg-teal-600 ${pulseClass}`}>Uniforme</Badge>
+      case 'servico_noturno': return <Badge variant="default" className={`bg-indigo-900 ${pulseClass}`}>S. Noturno</Badge>
+      case 'manutencao_cftv': return <Badge variant="default" className={`bg-cyan-600 ${pulseClass}`}>Maint. CFTV</Badge>
+      case 'ronda_dvr': return <Badge variant="default" className={`bg-stone-700 ${pulseClass}`}>Ronda DVR</Badge>
+      case 'checklist_central': return <Badge variant="default" className={`bg-blue-600 ${pulseClass}`}>Checklist</Badge>
+      default: return <Badge variant="secondary" className={`bg-slate-500 text-white ${pulseClass}`}>Ocorrência</Badge>
     }
   }
 
@@ -225,6 +231,42 @@ export function KanbanBoard({ title = "Gestão de Tarefas", subtitle = "Acompanh
       data_desfecho: new Date().toISOString()
     })
     setTarefaSelecionadaParaDesfecho(null)
+  }
+  
+  const handlePriorityCycle = async (e: React.MouseEvent, tarefa: KanbanTarefa) => {
+    e.stopPropagation()
+    const priorities: (string)[] = ['baixa', 'media', 'alta', 'urgente']
+    const current = (tarefa.dados_especificos?.prioridade || 'baixa').toLowerCase()
+    const currentIndex = priorities.indexOf(current)
+    const nextIndex = (currentIndex + 1) % priorities.length
+    const nextPriority = priorities[nextIndex]
+
+    try {
+      const { error } = await supabase
+        .from('kanban_tarefas')
+        .update({ 
+          dados_especificos: { ...tarefa.dados_especificos, prioridade: nextPriority },
+          updated_by_name: usuario?.nome || 'Sistema',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', tarefa.id)
+
+      if (error) throw error
+      toast.success(`Prioridade alterada para ${nextPriority}`)
+      fetchTarefas()
+    } catch (e: any) {
+      toast.error("Erro ao mudar prioridade: " + e.message)
+    }
+  }
+
+  const getPriorityBadge = (priority: string = 'baixa') => {
+    const p = priority.toLowerCase()
+    switch (p) {
+      case 'urgente': return <Badge variant="outline" className="bg-red-600 text-white border-none text-[10px] h-5 px-1.5 animate-pulse uppercase">Urgente</Badge>
+      case 'alta': return <Badge variant="outline" className="bg-orange-500 text-white border-none text-[10px] h-5 px-1.5 uppercase">Alta</Badge>
+      case 'media': return <Badge variant="outline" className="bg-yellow-400 text-slate-800 border-none text-[10px] h-5 px-1.5 uppercase">Média</Badge>
+      default: return <Badge variant="outline" className="bg-slate-200 text-slate-600 border-none text-[10px] h-5 px-1.5 uppercase">Baixa</Badge>
+    }
   }
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, tarefa: KanbanTarefa) => {
@@ -367,8 +409,15 @@ export function KanbanBoard({ title = "Gestão de Tarefas", subtitle = "Acompanh
                     >
                       <div className="flex justify-between items-start">
                         <div className="flex items-center flex-wrap gap-y-1">
-                          {getCategoriaBadge(tarefa.categoria)}
+                          {getCategoriaBadge(tarefa.categoria, tarefa.dados_especificos?.prioridade)}
                           {getSubcategoriaBadge(tarefa)}
+                          <div 
+                            onClick={(e) => handlePriorityCycle(e, tarefa)}
+                            className="cursor-pointer hover:scale-110 transition-transform flex items-center ml-1"
+                            title="Clique para alternar prioridade"
+                          >
+                            {getPriorityBadge(tarefa.dados_especificos?.prioridade)}
+                          </div>
                         </div>
                         <div className="flex items-center">
                           <select 
@@ -415,12 +464,8 @@ export function KanbanBoard({ title = "Gestão de Tarefas", subtitle = "Acompanh
                       
                       {tarefa.categoria === 'os' && (
                         <div className="text-xs text-muted-foreground mt-1 flex gap-2">
-                          {tarefa.dados_especificos?.prioridade && (
-                             <span className="capitalize text-destructive font-medium border border-destructive/30 px-1 rounded-sm">
-                               {tarefa.dados_especificos.prioridade}
-                             </span>
-                          )}
                           {tarefa.dados_especificos?.local_bloco && <span>{tarefa.dados_especificos.local_bloco}</span>}
+                          {tarefa.dados_especificos?.patrimonio && <span> | {tarefa.dados_especificos.patrimonio}</span>}
                         </div>
                       )}
 

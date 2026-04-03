@@ -7,6 +7,11 @@ const ID_CONTROL_PASS = "123456789";
 
 async function request(options, body) {
     return new Promise((resolve, reject) => {
+        const payload = body ? JSON.stringify(body) : null;
+        if (payload && options.headers) {
+            options.headers['Content-Length'] = Buffer.byteLength(payload);
+        }
+
         const req = https.request(options, res => {
             let data = '';
             res.on('data', chunk => data += chunk);
@@ -19,7 +24,7 @@ async function request(options, body) {
             });
         });
         req.on('error', reject);
-        if (body) req.write(JSON.stringify(body));
+        if (payload) req.write(payload);
         req.end();
     });
 }
@@ -33,39 +38,39 @@ async function run() {
 
     const cleanToken = (login.data?.accessToken || login.data?.token).replace(/[\r\n]/g, '').trim();
 
-    // The most basic GET request to fetch users by name
+    // 2. Busca pelo Nome usando o método oficial (POST /api/user/list)
     const nameToSearch = "Igor Rodrigo de Oliveira";
-    const url = `/api/users?name=${encodeURIComponent(nameToSearch)}`;
+    const searchPayload = {
+        search: { value: nameToSearch, regex: false },
+        filterCol: "name",
+        length: 10,
+        start: 0
+    };
 
+    console.log(`🔍 Buscando por: "${nameToSearch}"...`);
     const res = await request({
-        hostname: '192.168.100.20', port: 30443, path: url, method: 'GET',
-        headers: { 'Authorization': `Bearer ${cleanToken}` },
+        hostname: '192.168.100.20', port: 30443, path: '/api/user/list', method: 'POST',
+        headers: { 
+            'Authorization': `Bearer ${cleanToken}`,
+            'Content-Type': 'application/json'
+        },
         rejectUnauthorized: false
-    }, null); 
+    }, searchPayload); 
 
     if (res.status === 200 && res.data) {
-        let users = Array.isArray(res.data) ? res.data : (res.data.content || (res.data.id ? [res.data] : []));
+        let users = res.data.data || res.data.content || (Array.isArray(res.data) ? res.data : []);
         if (users.length > 0) {
             const igor = users[0];
-            console.log(`\nLocalizado: ${igor.name}`);
-            console.log(`- Data Inicial (shelfStartLife): ${igor.shelfStartLife || 'Não preenchida'}`);
-            console.log(`- Data Final (shelfLife): ${igor.shelfLife || 'Não preenchida'}`);
-            
-            // Get detailed observations
-            const uRes = await request({
-                hostname: '192.168.100.20', port: 30443, path: `/api/user/${igor.id}`, method: 'GET',
-                headers: { 'Authorization': `Bearer ${cleanToken}` }, rejectUnauthorized: false
-            });
-            if (uRes.status === 200 && uRes.data) {
-                console.log(`- Observações (comments): ${uRes.data.comments || 'Vazio'}`);
-            } else {
-                console.log(`- Não foi possivel carregar as observacoes. Status: ${uRes.status}`);
-            }
+            console.log(`\n✅ Localizado: ${igor.name} (ID: ${igor.id || igor.idUser})`);
+            console.log(`   - Data Inicial: ${igor.shelfStartLife || '---'}`);
+            console.log(`   - Data Final: ${igor.shelfLife || '---'}`);
+            console.log(`   - Empresa: ${igor.companyName || '---'}`);
+            console.log(`   - Observações: ${igor.comments || 'Vazio'}`);
         } else {
-             console.log("Igor não encontrado. A API retornou lista vazia.");
+             console.log("❌ Igor não encontrado no portal ID CONTROL.");
         }
     } else {
-        console.log("Falha na busca:", res.status);
+        console.log("❌ Falha na busca. Status:", res.status);
     }
 }
 

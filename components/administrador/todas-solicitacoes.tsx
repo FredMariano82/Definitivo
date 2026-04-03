@@ -62,6 +62,7 @@ const COLUNAS_DISPONIVEIS = [
   { key: "empresa", label: "Empresa" },
   { key: "evento", label: "Evento" },
   { key: "checagem", label: "Checagem" },
+  { key: "liberacao", label: "Liberação" },
   { key: "validaAte", label: "Válida até" },
   { key: "dataInicial", label: "Data Inicial" },
   { key: "dataFinal", label: "Data Final" },
@@ -965,6 +966,14 @@ export default function TodasSolicitacoes() {
                             <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                               <StatusChecagemIcon status={getChecagemStatus(prestador) as any} />
                               <StatusChecagemBadge status={getChecagemStatus(prestador) as any} />
+                            </div>
+                          </td>
+                        )}
+                        {colunasVisiveis.liberacao && (
+                          <td className="p-4 align-middle text-center">
+                            <div className="flex items-center justify-center gap-2 whitespace-nowrap">
+                              <StatusLiberacaoIcon status={getLiberacaoStatus(prestador, solicitacao.dataFinal) as any} />
+                              <StatusLiberacaoBadge status={getLiberacaoStatus(prestador, solicitacao.dataFinal) as any} />
                             </div>
                           </td>
                         )}

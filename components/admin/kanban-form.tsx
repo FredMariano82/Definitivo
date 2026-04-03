@@ -33,7 +33,7 @@ const kanbanSchema = z.object({
   titulo: z.string().min(3, "O título deve ter no mínimo 3 caracteres."),
   descricao: z.string().optional(),
   foto_url: z.string().optional(),
-  categoria: z.enum(["imagem", "os", "ocorrencia", "autorizacao_chaves", "achados_perdidos", "eventos", "uniforme", "servico_noturno"], {
+  categoria: z.enum(["imagem", "os", "ocorrencia", "autorizacao_chaves", "achados_perdidos", "eventos", "uniforme", "servico_noturno", "manutencao_cftv", "ronda_dvr", "checklist_central"], {
     required_error: "Selecione uma categoria.",
   }),
   // Campos dinâmicos (Imagem)
@@ -120,7 +120,7 @@ export function KanbanForm({ onSuccess, defaultValues }: KanbanFormProps) {
       // Separando campos padrão dos dados específicos
       const { titulo, descricao, categoria, foto_url, ...rest } = data;
       
-      let dados_especificos = {};
+      let dados_especificos: any = {};
       
       if (categoria === 'imagem') {
         dados_especificos = {
@@ -131,8 +131,7 @@ export function KanbanForm({ onSuccess, defaultValues }: KanbanFormProps) {
       } else if (categoria === 'os') {
         dados_especificos = {
           local_bloco: rest.local_bloco,
-          patrimonio: rest.patrimonio,
-          prioridade: rest.prioridade
+          patrimonio: rest.patrimonio
         };
       } else if (categoria === 'autorizacao_chaves') {
         dados_especificos = {
@@ -166,6 +165,9 @@ export function KanbanForm({ onSuccess, defaultValues }: KanbanFormProps) {
           } : {})
         };
       }
+      
+      // Sempre incluir prioridade se houver (Universal)
+      dados_especificos.prioridade = rest.prioridade || 'baixa';
       
       const { error } = await supabase
         .from('kanban_tarefas')
@@ -253,11 +255,37 @@ export function KanbanForm({ onSuccess, defaultValues }: KanbanFormProps) {
                     <SelectItem value="eventos">Eventos</SelectItem>
                     <SelectItem value="uniforme">Uniforme</SelectItem>
                     <SelectItem value="servico_noturno">Serviço Noturno</SelectItem>
+                    <SelectItem value="manutencao_cftv">Manutenção CFTV</SelectItem>
+                    <SelectItem value="ronda_dvr">Ronda dos DVR's</SelectItem>
+                    <SelectItem value="checklist_central">Checklist Central</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormDescription>
                   Define os campos específicos que serão solicitados.
                 </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="prioridade"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Prioridade</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value || 'baixa'}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="baixa">Baixa</SelectItem>
+                    <SelectItem value="media">Média</SelectItem>
+                    <SelectItem value="alta">Alta</SelectItem>
+                    <SelectItem value="urgente">Urgente</SelectItem>
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
@@ -329,29 +357,6 @@ export function KanbanForm({ onSuccess, defaultValues }: KanbanFormProps) {
                     <FormControl>
                       <Input placeholder="Ex: Bloco B, Térreo" {...field} />
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="prioridade"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Prioridade</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione..." />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="baixa">Baixa</SelectItem>
-                        <SelectItem value="media">Média</SelectItem>
-                        <SelectItem value="alta">Alta</SelectItem>
-                        <SelectItem value="urgente">Urgente</SelectItem>
-                      </SelectContent>
-                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -6,10 +6,19 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "../contexts/auth-context"
-import { CheckCircle, FileText, Users, BarChart3, HeadphonesIcon, Crown, DollarSign, Crosshair, ChevronLeft, ChevronRight, Key } from "lucide-react"
+import { CheckCircle, FileText, Users, BarChart3, HeadphonesIcon, Crown, DollarSign, Crosshair, ChevronLeft, ChevronRight, Key, Monitor, ClipboardCheck, Video, ChevronDown } from "lucide-react"
 import { getSolicitacoesByDepartamento } from "../services/solicitacoes-service"
 import { getLiberacaoStatus } from "./ui/status-badges"
 import { converterDataBrParaDate, getCurrentDate } from "../utils/date-helpers"
+
+interface MenuItem {
+  href?: string;
+  label: string;
+  icon: any;
+  className?: string;
+  hasAlert?: boolean;
+  subItems?: { href: string; label: string; icon: any }[];
+}
 
 interface NavigationProps {
   isCollapsed?: boolean;
@@ -21,6 +30,14 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
   const { usuario } = useAuth()
   const pathname = usePathname()
   const [alertaLiberacoes, setAlertaLiberacoes] = useState(false)
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({})
+
+  const toggleMenu = (label: string) => {
+    setExpandedMenus(prev => ({
+      ...prev,
+      [label]: !prev[label]
+    }))
+  }
 
   // Função para verificar prestadores com data final próxima do vencimento
   const verificarLiberacoesUrgentes = async () => {
@@ -109,7 +126,7 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
   if (!usuario) return null
 
   // Mapeamento de Rotas por Perfil
-  const getMenuButtons = () => {
+  const getMenuButtons = (): MenuItem[] => {
     switch (usuario.perfil) {
       case "solicitante":
         return [
@@ -248,6 +265,15 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
             className: getButtonClass("/admin/todas-solicitacoes"),
           },
           {
+            label: "Monitoramento CFTV",
+            icon: Monitor,
+            subItems: [
+              { href: "/op/cftv/manutencao", label: "CFTV Manutenções", icon: Video },
+              { href: "/op/cftv/ronda-dvr", label: "Ronda dos DVR's", icon: ClipboardCheck },
+              { href: "/op/cftv/checklist", label: "Checklist Central", icon: CheckCircle },
+            ]
+          },
+          {
             href: "/op/painel",
             label: "Gestão Operacional",
             icon: Users,
@@ -270,6 +296,43 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
             label: "Financeiro",
             icon: DollarSign,
             className: getButtonClass("/admin/financeiro"),
+          },
+        ]
+
+      case "operador":
+        return [
+          {
+            href: "/admin/kanban",
+            label: "Tarefas",
+            icon: BarChart3,
+            className: getButtonClass("/admin/kanban"),
+          },
+          {
+            href: "/admin/todas-solicitacoes",
+            label: "Todas as Solicitações",
+            icon: FileText,
+            className: getButtonClass("/admin/todas-solicitacoes"),
+          },
+          {
+            label: "Monitoramento CFTV",
+            icon: Monitor,
+            subItems: [
+              { href: "/op/cftv/manutencao", label: "CFTV Manutenções", icon: Video },
+              { href: "/op/cftv/ronda-dvr", label: "Ronda dos DVR's", icon: ClipboardCheck },
+              { href: "/op/cftv/checklist", label: "Checklist Central", icon: CheckCircle },
+            ]
+          },
+          {
+            href: "/op/tatico",
+            label: "Painél Tático",
+            icon: Crosshair,
+            className: getButtonClass("/op/tatico"),
+          },
+          {
+            href: "/admin/controle-chaves",
+            label: "Controle de Chaves",
+            icon: Key,
+            className: getButtonClass("/admin/controle-chaves"),
           },
         ]
 
@@ -331,10 +394,61 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
 
         {menuButtons.map((button) => {
           const IconComponent = button.icon
-          const isActive = pathname === button.href || pathname?.startsWith(button.href + "/")
+          const isActive = button.href ? (pathname === button.href || pathname?.startsWith(button.href + "/")) : false
+          const isExpanded = expandedMenus[button.label]
+
+          if (button.subItems) {
+            return (
+              <div key={button.label} className="space-y-1">
+                <Button
+                  className={`
+                    w-full ${isCollapsed ? 'justify-center' : 'justify-start'} rounded-xl px-4 py-6 transition-soft mb-1
+                    bg-transparent text-slate-300 hover:bg-white/5 hover:text-white border-transparent
+                  `}
+                  variant="ghost"
+                  onClick={() => toggleMenu(button.label)}
+                >
+                  <span className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 w-full'}`}>
+                    <IconComponent className={`h-5 w-5 ${isActive ? "text-white" : "text-slate-400 group-hover:text-blue-400"} ${isCollapsed ? 'h-6 w-6' : ''}`} />
+                    {!isCollapsed && (
+                      <>
+                        <span className="font-medium tracking-wide flex-1 text-left">{button.label}</span>
+                        <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                      </>
+                    )}
+                  </span>
+                </Button>
+                
+                {isExpanded && !isCollapsed && (
+                  <div className="pl-6 space-y-1">
+                    {button.subItems.map((subItem) => {
+                      const SubIcon = subItem.icon
+                      const isSubActive = pathname === subItem.href
+                      return (
+                        <Link key={subItem.href} href={subItem.href!} className="block group">
+                          <Button
+                            className={`
+                              w-full justify-start rounded-lg px-3 py-4 transition-soft mb-1 h-8
+                              ${isSubActive ? "bg-blue-600/20 text-blue-400" : "bg-transparent text-slate-400 hover:bg-white/5 hover:text-white"}
+                            `}
+                            variant="ghost"
+                          >
+                            <span className="flex items-center gap-2">
+                              <SubIcon className="h-4 w-4" />
+                              <span className="text-sm">{subItem.label}</span>
+                            </span>
+                          </Button>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          }
 
           return (
-            <Link key={button.href} href={button.href} className="block group">
+            <Link key={button.href} href={button.href!} className="block group">
               <Button
                 className={`
                   w-full ${isCollapsed ? 'justify-center' : 'justify-start'} rounded-xl px-4 py-6 transition-soft mb-1

@@ -4,7 +4,7 @@ export interface Usuario {
   email: string
   departamento: string
   departamento_id?: number // PRODUÇÃO REAL: ID departamento para relação interna
-  perfil: "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte" | "superadmin"
+  perfil: "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte" | "superadmin" | "operador"
 }
 
 export type StatusChecagem = "pendente" | "aprovada" | "reprovada" | "vencida" | "excecao" | "erro_rg" | "aprovado" | "reprovado" | "revisar" | "base"
