@@ -46,6 +46,21 @@ const STATUS_OPCOES = [
     { value: 'FORA_FOCO', label: 'Fora de Foco (Cinza)', color: 'bg-zinc-500 shadow-zinc-500/50', icon: Activity },
 ]
 
+// Backup dos Nomes Principais (Lista Angelina)
+const LISTA_DVRS_PRINCIPAIS = [
+    'After 1', 'After 2', 'Angelina 1', 'Angelina 2', 'Almoxarifado', 
+    'Audio & Luz', 'Bar da Piscina', 'Bar Do Tênis', 'Beach Tênis', 
+    'Berçario Angelina', 'Bico', 'Casa', 'Central', 'C.J 1', 'C.J 2', 
+    'Centro de Lutas', 'Centro de música', 'Centro Civico 1 Sala Chefia Externa', 
+    'Centro Civico 2 Sala Chefia Internas', 'Centro Civico 3 Entrada Alceu', 
+    'Chapeira', 'Diversos', 'Espaço Hebra', 'Fit Center 1', 'Fit Center 2', 
+    'Fisioterapia', 'Fresto', 'Ginastica Artistica', 'Hungria 1', 'Hungria 2', 
+    'Locker Piscina', 'Maternal 1 Rack Sala 07', 'Maternal 2 Rack Sala 07', 
+    'Maternal 3 Sala 05', 'Merkas', 'Mitzpe', 'Patrimonio', 'Passarela Tênis', 
+    'Piscina', 'Poli Esportivo', 'Presidencia', 'Presidente', 'Refeitorio', 
+    'Tênis', 'Tesouraria / Agenda', 'T.I'
+]
+
 export default function RondaDVRPage() {
     const router = useRouter()
     const [dvrs, setDvrs] = useState<any[]>([])
@@ -60,8 +75,19 @@ export default function RondaDVRPage() {
         const loadInitialData = async () => {
             setLoading(true)
             try {
-                // 1. Carregar lista de DVRs reais
-                const listaDvrs = await CftvService.getDVRs()
+                // 1. Carregar lista de DVRs reais do banco
+                let listaDvrs = await CftvService.getDVRs()
+                
+                // FALLBACK: Se o banco estiver vazio ou falhar, usar a frota "Angelina"
+                if (!listaDvrs || listaDvrs.length === 0) {
+                    console.warn("⚠️ Banco de DVRs vazio. Acionando Frota Angelina (Fallback)...")
+                    listaDvrs = LISTA_DVRS_PRINCIPAIS.map((nome, i) => ({
+                        id: `id-fixo-${i+1}`, 
+                        nome,
+                        canais: 16
+                    }))
+                }
+                
                 setDvrs(listaDvrs)
                 if (listaDvrs.length > 0) {
                     setDvrAtivoId(listaDvrs[0].id)
@@ -72,13 +98,17 @@ export default function RondaDVRPage() {
                 if (ultima && ultima.dados_ronda) {
                     setMatriz(ultima.dados_ronda as { [key: string]: string })
                     setDataUltimaRonda(ultima.data_ronda || null)
-                } else {
-                    // Inicializar se vazio (opcional, matriz é dinâmica)
-                    setMatriz({})
                 }
             } catch (error) {
                 console.error("Erro ao carregar dados iniciais:", error)
-                toast.error("Erro ao sincronizar com o banco de DVRs.")
+                // Usar fallback mesmo em erro crítico
+                const fallback = LISTA_DVRS_PRINCIPAIS.map((nome, i) => ({
+                    id: `id-err-${i+1}`, 
+                    nome,
+                    canais: 16
+                }))
+                setDvrs(fallback)
+                setDvrAtivoId(fallback[0].id)
             } finally {
                 setLoading(false)
             }
