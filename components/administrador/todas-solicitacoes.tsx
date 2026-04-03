@@ -109,6 +109,7 @@ export default function TodasSolicitacoes() {
   const [novaDataSolicitacao, setNovaDataSolicitacao] = useState("")
   const [novaHoraSolicitacao, setNovaHoraSolicitacao] = useState("")
   const [salvandoEdicao, setSalvandoEdicao] = useState(false)
+  const [processandoId, setProcessandoId] = useState<string | null>(null)
 
   // Estado inicial das colunas: todas visíveis por padrão (Sempre reseta ao carregar)
   const [colunasVisiveis, setColunasVisiveis] = useState<Record<string, boolean>>(() => {
@@ -214,7 +215,17 @@ export default function TodasSolicitacoes() {
 
   // 🆕 FUNÇÃO PARA VERIFICAR SE BOTÕES DEVEM ESTAR HABILITADOS
   const isBotoesHabilitados = (prestador: PrestadorAvaliacao): boolean => {
-    return prestador.checagem.toLowerCase() !== "pendente"
+    // 1. Checagem deve estar concluída
+    if (prestador.checagem.toLowerCase() === "pendente") return false
+
+    // 2. Não deve estar processando no momento
+    if (processandoId === prestador.id) return false
+
+    // 3. Não deve ter um status conclusivo de liberação (Já processado)
+    const statusAtual = prestador.liberacao?.toLowerCase()
+    if (statusAtual === "ok" || statusAtual === "negada") return false
+
+    return true
   }
 
   const getStatusIcon = (status: string) => {
@@ -436,6 +447,7 @@ export default function TodasSolicitacoes() {
 
     try {
       setCarregandoNegacao(true)
+      setProcessandoId(prestadorSelecionado.prestador.id)
       console.log("🔴 PRODUÇÃO REAL: Negando prestador com observações...")
 
       const { error } = await supabase
@@ -487,11 +499,13 @@ export default function TodasSolicitacoes() {
       alert(`Erro inesperado: ${error.message}`)
     } finally {
       setCarregandoNegacao(false)
+      setProcessandoId(null)
     }
   }
 
   const handleConfirmarCadastro = async (solicitacao: Solicitacao, prestador: PrestadorAvaliacao) => {
     try {
+      setProcessandoId(prestador.id)
       console.log("🔧 PRODUÇÃO REAL: INICIANDO DEBUG...")
       console.log("📋 Dados recebidos:", {
         solicitacao: solicitacao.numero,
@@ -569,6 +583,8 @@ export default function TodasSolicitacoes() {
     } catch (error: any) {
       console.error("💥 PRODUÇÃO REAL: Erro na função:", error)
       alert(`Erro inesperado: ${error.message}`)
+    } finally {
+      setProcessandoId(null)
     }
   }
 
@@ -664,7 +680,7 @@ export default function TodasSolicitacoes() {
 
       const wb = XLSX.utils.book_new()
       const ws = XLSX.utils.json_to_sheet(dadosParaExportar)
-      
+
       const wscols = [{ wch: 15 }, { wch: 12 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 25 }, { wch: 30 }, { wch: 18 }, { wch: 18 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 30 }, { wch: 30 }]
       ws["!cols"] = wscols
 
@@ -755,7 +771,7 @@ export default function TodasSolicitacoes() {
                           Nova Solicitação
                         </Button>
                       </Link>
-                      
+
                       <div className="h-6 w-[1px] bg-slate-300 mx-2"></div>
                       <Button
                         onClick={() => setMostrarFiltros(!mostrarFiltros)}
@@ -983,8 +999,23 @@ export default function TodasSolicitacoes() {
                         {colunasVisiveis.acoes && (
                           <td className="p-4 align-middle relative">
                             <div className="flex items-center justify-center gap-2">
-                              <Button onClick={() => handleConfirmarCadastro(solicitacao, prestador)} size="sm" disabled={!isBotoesHabilitados(prestador)} className="h-7 w-7 p-0 bg-green-600 hover:bg-green-700 text-white"><CheckCircle className="h-4 w-4" /></Button>
-                              <Button onClick={() => handleNegarClick(solicitacao, prestador)} variant="outline" size="sm" disabled={!isBotoesHabilitados(prestador)} className="h-7 w-7 p-0 border-red-600 text-red-600 hover:bg-red-50"><XCircle className="h-4 w-4" /></Button>
+                              <Button
+                                onClick={() => handleConfirmarCadastro(solicitacao, prestador)}
+                                size="sm"
+                                disabled={!isBotoesHabilitados(prestador)}
+                                className={`h-8 w-8 p-0 ${prestador.liberacao === 'ok' ? 'bg-slate-100 text-emerald-600 border-emerald-200' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+                              >
+                                {processandoId === prestador.id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                              </Button>
+                              <Button
+                                onClick={() => handleNegarClick(solicitacao, prestador)}
+                                variant="outline"
+                                size="sm"
+                                disabled={!isBotoesHabilitados(prestador)}
+                                className={`h-8 w-8 p-0 ${prestador.liberacao === 'negada' ? 'bg-rose-50 text-rose-600 border-rose-200' : 'border-red-600 text-red-600 hover:bg-red-50'}`}
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </Button>
                             </div>
                           </td>
                         )}
