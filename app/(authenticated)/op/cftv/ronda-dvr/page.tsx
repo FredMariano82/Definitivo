@@ -21,8 +21,14 @@ import {
     Clock,
     History,
     FileText,
-    ArrowRight
+    ArrowRight,
+    Palette
 } from "lucide-react"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { CftvService, RondaDVR } from '@/services/cftv-service'
@@ -42,43 +48,46 @@ const STATUS_OPCOES = [
 
 export default function RondaDVRPage() {
     const router = useRouter()
-    const [dvrAtivo, setDvrAtivo] = useState(1)
+    const [dvrs, setDvrs] = useState<any[]>([])
+    const [dvrAtivoId, setDvrAtivoId] = useState<string | null>(null)
     const [matriz, setMatriz] = useState<{ [key: string]: string }>({})
-    const [loading, setLoading] = useState(false)
+    const [loading, setLoading] = useState(true)
     const [isSaving, setIsSaving] = useState(false)
     const [dataUltimaRonda, setDataUltimaRonda] = useState<string | null>(null)
 
-    // Carregar última ronda ao iniciar
+    // Carregar DVRs e última ronda ao iniciar
     useEffect(() => {
-        const fetchUltimaRonda = async () => {
+        const loadInitialData = async () => {
             setLoading(true)
             try {
+                // 1. Carregar lista de DVRs reais
+                const listaDvrs = await CftvService.getDVRs()
+                setDvrs(listaDvrs)
+                if (listaDvrs.length > 0) {
+                    setDvrAtivoId(listaDvrs[0].id)
+                }
+
+                // 2. Carregar última ronda
                 const ultima = await CftvService.getUltimaRonda()
                 if (ultima && ultima.dados_ronda) {
                     setMatriz(ultima.dados_ronda as { [key: string]: string })
                     setDataUltimaRonda(ultima.data_ronda || null)
-                    toast.info("Último estado da ronda carregado da base de dados.")
                 } else {
-                    // Inicializar tudo como OK se não houver registros
-                    const novaMatriz: { [key: string]: string } = {}
-                    for (let d = 1; d <= TOTAL_DVRS; d++) {
-                        for (let c = 1; c <= CAMERAS_POR_DVR; c++) {
-                            novaMatriz[`${d}-${c}`] = 'OK'
-                        }
-                    }
-                    setMatriz(novaMatriz)
+                    // Inicializar se vazio (opcional, matriz é dinâmica)
+                    setMatriz({})
                 }
             } catch (error) {
-                console.error("Erro ao carregar última ronda:", error)
+                console.error("Erro ao carregar dados iniciais:", error)
+                toast.error("Erro ao sincronizar com o banco de DVRs.")
             } finally {
                 setLoading(false)
             }
         }
-        fetchUltimaRonda()
+        loadInitialData()
     }, [])
 
-    const toggleStatus = (dvr: number, camera: number) => {
-        const key = `${dvr}-${camera}`
+    const toggleStatus = (dvrId: string, camera: number) => {
+        const key = `${dvrId}-${camera}`
         const statusAtual = matriz[key] || 'OK'
         const currentIndex = STATUS_OPCOES.findIndex(op => op.value === statusAtual)
         const nextIndex = (currentIndex + 1) % STATUS_OPCOES.length
@@ -89,13 +98,23 @@ export default function RondaDVRPage() {
         }))
     }
 
+    const setStatusManual = (dvrId: string, camera: number, status: string) => {
+        const key = `${dvrId}-${camera}`
+        setMatriz(prev => ({
+            ...prev,
+            [key]: status
+        }))
+    }
+
     const setStatusLote = (status: string) => {
+        if (!dvrAtivoId) return
         const novaMatriz = { ...matriz }
         for (let c = 1; c <= CAMERAS_POR_DVR; c++) {
-            novaMatriz[`${dvrAtivo}-${c}`] = status
+            novaMatriz[`${dvrAtivoId}-${c}`] = status
         }
         setMatriz(novaMatriz)
-        toast.success(`DVR ${dvrAtivo}: Todas as câmeras marcadas como ${status}`)
+        const dvrNome = dvrs.find(d => d.id === dvrAtivoId)?.nome || "DVR"
+        toast.success(`${dvrNome}: Todas as câmeras marcadas como ${status}`)
     }
 
     // Métricas
@@ -234,25 +253,24 @@ export default function RondaDVRPage() {
                         <ArrowRight className="h-4 w-4 text-blue-600" />
                         Unidade de Gravação
                     </h3>
-                    <div className="grid grid-cols-2 gap-2">
-                        {Array.from({ length: TOTAL_DVRS }).map((_, i) => {
-                            const dvrNum = i + 1
-                            const camerasDvr = Object.keys(matriz).filter(key => key.startsWith(`${dvrNum}-`))
+                    <div className="grid grid-cols-1 gap-2 max-h-[500px] overflow-y-auto pr-2 scrollbar-thin">
+                        {dvrs.map((dvr) => {
+                            const camerasDvr = Object.keys(matriz).filter(key => key.startsWith(`${dvr.id}-`))
                             const camerasComProblema = camerasDvr.filter(key => matriz[key] !== 'OK' && matriz[key] !== 'DESATIVADA').length
                             
                             return (
                                 <Button
-                                    key={dvrNum}
-                                    variant={dvrAtivo === dvrNum ? 'default' : 'outline'}
+                                    key={dvr.id}
+                                    variant={dvrAtivoId === dvr.id ? 'default' : 'outline'}
                                     className={`
-                                        h-16 rounded-2xl font-black text-lg flex flex-col items-center justify-center transition-all
-                                        ${dvrAtivo === dvrNum ? 'bg-blue-600 shadow-lg shadow-blue-600/30' : 'hover:bg-slate-50 border-slate-200'}
+                                        h-14 rounded-2xl font-black text-sm flex items-center justify-between px-4 transition-all
+                                        ${dvrAtivoId === dvr.id ? 'bg-blue-600 shadow-lg shadow-blue-600/30' : 'hover:bg-slate-50 border-slate-200'}
                                     `}
-                                    onClick={() => setDvrAtivo(dvrNum)}
+                                    onClick={() => setDvrAtivoId(dvr.id)}
                                 >
-                                    <span>DVR {String(dvrNum).padStart(2, '0')}</span>
+                                    <span className="truncate max-w-[150px]">{dvr.nome}</span>
                                     {camerasComProblema > 0 && (
-                                        <Badge className="bg-rose-500 text-[9px] h-4 min-w-[16px] px-1 flex items-center justify-center">
+                                        <Badge className="bg-rose-500 text-[10px] h-5 min-w-[20px] px-1.5 flex items-center justify-center rounded-full border-2 border-white">
                                             {camerasComProblema}
                                         </Badge>
                                     )}
@@ -281,16 +299,26 @@ export default function RondaDVRPage() {
                                     <MonitorCheck className="h-7 w-7 text-blue-600" />
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-black text-slate-900 tracking-tight">MAPA DE CANAIS: DVR {String(dvrAtivo).padStart(2, '0')}</h2>
-                                    <p className="text-slate-400 text-sm font-bold">Gerenciamento {CAMERAS_POR_DVR} de canais físicos</p>
+                                    <h2 className="text-xl font-black text-slate-900 tracking-tight uppercase">
+                                        MAPA: {dvrs.find(d => d.id === dvrAtivoId)?.nome || "Selecione um DVR"}
+                                    </h2>
+                                    <p className="text-slate-400 text-sm font-bold">Gerenciamento {(dvrs.find(d => d.id === dvrAtivoId)?.canais || CAMERAS_POR_DVR)} canais físicos</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 bg-white p-2 rounded-2xl shadow-sm border border-slate-100/50">
-                                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl" onClick={() => setDvrAtivo(prev => Math.max(1, prev - 1))}>
+                                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl" onClick={() => {
+                                    const index = dvrs.findIndex(d => d.id === dvrAtivoId)
+                                    if (index > 0) setDvrAtivoId(dvrs[index - 1].id)
+                                }}>
                                     <ChevronLeft className="h-5 w-5" />
                                 </Button>
-                                <span className="font-black px-4 text-slate-600">DVR {dvrAtivo} / {TOTAL_DVRS}</span>
-                                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl" onClick={() => setDvrAtivo(prev => Math.min(TOTAL_DVRS, prev + 1))}>
+                                <span className="font-black px-4 text-slate-600 text-xs uppercase">
+                                    {(dvrs.findIndex(d => d.id === dvrAtivoId) + 1)} / {dvrs.length}
+                                </span>
+                                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl" onClick={() => {
+                                    const index = dvrs.findIndex(d => d.id === dvrAtivoId)
+                                    if (index < dvrs.length - 1) setDvrAtivoId(dvrs[index + 1].id)
+                                }}>
                                     <ChevronRight className="h-5 w-5" />
                                 </Button>
                             </div>
@@ -298,37 +326,67 @@ export default function RondaDVRPage() {
                     </CardHeader>
                     <CardContent className="p-8">
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-6">
-                            {Array.from({ length: CAMERAS_POR_DVR }).map((_, i) => {
+                            {Array.from({ length: (dvrs.find(d => d.id === dvrAtivoId)?.canais || CAMERAS_POR_DVR) }).map((_, i) => {
                                 const camNum = i + 1
-                                const status = matriz[`${dvrAtivo}-${camNum}`] || 'OK'
+                                const status = matriz[`${dvrAtivoId}-${camNum}`] || 'OK'
                                 const config = STATUS_OPCOES.find(op => op.value === status) || STATUS_OPCOES[0]
                                 const Icon = config.icon
 
                                 return (
                                     <div key={camNum} className="space-y-2 group">
-                                        <button
-                                            onClick={() => toggleStatus(dvrAtivo, camNum)}
-                                            className={`
-                                                relative w-full aspect-video rounded-3xl flex flex-col items-center justify-center gap-2
-                                                transition-all duration-300 active:scale-95 shadow-lg border-4
-                                                ${config.color} ${status === 'OK' ? 'border-emerald-100/30' : 'border-white/20'}
-                                                hover:brightness-110 group-hover:shadow-xl
-                                            `}
-                                        >
-                                            <div className="absolute top-3 left-4 bg-black/10 backdrop-blur-md px-3 py-1 rounded-full border border-white/20">
-                                                <span className="text-[10px] font-black text-white">CH {String(camNum).padStart(2, '0')}</span>
-                                            </div>
-                                            
-                                            <Icon className="h-10 w-10 text-white drop-shadow-md transition-transform group-hover:scale-110" />
-                                            
-                                            <div className="absolute bottom-3 text-center">
-                                                <span className="text-[10px] font-black text-white/90 uppercase tracking-tighter drop-shadow-md">
-                                                    {config.label === 'OK' ? 'Estável' : config.label.split(' ')[0]}
-                                                </span>
-                                            </div>
-                                        </button>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <button
+                                                    className={`
+                                                        relative w-full aspect-video rounded-3xl flex flex-col items-center justify-center gap-2
+                                                        transition-all duration-300 active:scale-95 shadow-lg border-4
+                                                        ${config.color} ${status === 'OK' ? 'border-emerald-100/30' : 'border-white/20'}
+                                                        hover:brightness-110 group-hover:shadow-xl
+                                                    `}
+                                                >
+                                                    <div className="absolute top-3 left-4 bg-black/10 backdrop-blur-md px-3 py-1 rounded-full border border-white/20">
+                                                        <span className="text-[10px] font-black text-white">CH {String(camNum).padStart(2, '0')}</span>
+                                                    </div>
+                                                    
+                                                    <Icon className="h-10 w-10 text-white drop-shadow-md transition-transform group-hover:scale-110" />
+                                                    
+                                                    <div className="absolute bottom-3 text-center">
+                                                        <span className="text-[10px] font-black text-white/90 uppercase tracking-tighter drop-shadow-md">
+                                                            {config.label === 'OK' ? 'Estável' : config.label.split(' ')[0]}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <Palette className="h-4 w-4 text-white/50" />
+                                                    </div>
+                                                </button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-64 p-2 rounded-2xl bg-white/90 backdrop-blur-xl border-white/20 shadow-2xl" side="top">
+                                                <div className="grid grid-cols-1 gap-1">
+                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2 mb-1">Selecionar Status</p>
+                                                    {STATUS_OPCOES.map((op) => (
+                                                        <button
+                                                            key={op.value}
+                                                            onClick={() => setStatusManual(dvrAtivoId!, camNum, op.value)}
+                                                            className={`
+                                                                flex items-center gap-3 p-2 rounded-xl transition-all
+                                                                ${status === op.value ? 'bg-slate-100' : 'hover:bg-slate-50'}
+                                                            `}
+                                                        >
+                                                            <div className={`h-6 w-6 rounded-lg ${op.color} flex items-center justify-center`}>
+                                                                <op.icon className="h-3 w-3 text-white" />
+                                                            </div>
+                                                            <span className="text-[11px] font-bold text-slate-700">{op.label}</span>
+                                                            {status === op.value && <CheckCircle2 className="h-3 w-3 text-emerald-500 ml-auto" />}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </PopoverContent>
+                                        </Popover>
                                         <div className="flex justify-between items-center px-2">
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest truncate">DVR {dvrAtivo} Canal {camNum}</span>
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter truncate max-w-[120px]">
+                                                {dvrs.find(d => d.id === dvrAtivoId)?.nome} - CH {camNum}
+                                            </span>
                                             <div className={`h-2 w-2 rounded-full ${config.color}`}></div>
                                         </div>
                                     </div>
