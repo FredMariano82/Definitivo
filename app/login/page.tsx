@@ -16,7 +16,7 @@ export default function LoginPage() {
             } else if (usuario.perfil === "aprovador") {
                 router.push("/aprovador/pendentes")
             } else if (usuario.perfil === "administrador") {
-                router.push("/admin/dashboard")
+                router.push("/admin/kanban")
             } else if (usuario.perfil === "gestor") {
                 router.push("/gestor/consulta")
             } else if (usuario.perfil === "recepcao") {

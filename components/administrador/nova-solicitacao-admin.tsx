@@ -273,6 +273,11 @@ export default function NovaSolicitacaoAdmin({
     const hojeFormatado = `${hojeLocal.getFullYear()}-${String(hojeLocal.getMonth() + 1).padStart(2, "0")}-${String(hojeLocal.getDate()).padStart(2, "0")}`
 
     if (dataInicial && dataInicial === hojeFormatado && !prosseguirUrgente) {
+      // ADM/SUPERADMIN: Não bloquear o envio, apenas mostrar o alerta (que já é feito em verificarDataUrgente)
+      if (usuario?.perfil === "administrador" || usuario?.perfil === "superadmin") {
+        console.log("🎫 ADM - Permitindo envio com data de hoje (Urgente Informativo)")
+        return ""
+      }
       return "Confirme se deseja prosseguir com a solicitação urgente ou corrija a data inicial"
     }
 
@@ -483,18 +488,12 @@ export default function NovaSolicitacaoAdmin({
   }
 
   const verificarDataUrgente = (data: string) => {
-    if (!data) {
-      setAlertaDataUrgente("")
-      setMostrarOpcoesPrazo(false)
-      setProsseguirUrgente(false)
-      return
-    }
+    const dataSelecionada = data // Formato já é "yyyy-mm-dd"
+    const agora = new Date()
+    const hojeLocal = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate())
+    const hojeFormatado = `${hojeLocal.getFullYear()}-${String(hojeLocal.getMonth() + 1).padStart(2, "0")}-${String(hojeLocal.getDate()).padStart(2, "0")}`
 
-    const dataSelecionada = new Date(data)
-    const dataAtual = new Date()
-    const diferencaEmDias = (dataSelecionada.getTime() - dataAtual.getTime()) / (1000 * 3600 * 24)
-
-    if (diferencaEmDias === 0) {
+    if (dataSelecionada === hojeFormatado) {
       setAlertaDataUrgente("A data inicial é hoje. Confirme se deseja prosseguir com a solicitação urgente.")
       setMostrarOpcoesPrazo(true)
     } else {

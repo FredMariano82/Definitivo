@@ -36,6 +36,7 @@ const kanbanSchema = z.object({
   categoria: z.enum(["imagem", "os", "ocorrencia", "autorizacao_chaves", "achados_perdidos", "eventos", "uniforme", "servico_noturno", "manutencao_cftv", "ronda_dvr", "checklist_central"], {
     required_error: "Selecione uma categoria.",
   }),
+  direcionar_para: z.string().optional(),
   // Campos dinâmicos (Imagem)
   data_hora_evento: z.string().optional(),
   cameras_solicitadas: z.string().optional(),
@@ -108,6 +109,7 @@ export function KanbanForm({ onSuccess, defaultValues }: KanbanFormProps) {
       peca_uniforme: defaultValues?.peca_uniforme || "",
       tamanho_atual: defaultValues?.tamanho_atual || "",
       tamanho_novo: defaultValues?.tamanho_novo || "",
+      direcionar_para: defaultValues?.direcionar_para || "",
     },
   })
 
@@ -118,9 +120,9 @@ export function KanbanForm({ onSuccess, defaultValues }: KanbanFormProps) {
     setIsSubmitting(true)
     try {
       // Separando campos padrão dos dados específicos
-      const { titulo, descricao, categoria, foto_url, ...rest } = data;
+      const { titulo, descricao, categoria, foto_url, direcionar_para, ...rest } = data;
       
-      let dados_especificos: any = {};
+      let dados_especificos: any = { direcionar_para };
       
       if (categoria === 'imagem') {
         dados_especificos = {
@@ -284,6 +286,31 @@ export function KanbanForm({ onSuccess, defaultValues }: KanbanFormProps) {
                     <SelectItem value="media">Média</SelectItem>
                     <SelectItem value="alta">Alta</SelectItem>
                     <SelectItem value="urgente">Urgente</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="direcionar_para"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Direcionar para (Caixa de Entrada)</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o Departamento..." />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="geral">📬 Geral (Todos)</SelectItem>
+                    <SelectItem value="operador">🎮 Operadores (Monitoramento)</SelectItem>
+                    <SelectItem value="administrador">🏢 Administração / Financeiro</SelectItem>
+                    <SelectItem value="gestor">👔 Gestão / Supervisão</SelectItem>
+                    <SelectItem value="suporte">🛠️ Suporte Técnico</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />

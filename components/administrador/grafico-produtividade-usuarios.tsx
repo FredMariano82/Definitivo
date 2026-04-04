@@ -12,6 +12,7 @@ import {
   ProdutividadeService,
   type ProdutividadeUsuario,
   type ProdutividadePerfil,
+  type ProdutividadeDepartamento,
 } from "../../services/produtividade-service"
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
@@ -25,12 +26,12 @@ export default function GraficoProdutividadeUsuarios({
   dataFinal?: string; 
 }) {
   const [dadosProdutividade, setDadosProdutividade] = useState<ProdutividadeUsuario[]>([])
-  const [dadosPorPerfil, setDadosPorPerfil] = useState<ProdutividadePerfil[]>([])
+  const [dadosPorDepartamento, setDadosPorDepartamento] = useState<ProdutividadeDepartamento[]>([])
   const [usuariosSelecionados, setUsuariosSelecionados] = useState<Set<string>>(new Set())
-  const [perfisSelecionados, setPerfisSelecionados] = useState<Set<string>>(new Set())
+  const [departamentosSelecionados, setDepartamentosSelecionados] = useState<Set<string>>(new Set())
   const [carregando, setCarregando] = useState(true)
   // Dados removidos (agora vêm via props)
-  const [visualizacaoPorPerfil, setVisualizacaoPorPerfil] = useState(false)
+  const [visualizacaoPorDepartamento, setVisualizacaoPorDepartamento] = useState(false)
   const [estatisticas, setEstatisticas] = useState({
     totalUsuarios: 0,
     totalPrestadores: 0,
@@ -46,19 +47,19 @@ export default function GraficoProdutividadeUsuarios({
   const buscarDados = async (inicio?: string, fim?: string) => {
     try {
       setCarregando(true)
-      const [dadosIndividuais, dadosPerfis, stats] = await Promise.all([
+      const [dadosIndividuais, dadosDepto, stats] = await Promise.all([
         ProdutividadeService.buscarProdutividadePorHora(inicio || undefined, fim || undefined),
-        ProdutividadeService.buscarProdutividadePorPerfil(inicio || undefined, fim || undefined),
+        ProdutividadeService.buscarProdutividadePorDepartamento(inicio || undefined, fim || undefined),
         ProdutividadeService.buscarEstatisticasProdutividade(inicio || undefined, fim || undefined) as Promise<any>,
       ])
 
       setDadosProdutividade(dadosIndividuais)
-      setDadosPorPerfil(dadosPerfis)
+      setDadosPorDepartamento(dadosDepto)
       setEstatisticas(stats)
 
       // Selecionar todos por padrão
       setUsuariosSelecionados(new Set(dadosIndividuais.map((u) => u.usuario)))
-      setPerfisSelecionados(new Set(dadosPerfis.map((p) => p.perfil)))
+      setDepartamentosSelecionados(new Set(dadosDepto.map((p) => p.departamento)))
     } catch (error) {
       console.error("Erro ao buscar dados de produtividade:", error)
     } finally {
@@ -78,27 +79,27 @@ export default function GraficoProdutividadeUsuarios({
     setUsuariosSelecionados(novosUsuarios)
   }
 
-  const togglePerfil = (perfil: string) => {
-    const novosPerfis = new Set(perfisSelecionados)
-    if (novosPerfis.has(perfil)) {
-      novosPerfis.delete(perfil)
+  const toggleDepartamento = (depto: string) => {
+    const novosDeptos = new Set(departamentosSelecionados)
+    if (novosDeptos.has(depto)) {
+      novosDeptos.delete(depto)
     } else {
-      novosPerfis.add(perfil)
+      novosDeptos.add(depto)
     }
-    setPerfisSelecionados(novosPerfis)
+    setDepartamentosSelecionados(novosDeptos)
   }
 
   const selecionarTodos = () => {
-    if (visualizacaoPorPerfil) {
-      setPerfisSelecionados(new Set(dadosPorPerfil.map((p) => p.perfil)))
+    if (visualizacaoPorDepartamento) {
+      setDepartamentosSelecionados(new Set(dadosPorDepartamento.map((p) => p.departamento)))
     } else {
       setUsuariosSelecionados(new Set(dadosProdutividade.map((u) => u.usuario)))
     }
   }
 
   const desmarcarTodos = () => {
-    if (visualizacaoPorPerfil) {
-      setPerfisSelecionados(new Set())
+    if (visualizacaoPorDepartamento) {
+      setDepartamentosSelecionados(new Set())
     } else {
       setUsuariosSelecionados(new Set())
     }
@@ -108,11 +109,11 @@ export default function GraficoProdutividadeUsuarios({
   const dadosGrafico = Array.from({ length: 24 }, (_, hora) => {
     const dadosHora: any = { hora: `${hora.toString().padStart(2, "0")}:00` }
 
-    if (visualizacaoPorPerfil) {
-      dadosPorPerfil.forEach((perfil) => {
-        if (perfisSelecionados.has(perfil.perfil)) {
-          const dadoHora = perfil.dadosPorHora.find((d) => d.hora === hora)
-          dadosHora[perfil.perfil] = dadoHora?.prestadores || 0
+    if (visualizacaoPorDepartamento) {
+      dadosPorDepartamento.forEach((depto) => {
+        if (departamentosSelecionados.has(depto.departamento)) {
+          const dadoHora = depto.dadosPorHora.find((d) => d.hora === hora)
+          dadosHora[depto.departamento] = dadoHora?.prestadores || 0
         }
       })
     } else {
@@ -185,52 +186,60 @@ export default function GraficoProdutividadeUsuarios({
       {/* Filtro removido (centralizado no DashboardAdmin) */}
 
       {/* Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="border-blue-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total de Usuários</CardTitle>
-            <Users className="h-4 w-4 text-blue-600" />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card className="backdrop-blur-xl bg-white/40 border-white/20 shadow-xl rounded-2xl overflow-hidden hover:scale-[1.02] transition-transform duration-300">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-semibold text-slate-600">Operadores Ativos</CardTitle>
+            <div className="p-2 bg-blue-500/10 rounded-lg">
+              <Users className="h-4 w-4 text-blue-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-700">{estatisticas.totalUsuarios}</div>
-            <p className="text-xs text-gray-500 mt-1">Usuários ativos</p>
+            <div className="text-3xl font-bold text-blue-700 tracking-tight">{estatisticas.totalUsuarios}</div>
+            <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-wider">Usuários logados</p>
           </CardContent>
         </Card>
 
-        <Card className="border-green-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total de Prestadores</CardTitle>
-            <Activity className="h-4 w-4 text-green-600" />
+        <Card className="backdrop-blur-xl bg-white/40 border-white/20 shadow-xl rounded-2xl overflow-hidden hover:scale-[1.02] transition-transform duration-300">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-semibold text-slate-600">Fluxo de Prestadores</CardTitle>
+            <div className="p-2 bg-green-500/10 rounded-lg">
+              <Activity className="h-4 w-4 text-green-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-700">{estatisticas.totalPrestadores}</div>
-            <p className="text-xs text-gray-500 mt-1">Prestadores processados</p>
+            <div className="text-3xl font-bold text-green-700 tracking-tight">{estatisticas.totalPrestadores}</div>
+            <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-wider">Total processado</p>
           </CardContent>
         </Card>
 
-        <Card className="border-orange-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Horário Mais Ativo</CardTitle>
-            <Clock className="h-4 w-4 text-orange-600" />
+        <Card className="backdrop-blur-xl bg-white/40 border-white/20 shadow-xl rounded-2xl overflow-hidden hover:scale-[1.02] transition-transform duration-300">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-semibold text-slate-600">Pico de Atividade</CardTitle>
+            <div className="p-2 bg-orange-500/10 rounded-lg">
+              <Clock className="h-4 w-4 text-orange-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-700">
+            <div className="text-3xl font-bold text-orange-700 tracking-tight">
               {estatisticas.horarioMaisAtivo.hora.toString().padStart(2, "0")}:00
             </div>
-            <p className="text-xs text-gray-500 mt-1">{estatisticas.horarioMaisAtivo.prestadores} prestadores</p>
+            <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-wider">{estatisticas.horarioMaisAtivo.prestadores} prestadores/hora</p>
           </CardContent>
         </Card>
 
-        <Card className="border-purple-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Usuário Mais Ativo</CardTitle>
-            <TrendingUp className="h-4 w-4 text-purple-600" />
+        <Card className="backdrop-blur-xl bg-white/40 border-white/20 shadow-xl rounded-2xl overflow-hidden hover:scale-[1.02] transition-transform duration-300">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-semibold text-slate-600">Líder de Produção</CardTitle>
+            <div className="p-2 bg-purple-500/10 rounded-lg">
+              <TrendingUp className="h-4 w-4 text-purple-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-bold text-purple-700 truncate">
+            <div className="text-xl font-bold text-purple-700 truncate tracking-tight">
               {estatisticas.usuarioMaisAtivo.usuario || "N/A"}
             </div>
-            <p className="text-xs text-gray-500 mt-1">{estatisticas.usuarioMaisAtivo.prestadores} prestadores</p>
+            <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-wider">{estatisticas.usuarioMaisAtivo.prestadores} processamentos</p>
           </CardContent>
         </Card>
       </div>
@@ -243,19 +252,19 @@ export default function GraficoProdutividadeUsuarios({
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                {visualizacaoPorPerfil ? "Perfis" : "Usuários"} (
-                {visualizacaoPorPerfil ? dadosPorPerfil.length : dadosProdutividade.length})
+                {visualizacaoPorDepartamento ? "Departamentos" : "Usuários"} (
+                {visualizacaoPorDepartamento ? dadosPorDepartamento.length : dadosProdutividade.length})
               </CardTitle>
 
               {/* Toggle de Visualização */}
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setVisualizacaoPorPerfil(!visualizacaoPorPerfil)}
+                onClick={() => setVisualizacaoPorDepartamento(!visualizacaoPorDepartamento)}
                 className="flex items-center gap-2"
               >
-                {visualizacaoPorPerfil ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}
-                {visualizacaoPorPerfil ? "Perfil" : "Individual"}
+                {visualizacaoPorDepartamento ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}
+                {visualizacaoPorDepartamento ? "Departamento" : "Individual"}
               </Button>
             </div>
 
@@ -269,27 +278,27 @@ export default function GraficoProdutividadeUsuarios({
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {visualizacaoPorPerfil
-              ? // Visualização por Perfil
-              dadosPorPerfil.map((perfil) => (
-                <div key={perfil.perfil} className="flex items-center space-x-3">
+            {visualizacaoPorDepartamento
+              ? // Visualização por Departamento
+              dadosPorDepartamento.map((depto) => (
+                <div key={depto.departamento} className="flex items-center space-x-3">
                   <Checkbox
-                    id={perfil.perfil}
-                    checked={perfisSelecionados.has(perfil.perfil)}
-                    onCheckedChange={() => togglePerfil(perfil.perfil)}
+                    id={depto.departamento}
+                    checked={departamentosSelecionados.has(depto.departamento)}
+                    onCheckedChange={() => toggleDepartamento(depto.departamento)}
                   />
                   <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: perfil.cor }} />
+                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: depto.cor }} />
                     <Label
-                      htmlFor={perfil.perfil}
+                      htmlFor={depto.departamento}
                       className="text-sm font-medium cursor-pointer truncate capitalize"
-                      title={perfil.perfil}
+                      title={depto.departamento}
                     >
-                      {perfil.perfil}
+                      {depto.departamento}
                     </Label>
                   </div>
                   <Badge variant="secondary" className="text-xs">
-                    {perfil.dadosPorHora.reduce((sum, h) => sum + h.prestadores, 0)}
+                    {depto.dadosPorHora.reduce((sum, h) => sum + h.prestadores, 0)}
                   </Badge>
                 </div>
               ))
@@ -317,7 +326,7 @@ export default function GraficoProdutividadeUsuarios({
                 </div>
               ))}
 
-            {(visualizacaoPorPerfil ? dadosPorPerfil.length : dadosProdutividade.length) === 0 && (
+            {(visualizacaoPorDepartamento ? dadosPorDepartamento.length : dadosProdutividade.length) === 0 && (
               <div className="text-center py-8 text-gray-500">
                 <Activity className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                 <p>Nenhum dado encontrado</p>
@@ -333,8 +342,8 @@ export default function GraficoProdutividadeUsuarios({
             <CardTitle className="text-lg font-semibold text-gray-800">📊 Produtividade por Horário</CardTitle>
             <p className="text-sm text-gray-600">
               Prestadores processados ao longo do dia •{" "}
-              {visualizacaoPorPerfil ? perfisSelecionados.size : usuariosSelecionados.size}{" "}
-              {visualizacaoPorPerfil ? "perfil(s)" : "usuário(s)"} selecionado(s)
+              {visualizacaoPorDepartamento ? departamentosSelecionados.size : usuariosSelecionados.size}{" "}
+              {visualizacaoPorDepartamento ? "departamento(s)" : "usuário(s)"} selecionado(s)
             </p>
           </CardHeader>
           <CardContent>
@@ -360,18 +369,18 @@ export default function GraficoProdutividadeUsuarios({
                     />
                     <Legend />
                     
-                    {visualizacaoPorPerfil 
-                      ? dadosPorPerfil.map((perfil) => (
-                          perfisSelecionados.has(perfil.perfil) && (
+                    {visualizacaoPorDepartamento 
+                      ? dadosPorDepartamento.map((depto) => (
+                          departamentosSelecionados.has(depto.departamento) && (
                             <Line
-                              key={perfil.perfil}
+                              key={depto.departamento}
                               type="monotone"
-                              dataKey={perfil.perfil}
-                              stroke={perfil.cor}
+                              dataKey={depto.departamento}
+                              stroke={depto.cor}
                               strokeWidth={3}
                               dot={{ r: 4, strokeWidth: 2, fill: '#fff' }}
                               activeDot={{ r: 6 }}
-                              name={perfil.perfil}
+                              name={depto.departamento}
                             />
                           )
                         ))

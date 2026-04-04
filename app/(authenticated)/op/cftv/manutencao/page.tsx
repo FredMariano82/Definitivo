@@ -19,6 +19,9 @@ import {
 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
+import { CftvService } from "@/services/cftv-service"
+import { ManutencaoConsolidacaoModal } from "@/components/op/manutencao-consolidacao-modal"
+import { FileText, Loader2 } from "lucide-react"
 
 export default function ManutencaoCFTVPage() {
   const { usuario } = useAuth()
@@ -31,6 +34,22 @@ export default function ManutencaoCFTVPage() {
     prioridade: "baixa",
     descricao: ""
   })
+  const [isConsolidating, setIsConsolidating] = useState(false)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [tarefasHoje, setTarefasHoje] = useState<any[]>([])
+
+  const handleOpenConsolidar = async () => {
+    setIsConsolidating(true)
+    try {
+      const tarefas = await CftvService.getManutencoesDoDia()
+      setTarefasHoje(tarefas)
+      setIsModalOpen(true)
+    } catch (error: any) {
+      toast.error("Erro ao buscar manutenções do dia: " + error.message)
+    } finally {
+      setIsConsolidating(false)
+    }
+  }
 
   const handleSave = async () => {
     if (!usuario) return
@@ -77,6 +96,16 @@ export default function ManutencaoCFTVPage() {
           </h1>
           <p className="text-muted-foreground">Registro de falhas, trocas e manutenções técnicas</p>
         </div>
+
+        <Button 
+            onClick={handleOpenConsolidar}
+            disabled={isConsolidating}
+            variant="outline" 
+            className="h-14 px-8 rounded-2xl border-cyan-100 bg-cyan-50/50 text-cyan-700 font-black uppercase tracking-widest text-xs hover:bg-cyan-100 transition-all flex items-center gap-3 shadow-sm"
+        >
+            {isConsolidating ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileText className="h-5 w-5" />}
+            Consolidar Relatório do Dia
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -216,6 +245,13 @@ export default function ManutencaoCFTVPage() {
           </Card>
         </div>
       </div>
+
+      <ManutencaoConsolidacaoModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        tarefas={tarefasHoje}
+        operadorNome={usuario?.nome || "Técnico"}
+      />
     </div>
   )
 }

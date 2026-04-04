@@ -4,7 +4,8 @@ export interface Usuario {
   email: string
   departamento: string
   departamento_id?: number // PRODUÇÃO REAL: ID departamento para relação interna
-  perfil: "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte" | "superadmin" | "operador"
+  funcao?: string // PRODUÇÃO REAL: Nomenclatura operacional/função
+  perfil: "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte" | "superadmin" | "operador" | "coordenador" | "encarregado"
 }
 
 export type StatusChecagem = "pendente" | "aprovada" | "reprovada" | "vencida" | "excecao" | "erro_rg" | "aprovado" | "reprovado" | "revisar" | "base"
@@ -25,6 +26,10 @@ export interface PrestadorAvaliacao {
   horasRestantes?: number // Nova propriedade para o contador regressivo
   justificativa?: string // Para casos de exceção
   empresa?: string // PRODUÇÃO REAL: Campo empresa específica adicionado
+  horario_entrada?: string // Opcional para check-in
+  horario_saida?: string // Opcional para check-out
+  registrado_por_entrada?: string
+  registrado_por_saida?: string
 }
 
 export interface PrestadorHistorico {

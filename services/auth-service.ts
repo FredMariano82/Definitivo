@@ -43,6 +43,7 @@ export class AuthService {
           email: usuario.email,
           departamento: usuario.departamento,
           departamento_id: usuario.departamento_id,
+          funcao: usuario.funcao,
           perfil: usuario.perfil as "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte" | "superadmin" | "operador",
         },
         sucesso: true,
@@ -111,7 +112,8 @@ export class AuthService {
         email: usuario.email,
         departamento: usuario.departamento,
         departamento_id: usuario.departamento_id,
-        perfil: usuario.perfil as "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte" | "superadmin" | "operador",
+        funcao: usuario.funcao,
+        perfil: usuario.perfil as "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte" | "superadmin" | "operador" | "coordenador" | "encarregado",
       }
     } catch (error) {
       console.error("Erro ao buscar usuário:", error)
@@ -180,6 +182,7 @@ export class AuthService {
         nome: u.nome,
         email: u.email,
         departamento: u.departamento,
+        funcao: u.funcao,
         perfil: u.perfil as "solicitante" | "aprovador" | "administrador" | "gestor" | "recepcao" | "suporte" | "superadmin" | "operador",
       }))
     } catch (error) {

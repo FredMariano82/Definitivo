@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { TrendingUp, FileText, DollarSign, AlertTriangle, Filter, X, Play, Pause, FileSpreadsheet, Search, Loader2, Activity, GitMerge, Database } from "lucide-react"
+import { TrendingUp, FileText, DollarSign, AlertTriangle, Filter, X, Play, Pause, FileSpreadsheet, Search, Loader2, Activity, GitMerge, Database, Clock, ShieldCheck } from "lucide-react"
 import { getAllSolicitacoes } from "../../services/solicitacoes-service"
 import RelatorioModal from "./relatorio-modal"
 import { EconomiasService, type EconomiaMetricas } from "../../services/economias-service"
@@ -196,12 +196,60 @@ export default function DashboardAdmin({ hideHeader = false }: { hideHeader?: bo
       {!hideHeader && <PageHeader title="Dashboard Administrativo" subtitle="Controle total do sistema" />}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card><CardHeader><CardTitle className="text-sm">Total</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{metricas.total}</div></CardContent></Card>
-        <Card><CardHeader><CardTitle className="text-sm">Pendentes</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-orange-600">{metricas.pendentes}</div></CardContent></Card>
-        <Card><CardHeader><CardTitle className="text-sm">Custo Checagem</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-emerald-600">R$ {metricas.custo}</div></CardContent></Card>
-        <Card><CardHeader><CardTitle className="text-sm">Economia</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-emerald-600">R$ {metricasEconomia.totalEconomizado.toFixed(2)}</div></CardContent></Card>
+        <Card className="backdrop-blur-xl bg-white/40 border-white/20 shadow-xl rounded-2xl overflow-hidden hover:scale-[1.02] transition-transform duration-300">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-semibold text-slate-600">Solicitações Totais</CardTitle>
+            <div className="p-2 bg-blue-500/10 rounded-lg">
+              <FileText className="h-4 w-4 text-blue-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-slate-800 tracking-tight">{metricas.total}</div>
+            <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-wider">Histórico Geral</p>
+          </CardContent>
+        </Card>
+
+        <Card className="backdrop-blur-xl bg-white/40 border-white/20 shadow-xl rounded-2xl overflow-hidden hover:scale-[1.02] transition-transform duration-300">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-semibold text-slate-600">Aguardando Análise</CardTitle>
+            <div className="p-2 bg-orange-500/10 rounded-lg">
+              <Clock className="h-4 w-4 text-orange-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-orange-600 tracking-tight">{metricas.pendentes}</div>
+            <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-wider">Pendências Atuais</p>
+          </CardContent>
+        </Card>
+
+        <Card className="backdrop-blur-xl bg-white/40 border-white/20 shadow-xl rounded-2xl overflow-hidden hover:scale-[1.02] transition-transform duration-300">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-semibold text-slate-600">Investimento Processado</CardTitle>
+            <div className="p-2 bg-emerald-500/10 rounded-lg">
+              <DollarSign className="h-4 w-4 text-emerald-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-emerald-600 tracking-tight">R$ {metricas.custo}</div>
+            <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-wider">Custo de Validação</p>
+          </CardContent>
+        </Card>
+
+        <Card className="backdrop-blur-xl bg-white/40 border-white/20 shadow-xl rounded-2xl overflow-hidden hover:scale-[1.02] transition-transform duration-300">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-semibold text-slate-600">Economia Gerada</CardTitle>
+            <div className="p-2 bg-emerald-500/10 rounded-lg">
+              <TrendingUp className="h-4 w-4 text-emerald-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-emerald-600 tracking-tight">R$ {metricasEconomia.totalEconomizado.toFixed(2)}</div>
+            <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-wider">Gastos Evitados</p>
+          </CardContent>
+        </Card>
       </div>
 
+      {/* 
       <Card className="border-2 border-red-200 bg-red-50/10">
         <CardHeader><CardTitle className="text-red-800 flex items-center gap-2 font-bold"><Activity className="h-5 w-5" /> Automações de Planilha</CardTitle></CardHeader>
         <CardContent className="flex flex-wrap gap-4">
@@ -221,6 +269,7 @@ export default function DashboardAdmin({ hideHeader = false }: { hideHeader?: bo
           ))}
         </CardContent>
       </Card>
+      */}
 
       {/* Controle do Robo4 desativado conforme solicitação. Descomente abaixo para reativar. */}
       {/* 

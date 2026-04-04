@@ -168,6 +168,7 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
           },
         ]
 
+      case "encarregado":
       case "administrador":
         return [
           {
@@ -211,10 +212,22 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
       case "gestor":
         return [
           {
+            href: "/admin/kanban",
+            label: "Tarefas",
+            icon: BarChart3,
+            className: getButtonClass("/admin/kanban"),
+          },
+          {
             href: "/gestor/consulta",
             label: "Consulta Solicitações",
-            icon: BarChart3,
+            icon: FileText,
             className: getButtonClass("/gestor/consulta"),
+          },
+          {
+            href: "/admin/todas-solicitacoes?status=excecao",
+            label: "Exceções Críticas",
+            icon: CheckCircle,
+            className: getButtonClass("/admin/todas-solicitacoes?status=excecao"),
           },
         ]
 
@@ -225,6 +238,12 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
             label: "Todas as Solicitações",
             icon: FileText,
             className: getButtonClass("/recepcao/todas"),
+          },
+          {
+            href: "/admin/controle-chaves",
+            label: "Controle de Chaves",
+            icon: Key,
+            className: getButtonClass("/admin/controle-chaves"),
           },
         ]
 
@@ -244,6 +263,7 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
           },
         ]
 
+      case "coordenador":
       case "superadmin":
         return [
           {
@@ -485,7 +505,9 @@ export default function Navigation({ isCollapsed, onToggle }: NavigationProps) {
           {!isCollapsed && (
             <div className="overflow-hidden">
               <p className="text-xs font-bold text-white truncate">{usuario?.nome}</p>
-              <p className="text-[10px] text-slate-400 truncate">{usuario?.departamento}</p>
+              <p className="text-[10px] text-slate-400 truncate">
+                {usuario?.funcao || usuario?.departamento}
+              </p>
             </div>
           )}
         </div>

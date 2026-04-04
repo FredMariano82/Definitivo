@@ -99,6 +99,11 @@ export default function SolicitacoesDepartamento() {
   const [dadosEdicao, setDadosEdicao] = useState({ doc1: "", doc2: "" })
   const [salvandoEdicao, setSalvandoEdicao] = useState(false)
   const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null)
+  const [modalDownloadAberto, setModalDownloadAberto] = useState(false)
+  const [filtroEmpresaDownload, setFiltroEmpresaDownload] = useState<string>("todos")
+  const [filtroPeriodoDownload, setFiltroPeriodoDownload] = useState<string>("todos")
+  const [filtroChecagemDownload, setFiltroChechagemDownload] = useState<string>("todos")
+  const [filtroLiberacaoDownload, setFiltroLiberacaoDownload] = useState<string>("todos")
 
   const handleAbrirEdicao = () => {
     if (prestadorSelecionado) {
@@ -420,7 +425,7 @@ export default function SolicitacoesDepartamento() {
     setDialogAberto(true)
   }
 
-  const handleDownloadExcel = async () => {
+  const handleDownloadExcel = async (filtroEmpresa?: string, filtroPeriodo?: string) => {
     try {
       setCarregandoDownload(true)
       console.log("📊 Iniciando download Excel - Solicitante Departamento")
@@ -431,20 +436,62 @@ export default function SolicitacoesDepartamento() {
       // Configurar XLSX para browser
       XLSX.set_fs({})
 
-      // Preparar dados para Excel
-      const dadosParaExportar = dadosOrdenados.map((item, index) => ({
-        "#": index + 1,
-        Prestador: item.prestador.nome,
-        Doc1: item.prestador.doc1,
-        Doc2: item.prestador.doc2 || "-",
+      // 🎯 APLICAR FILTROS DO MODAL DE DOWNLOAD
+      let dadosFinal = [...dadosOrdenados]
+      
+      if (filtroEmpresaDownload !== "todos") {
+        dadosFinal = dadosFinal.filter(item => item.solicitacao.empresa === filtroEmpresaDownload)
+      }
+      
+      if (filtroPeriodoDownload !== "todos") {
+        const agora = new Date()
+        let limite = new Date()
+        
+        if (filtroPeriodoDownload === "hoje") {
+          limite.setHours(0, 0, 0, 0)
+        } else if (filtroPeriodoDownload === "semana") {
+          limite.setDate(agora.getDate() - 7)
+        } else if (filtroPeriodoDownload === "mes") {
+          limite.setMonth(agora.getMonth() - 1)
+        }
+        
+        dadosFinal = dadosFinal.filter(item => {
+          const dataSolicitacao = new Date(item.solicitacao.dataSolicitacao.split("/").reverse().join("-"))
+          return dataSolicitacao >= limite
+        })
+      }
+      
+      if (filtroChecagemDownload !== "todos") {
+        dadosFinal = dadosFinal.filter(item => {
+          const statusReal = getChecagemStatus(item.prestador)
+          if (filtroChecagemDownload === "vencida") return statusReal === "vencida"
+          return item.prestador.checagem === filtroChecagemDownload
+        })
+      }
+      
+      if (filtroLiberacaoDownload !== "todos") {
+        dadosFinal = dadosFinal.filter(item => {
+          const statusReal = getLiberacaoStatus(item.prestador, item.solicitacao.dataFinal)
+          if (filtroLiberacaoDownload === "vencida") return statusReal === "vencida"
+          return item.prestador.liberacao === filtroLiberacaoDownload
+        })
+      }
+
+      // Preparar dados para Excel (Fiel aos Cabeçalhos do Upload!)
+      const dadosParaExportar = dadosFinal.map((item, index) => ({
+        "Nome": item.prestador.nome,
+        "Empresa": item.solicitacao.empresa,
+        "RG / Doc1": item.prestador.doc1,
+        "CPF / Doc2": item.prestador.doc2 || "-",
         "Data Inicial": item.solicitacao.dataInicial,
         "Data Final": item.solicitacao.dataFinal,
         "Liberação": getLiberacaoStatus(item.prestador, item.solicitacao.dataFinal),
         "Checagem": getChecagemStatus(item.prestador),
         "Válida até": item.prestador.checagemValidaAte ? formatarDataParaBR(item.prestador.checagemValidaAte) : "-",
-        Observações: item.prestador.observacoes || "-",
-        Departamento: item.solicitacao.departamento,
-        "Número da Solicitação": item.solicitacao.numero,
+        "Observações": item.prestador.observacoes || "-",
+        "Departamento": item.solicitacao.departamento,
+        "Número": item.solicitacao.numero,
+        "#": index + 1,
       }))
 
       // Criar workbook
@@ -599,7 +646,7 @@ export default function SolicitacoesDepartamento() {
                 </div>
 
                 <Button
-                  onClick={handleDownloadExcel}
+                  onClick={() => setModalDownloadAberto(true)}
                   disabled={carregandoDownload}
                   variant="outline"
                   size="sm"
@@ -986,6 +1033,202 @@ export default function SolicitacoesDepartamento() {
                   <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               </div>
+              {/* 📊 MODAL DE DOWNLOAD INTELIGENTE */}
+          <Dialog open={modalDownloadAberto} onOpenChange={setModalDownloadAberto}>
+            <DialogContent className="sm:max-w-lg overflow-hidden border-slate-200">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <Download className="h-6 w-6 text-blue-600" />
+                  Assistente de Exportação Excel
+                </DialogTitle>
+                <div className="text-sm text-slate-500">Filtre e valide os dados antes de gerar a planilha.</div>
+              </DialogHeader>
+              <div className="py-6 space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Filtrar Empresa</Label>
+                    <Select value={filtroEmpresaDownload} onValueChange={setFiltroEmpresaDownload}>
+                      <SelectTrigger className="bg-slate-50 border-slate-200 h-10">
+                        <SelectValue placeholder="Todas" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todas as Empresas</SelectItem>
+                        {empresasDepartamento.map((emp) => (
+                          <SelectItem key={emp} value={emp}>{emp}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Período</Label>
+                    <Select value={filtroPeriodoDownload} onValueChange={setFiltroPeriodoDownload}>
+                      <SelectTrigger className="bg-slate-50 border-slate-200 h-10">
+                        <SelectValue placeholder="Geral" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todo o Histórico</SelectItem>
+                        <SelectItem value="hoje">Somente Hoje</SelectItem>
+                        <SelectItem value="semana">Últimos 7 dias</SelectItem>
+                        <SelectItem value="mes">Último Mês</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Status Checagem</Label>
+                    <Select value={filtroChecagemDownload} onValueChange={setFiltroChechagemDownload}>
+                      <SelectTrigger className="bg-slate-50 border-slate-200 h-10">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos os Status</SelectItem>
+                        <SelectItem value="pendente">Pendente</SelectItem>
+                        <SelectItem value="aprovado">Aprovado</SelectItem>
+                        <SelectItem value="reprovado">Reprovado</SelectItem>
+                        <SelectItem value="vencida">Vencida</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Status Liberação</Label>
+                    <Select value={filtroLiberacaoDownload} onValueChange={setFiltroLiberacaoDownload}>
+                      <SelectTrigger className="bg-slate-50 border-slate-200 h-10">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos os Status</SelectItem>
+                        <SelectItem value="pendente">Pendente</SelectItem>
+                        <SelectItem value="ok">Ok</SelectItem>
+                        <SelectItem value="urgente">Urgente</SelectItem>
+                        <SelectItem value="vencida">Vencida</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* PRÉVIA DE DADOS */}
+                <div className="bg-slate-900 rounded-xl p-4 border border-slate-800 shadow-inner">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <Users className="h-3 w-3" />
+                      Prévia dos Nomes Encontrados
+                    </div>
+                    <Badge className="bg-blue-600/20 text-blue-400 border-blue-500/30 text-[10px]">
+                      {(() => {
+                        let filtrados = [...dadosOrdenados]
+                        if (filtroEmpresaDownload !== "todos") filtrados = filtrados.filter(i => i.solicitacao.empresa === filtroEmpresaDownload)
+                        if (filtroPeriodoDownload !== "todos") {
+                            const agora = new Date()
+                            let limite = new Date()
+                            if (filtroPeriodoDownload === "hoje") limite.setHours(0, 0, 0, 0)
+                            else if (filtroPeriodoDownload === "semana") limite.setDate(agora.getDate() - 7)
+                            else if (filtroPeriodoDownload === "mes") limite.setMonth(agora.getMonth() - 1)
+                            filtrados = filtrados.filter(item => new Date(item.solicitacao.dataSolicitacao.split("/").reverse().join("-")) >= limite)
+                        }
+                        if (filtroChecagemDownload !== "todos") {
+                            filtrados = filtrados.filter(item => {
+                                const statusReal = getChecagemStatus(item.prestador)
+                                return filtroChecagemDownload === "vencida" ? statusReal === "vencida" : item.prestador.checagem === filtroChecagemDownload
+                            })
+                        }
+                        if (filtroLiberacaoDownload !== "todos") {
+                            filtrados = filtrados.filter(item => {
+                                const statusReal = getLiberacaoStatus(item.prestador, item.solicitacao.dataFinal)
+                                return filtroLiberacaoDownload === "vencida" ? statusReal === "vencida" : item.prestador.liberacao === filtroLiberacaoDownload
+                            })
+                        }
+                        return filtrados.length
+                      })()} prestadores
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    {(() => {
+                      let filtrados = [...dadosOrdenados]
+                      if (filtroEmpresaDownload !== "todos") filtrados = filtrados.filter(i => i.solicitacao.empresa === filtroEmpresaDownload)
+                      if (filtroPeriodoDownload !== "todos") {
+                          const agora = new Date()
+                          let limite = new Date()
+                          if (filtroPeriodoDownload === "hoje") limite.setHours(0, 0, 0, 0)
+                          else if (filtroPeriodoDownload === "semana") limite.setDate(agora.getDate() - 7)
+                          else if (filtroPeriodoDownload === "mes") limite.setMonth(agora.getMonth() - 1)
+                          filtrados = filtrados.filter(item => new Date(item.solicitacao.dataSolicitacao.split("/").reverse().join("-")) >= limite)
+                      }
+                      if (filtroChecagemDownload !== "todos") {
+                          filtrados = filtrados.filter(item => {
+                              const statusReal = getChecagemStatus(item.prestador)
+                              return filtroChecagemDownload === "vencida" ? statusReal === "vencida" : item.prestador.checagem === filtroChecagemDownload
+                          })
+                      }
+                      if (filtroLiberacaoDownload !== "todos") {
+                          filtrados = filtrados.filter(item => {
+                              const statusReal = getLiberacaoStatus(item.prestador, item.solicitacao.dataFinal)
+                              return filtroLiberacaoDownload === "vencida" ? statusReal === "vencida" : item.prestador.liberacao === filtroLiberacaoDownload
+                          })
+                      }
+                      
+                      const nomes = filtrados.slice(0, 5)
+                      
+                      if (nomes.length === 0) return <div className="text-slate-500 text-xs py-2 italic text-center">Nenhum registro encontrado para estes filtros.</div>
+                      
+                      return (
+                        <>
+                          {nomes.map((item, idx) => (
+                            <div key={idx} className="text-xs text-slate-300 flex items-center gap-2 py-1 border-b border-white/5 last:border-0 truncate">
+                              <span className="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                              {item.prestador.nome} 
+                              <span className="text-[10px] text-slate-500">({item.solicitacao.empresa})</span>
+                            </div>
+                          ))}
+                          {filtrados.length > 5 && (
+                            <div className="text-[10px] text-slate-500 pt-2 text-center">... e mais {filtrados.length - 5} nomes</div>
+                          )}
+                        </>
+                      )
+                    })()}
+                  </div>
+                </div>
+              </div>
+              <DialogFooter className="bg-slate-100 -mx-6 -mb-6 p-4 flex gap-3">
+                <Button variant="ghost" onClick={() => setModalDownloadAberto(false)} className="flex-1 text-slate-600">Cancelar</Button>
+                <Button 
+                  onClick={() => {
+                    handleDownloadExcel(filtroEmpresaDownload, filtroPeriodoDownload)
+                    setModalDownloadAberto(false)
+                  }}
+                  disabled={(() => {
+                    let filtrados = [...dadosOrdenados]
+                    if (filtroEmpresaDownload !== "todos") filtrados = filtrados.filter(i => i.solicitacao.empresa === filtroEmpresaDownload)
+                    if (filtroPeriodoDownload !== "todos") {
+                        const agora = new Date()
+                        let limite = new Date()
+                        if (filtroPeriodoDownload === "hoje") limite.setHours(0, 0, 0, 0)
+                        else if (filtroPeriodoDownload === "semana") limite.setDate(agora.getDate() - 7)
+                        else if (filtroPeriodoDownload === "mes") limite.setMonth(agora.getMonth() - 1)
+                        filtrados = filtrados.filter(item => new Date(item.solicitacao.dataSolicitacao.split("/").reverse().join("-")) >= limite)
+                    }
+                    if (filtroChecagemDownload !== "todos") {
+                        filtrados = filtrados.filter(item => {
+                            const statusReal = getChecagemStatus(item.prestador)
+                            return filtroChecagemDownload === "vencida" ? statusReal === "vencida" : item.prestador.checagem === filtroChecagemDownload
+                        })
+                    }
+                    if (filtroLiberacaoDownload !== "todos") {
+                        filtrados = filtrados.filter(item => {
+                            const statusReal = getLiberacaoStatus(item.prestador, item.solicitacao.dataFinal)
+                            return filtroLiberacaoDownload === "vencida" ? statusReal === "vencida" : item.prestador.liberacao === filtroLiberacaoDownload
+                        })
+                    }
+                    return filtrados.length === 0
+                  })()}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20"
+                >
+                  Confirmar e Gerar
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
             </div>
           </CardContent>
         </Card>

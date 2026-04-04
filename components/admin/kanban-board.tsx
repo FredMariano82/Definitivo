@@ -158,6 +158,23 @@ export function KanbanBoard({ title = "Gestão de Tarefas", subtitle = "Acompanh
     )
   }
 
+  const getInboxBadge = (direcionar_para?: string) => {
+    if (!direcionar_para || direcionar_para === 'geral') return null;
+
+    const labels: Record<string, string> = {
+      operador: "🕹️ Ops",
+      administrador: "🏢 Admin",
+      gestor: "👔 Gestão",
+      suporte: "🛠️ Suporte"
+    };
+
+    return (
+      <Badge variant="outline" className="ml-1.5 bg-slate-100 text-slate-700 border-slate-300 font-bold text-[10px] h-5 uppercase">
+        {labels[direcionar_para] || direcionar_para}
+      </Badge>
+    );
+  }
+
   const handleStatusChangeClick = (tarefa: KanbanTarefa, newStatus: TarefaStatus) => {
     if (newStatus === 'finalizado') {
       setTarefaSelecionadaParaDesfecho(tarefa)
@@ -189,7 +206,8 @@ export function KanbanBoard({ title = "Gestão de Tarefas", subtitle = "Acompanh
         const evento_id = tarefa.dados_especificos.evento_id;
         if (newStatus === 'finalizado') {
           await OpServiceV2.setEventoConcluido(evento_id, true)
-        } else if ((tarefa.status as string) === 'finalizado' && newStatus !== 'finalizado') {
+        } else if (tarefa.status === 'finalizado') {
+          // Se estava finalizado e foi movido de volta, remove a marcação de concluído
           await OpServiceV2.setEventoConcluido(evento_id, false)
         }
       }
@@ -390,7 +408,17 @@ export function KanbanBoard({ title = "Gestão de Tarefas", subtitle = "Acompanh
               <h3 className="font-semibold text-sm mb-4 flex items-center justify-between pointer-events-none">
                 {col.title}
                 <Badge variant="secondary" className="rounded-full">
-                  {tarefas.filter(t => t.status === col.id).length}
+                  {tarefas.filter(t => {
+                    if (t.status !== col.id) return false;
+                    if (col.id === 'finalizado') {
+                      const dataCriacao = new Date(t.created_at);
+                      const agora = new Date();
+                      const diffMs = agora.getTime() - dataCriacao.getTime();
+                      const diffHoras = diffMs / (1000 * 60 * 60);
+                      return diffHoras <= 48;
+                    }
+                    return true;
+                  }).length}
                 </Badge>
               </h3>
               
@@ -398,7 +426,20 @@ export function KanbanBoard({ title = "Gestão de Tarefas", subtitle = "Acompanh
                 {loading ? (
                   <div className="text-sm text-center text-muted-foreground py-4">Carregando...</div>
                 ) : (
-                  tarefas.filter(t => t.status === col.id).map(tarefa => (
+                  tarefas.filter(t => {
+                    if (t.status !== col.id) return false;
+                    
+                    // Filtro de 48 horas apenas para a coluna de Finalizados
+                    if (col.id === 'finalizado') {
+                      const dataCriacao = new Date(t.created_at);
+                      const agora = new Date();
+                      const diffMs = agora.getTime() - dataCriacao.getTime();
+                      const diffHoras = diffMs / (1000 * 60 * 60);
+                      return diffHoras <= 48;
+                    }
+                    
+                    return true;
+                  }).map(tarefa => (
                     <div 
                       key={tarefa.id} 
                       className="bg-card border rounded-md shadow-sm p-4 text-sm flex flex-col gap-2 hover:border-primary/50 transition-all cursor-grab active:cursor-grabbing"
@@ -411,6 +452,7 @@ export function KanbanBoard({ title = "Gestão de Tarefas", subtitle = "Acompanh
                         <div className="flex items-center flex-wrap gap-y-1">
                           {getCategoriaBadge(tarefa.categoria, tarefa.dados_especificos?.prioridade)}
                           {getSubcategoriaBadge(tarefa)}
+                          {getInboxBadge(tarefa.dados_especificos?.direcionar_para)}
                           <div 
                             onClick={(e) => handlePriorityCycle(e, tarefa)}
                             className="cursor-pointer hover:scale-110 transition-transform flex items-center ml-1"

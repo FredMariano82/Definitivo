@@ -524,6 +524,45 @@ export class SolicitacoesService {
       return { sucesso: false, erro: error.message }
     }
   }
+  // Registrar ENTRADA (Portaria)
+  static async registrarEntrada(prestadorId: string, usuarioNome: string): Promise<{ sucesso: boolean; erro: string }> {
+    try {
+      if (!supabase) return { sucesso: false, erro: "Conexão falhou" }
+      const agora = new Date().toISOString()
+      const { error } = await supabase
+        .from("prestadores")
+        .update({
+          horario_entrada: agora,
+          registrado_por_entrada: usuarioNome
+        })
+        .eq("id", prestadorId)
+
+      if (error) return { sucesso: false, erro: error.message }
+      return { sucesso: true, erro: "" }
+    } catch (error: any) {
+      return { sucesso: false, erro: error.message }
+    }
+  }
+
+  // Registrar SAÍDA (Portaria)
+  static async registrarSaida(prestadorId: string, usuarioNome: string): Promise<{ sucesso: boolean; erro: string }> {
+    try {
+      if (!supabase) return { sucesso: false, erro: "Conexão falhou" }
+      const agora = new Date().toISOString()
+      const { error } = await supabase
+        .from("prestadores")
+        .update({
+          horario_saida: agora,
+          registrado_por_saida: usuarioNome
+        })
+        .eq("id", prestadorId)
+
+      if (error) return { sucesso: false, erro: error.message }
+      return { sucesso: true, erro: "" }
+    } catch (error: any) {
+      return { sucesso: false, erro: error.message }
+    }
+  }
 }
 
 // Funções individuais para compatibilidade com outros imports

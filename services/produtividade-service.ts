@@ -10,12 +10,19 @@ export interface DadosProdutividade {
 export interface ProdutividadeUsuario {
   usuario: string
   perfil: string
+  departamento: string
   dadosPorHora: { hora: number; prestadores: number }[]
   cor: string
 }
 
 export interface ProdutividadePerfil {
   perfil: string
+  dadosPorHora: { hora: number; prestadores: number }[]
+  cor: string
+}
+
+export interface ProdutividadeDepartamento {
+  departamento: string
   dadosPorHora: { hora: number; prestadores: number }[]
   cor: string
 }
@@ -47,6 +54,7 @@ export class ProdutividadeService {
         .from("solicitacoes")
         .select(`
           solicitante, 
+          departamento,
           data_solicitacao, 
           hora_solicitacao,
           prestadores!inner(id)
@@ -82,9 +90,11 @@ export class ProdutividadeService {
 
       // Processar dados por usuário e hora (contando prestadores)
       const produtividadePorUsuario = new Map<string, Map<number, number>>()
+      const departamentoPorUsuario = new Map<string, string>()
 
       solicitacoes?.forEach((solicitacao) => {
         const usuario = solicitacao.solicitante
+        const departamento = solicitacao.departamento || "Sem Departamento"
         const horaCompleta = solicitacao.hora_solicitacao || "00:00"
         const hora = Number.parseInt(horaCompleta.split(":")[0])
         const numPrestadores = solicitacao.prestadores?.length || 0
@@ -95,6 +105,11 @@ export class ProdutividadeService {
 
         const horasUsuario = produtividadePorUsuario.get(usuario)!
         horasUsuario.set(hora, (horasUsuario.get(hora) || 0) + numPrestadores)
+
+        // Guardar departamento para o mapeamento posterior
+        if (!departamentoPorUsuario.has(usuario)) {
+          departamentoPorUsuario.set(usuario, departamento)
+        }
       })
 
       // Converter para formato do gráfico
@@ -104,6 +119,7 @@ export class ProdutividadeService {
       produtividadePorUsuario.forEach((horas, usuario) => {
         const dadosPorHora: { hora: number; prestadores: number }[] = []
         const perfil = perfilPorUsuario.get(usuario) || "solicitante"
+        const departamento = departamentoPorUsuario.get(usuario) || "Sem Departamento"
 
         // Preencher todas as horas (0-23) com dados
         for (let h = 0; h < 24; h++) {
@@ -116,6 +132,7 @@ export class ProdutividadeService {
         resultado.push({
           usuario,
           perfil,
+          departamento,
           dadosPorHora,
           cor: this.coresUsuarios[corIndex % this.coresUsuarios.length],
         })
@@ -178,6 +195,58 @@ export class ProdutividadeService {
       return []
     }
   }
+
+  static async buscarProdutividadePorDepartamento(dataInicial?: string, dataFinal?: string): Promise<ProdutividadeDepartamento[]> {
+    try {
+      const dadosIndividuais = await this.buscarProdutividadePorHora(dataInicial, dataFinal)
+
+      // Agrupar por departamento
+      const produtividadePorDepto = new Map<string, Map<number, number>>()
+
+      dadosIndividuais.forEach((usuario) => {
+        const depto = usuario.departamento || "Sem Departamento"
+
+        if (!produtividadePorDepto.has(depto)) {
+          produtividadePorDepto.set(depto, new Map())
+        }
+
+        const horasDepto = produtividadePorDepto.get(depto)!
+
+        usuario.dadosPorHora.forEach(({ hora, prestadores }) => {
+          horasDepto.set(hora, (horasDepto.get(hora) || 0) + prestadores)
+        })
+      })
+
+      // Converter para formato do gráfico
+      const resultado: ProdutividadeDepartamento[] = []
+      let corIndex = 0
+
+      produtividadePorDepto.forEach((horas, departamento) => {
+        const dadosPorHora: { hora: number; prestadores: number }[] = []
+
+        // Preencher todas as horas (0-23) com dados
+        for (let h = 0; h < 24; h++) {
+          dadosPorHora.push({
+            hora: h,
+            prestadores: horas.get(h) || 0,
+          })
+        }
+
+        resultado.push({
+          departamento,
+          dadosPorHora,
+          cor: this.coresUsuarios[corIndex % this.coresUsuarios.length], // Usar cores dinâmicas dos usuários
+          })
+  
+          corIndex++
+        })
+  
+        return resultado.sort((a, b) => a.departamento.localeCompare(b.departamento))
+      } catch (error) {
+        console.error("Erro ao buscar produtividade por departamento:", error)
+        return []
+      }
+    }
 
   static async buscarEstatisticasProdutividade(dataInicial?: string, dataFinal?: string) {
     try {

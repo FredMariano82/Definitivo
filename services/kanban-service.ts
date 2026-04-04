@@ -5,7 +5,7 @@ export interface KanbanTarefa {
   titulo: string
   descricao: string
   status: 'entrada' | 'andamento' | 'aguardando' | 'revisao' | 'finalizado'
-  categoria: 'imagem' | 'os' | 'ocorrencia' | 'autorizacao_chaves' | 'achados_perdidos' | 'eventos' | 'uniforme'
+  categoria: 'imagem' | 'os' | 'ocorrencia' | 'autorizacao_chaves' | 'achados_perdidos' | 'eventos' | 'uniforme' | 'servico_noturno' | 'manutencao_cftv' | 'ronda_dvr' | 'checklist_central' | 'manutencao_consolidada'
   foto_url?: string
   dados_especificos: Record<string, any>
   created_by_name?: string

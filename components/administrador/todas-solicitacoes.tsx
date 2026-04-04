@@ -7,25 +7,38 @@ import {
   Search,
   X,
   CheckCircle,
+  FileText,
+  Users,
+  BarChart3,
+  HeadphonesIcon,
+  Crown,
+  DollarSign,
+  Crosshair,
+  ChevronLeft,
+  ChevronRight,
+  Key,
+  Monitor,
+  ClipboardCheck,
+  Video,
+  ChevronDown,
+  Check,
+  LogOut,
+  LogIn,
+  AlertCircle,
   XCircle,
   Clock,
   ShieldAlert,
+  RefreshCw,
   Columns,
-  ChevronLeft,
-  ChevronRight,
-  Check,
-  User,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  ChevronDown,
   Edit,
   Calendar,
   LayoutDashboard,
   List,
   FileSpreadsheet,
   Download,
-  RefreshCw,
   Plus
 } from "lucide-react"
 import Link from "next/link"
@@ -50,6 +63,7 @@ import { DataInicialIndicator } from "../../utils/date-indicators"
 import PageHeader from "@/components/page-header"
 import { useAuth } from "../../contexts/auth-context"
 import { SolicitacoesService } from "../../services/solicitacoes-service"
+import { useSearchParams } from "next/navigation"
 
 type StatusLiberacao = "pendente" | "ok" | "urgente" | "vencida" | "negada"
 
@@ -74,10 +88,13 @@ const PRESTADORES_POR_PAGINA = 10
 
 export default function TodasSolicitacoes() {
   const { usuario } = useAuth()
+  const searchParams = useSearchParams()
+  const statusParam = searchParams.get("status")
+
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([])
   const [carregando, setCarregando] = useState(true)
   const [carregandoDownload, setCarregandoDownload] = useState(false)
-  const [filtroStatus, setFiltroStatus] = useState<string>("todos")
+  const [filtroStatus, setFiltroStatus] = useState<string>(statusParam || "todos")
   const [filtroCadastro, setFiltroCadastro] = useState<string>("todos")
   const [filtroAcoes, setFiltroAcoes] = useState<string>("todos")
   const [filtroDepartamento, setFiltroDepartamento] = useState<string>("todos")
@@ -105,6 +122,9 @@ export default function TodasSolicitacoes() {
 
   // 🎯 ESTADOS PARA EDIÇÃO DE SOLICITAÇÃO (EXCLUSIVO SUPERADMIN)
   const [modalEditarSolicitacaoAberta, setModalEditarSolicitacaoAberta] = useState(false)
+  const [modalExcecaoAberto, setModalExcecaoAberto] = useState(false)
+  const [qtdExcecoesDetectadas, setQtdExcecoesDetectadas] = useState(0)
+  const [qtdUrgenciasDetectadas, setQtdUrgenciasDetectadas] = useState(0)
   const [solicitacaoParaEditar, setSolicitacaoParaEditar] = useState<Solicitacao | null>(null)
   const [novaDataSolicitacao, setNovaDataSolicitacao] = useState("")
   const [novaHoraSolicitacao, setNovaHoraSolicitacao] = useState("")
@@ -128,6 +148,24 @@ export default function TodasSolicitacoes() {
   useEffect(() => {
     setPaginaAtual(1)
   }, [filtroStatus, filtroCadastro, filtroAcoes, filtroDepartamento, filtroEvento, buscaGeral])
+
+  useEffect(() => {
+    // Alerta Gestor sobre Exceções e Urgências (Conhecimento)
+    if (usuario?.perfil === "gestor") {
+      const allPrestadores = solicitacoes.flatMap(s => s.prestadores || [])
+      const excecoes = allPrestadores.filter(p => p.checagem === "excecao")
+      const urgencias = allPrestadores.filter(p => p.liberacao === "urgente")
+      
+      const novaExcecao = excecoes.length > qtdExcecoesDetectadas
+      const novaUrgencia = urgencias.length > qtdUrgenciasDetectadas
+
+      if ((novaExcecao || novaUrgencia) && (excecoes.length > 0 || urgencias.length > 0)) {
+        setQtdExcecoesDetectadas(excecoes.length)
+        setQtdUrgenciasDetectadas(urgencias.length)
+        setModalExcecaoAberto(true)
+      }
+    }
+  }, [solicitacoes, usuario, qtdExcecoesDetectadas, qtdUrgenciasDetectadas])
 
   const buscarSolicitacoes = async () => {
     try {
@@ -588,6 +626,53 @@ export default function TodasSolicitacoes() {
     }
   }
 
+  // 🎯 FUNÇÕES PARA PORTARIA (Check-in/Out)
+  const handleCheckIn = async (solicitacao: Solicitacao, prestador: PrestadorAvaliacao) => {
+    try {
+      setProcessandoId(prestador.id)
+      const { sucesso, erro } = await SolicitacoesService.registrarEntrada(prestador.id, usuario?.nome || "Desconhecido")
+      
+      if (sucesso) {
+        setSolicitacoes(prev => prev.map(s => 
+          s.id === solicitacao.id 
+          ? { ...s, prestadores: s.prestadores.map(p => p.id === prestador.id ? { ...p, horario_entrada: new Date().toISOString() } : p) }
+          : s
+        ))
+        setMensagemSucesso(prestador.id)
+        setTimeout(() => setMensagemSucesso(null), 3000)
+      } else {
+        alert("Erro ao registrar entrada: " + erro)
+      }
+    } catch (error: any) {
+      alert("Erro inesperado: " + error.message)
+    } finally {
+      setProcessandoId(null)
+    }
+  }
+
+  const handleCheckOut = async (solicitacao: Solicitacao, prestador: PrestadorAvaliacao) => {
+    try {
+      setProcessandoId(prestador.id)
+      const { sucesso, erro } = await SolicitacoesService.registrarSaida(prestador.id, usuario?.nome || "Desconhecido")
+      
+      if (sucesso) {
+        setSolicitacoes(prev => prev.map(s => 
+          s.id === solicitacao.id 
+          ? { ...s, prestadores: s.prestadores.map(p => p.id === prestador.id ? { ...p, horario_saida: new Date().toISOString() } : p) }
+          : s
+        ))
+        setMensagemSucesso(prestador.id)
+        setTimeout(() => setMensagemSucesso(null), 3000)
+      } else {
+        alert("Erro ao registrar saída: " + erro)
+      }
+    } catch (error: any) {
+      alert("Erro inesperado: " + error.message)
+    } finally {
+      setProcessandoId(null)
+    }
+  }
+
   // 🎯 FUNÇÕES PARA EDIÇÃO DE SOLICITAÇÃO
   const handleAbrirEdicaoSolicitacao = (sol: Solicitacao) => {
     setSolicitacaoParaEditar(sol)
@@ -999,23 +1084,52 @@ export default function TodasSolicitacoes() {
                         {colunasVisiveis.acoes && (
                           <td className="p-4 align-middle relative">
                             <div className="flex items-center justify-center gap-2">
-                              <Button
-                                onClick={() => handleConfirmarCadastro(solicitacao, prestador)}
-                                size="sm"
-                                disabled={!isBotoesHabilitados(prestador)}
-                                className={`h-8 w-8 p-0 ${prestador.liberacao === 'ok' ? 'bg-slate-100 text-emerald-600 border-emerald-200' : 'bg-green-600 hover:bg-green-700 text-white'}`}
-                              >
-                                {processandoId === prestador.id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
-                              </Button>
-                              <Button
-                                onClick={() => handleNegarClick(solicitacao, prestador)}
-                                variant="outline"
-                                size="sm"
-                                disabled={!isBotoesHabilitados(prestador)}
-                                className={`h-8 w-8 p-0 ${prestador.liberacao === 'negada' ? 'bg-rose-50 text-rose-600 border-rose-200' : 'border-red-600 text-red-600 hover:bg-red-50'}`}
-                              >
-                                <XCircle className="h-4 w-4" />
-                              </Button>
+                              {usuario?.perfil === "recepcao" ? (
+                                <div className="flex gap-1">
+                                  <Button
+                                    onClick={() => handleCheckIn(solicitacao, prestador)}
+                                    size="sm"
+                                    title="Check-in Entrada"
+                                    className={`h-8 w-8 p-0 ${prestador.horario_entrada ? "bg-blue-100 text-blue-600 border-blue-200" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
+                                  >
+                                    <LogIn className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    onClick={() => handleCheckOut(solicitacao, prestador)}
+                                    size="sm"
+                                    title="Check-out Saída"
+                                    disabled={!prestador.horario_entrada}
+                                    className={`h-8 w-8 p-0 ${prestador.horario_saida ? "bg-amber-100 text-amber-600 border-amber-200" : "bg-amber-600 hover:bg-amber-700 text-white"}`}
+                                  >
+                                    <LogOut className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <>
+                                  {/* REGRA: Se for Exceção, APENAS Gestor pode atuar */}
+                                  {(prestador.checagem !== "excecao" || usuario?.perfil === "gestor") && (
+                                    <div className="flex gap-1">
+                                      <Button
+                                        onClick={() => handleConfirmarCadastro(solicitacao, prestador)}
+                                        size="sm"
+                                        disabled={!isBotoesHabilitados(prestador)}
+                                        className={`h-8 w-8 p-0 ${prestador.liberacao === "ok" ? "bg-slate-100 text-emerald-600 border-emerald-200" : "bg-green-600 hover:bg-green-700 text-white"}`}
+                                      >
+                                        {processandoId === prestador.id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                                      </Button>
+                                      <Button
+                                        onClick={() => handleNegarClick(solicitacao, prestador)}
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={!isBotoesHabilitados(prestador)}
+                                        className={`h-8 w-8 p-0 ${prestador.liberacao === "negada" ? "bg-rose-50 text-rose-600 border-rose-200" : "border-red-600 text-red-600 hover:bg-red-50"}`}
+                                      >
+                                        <XCircle className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </>
+                              )}
                             </div>
                           </td>
                         )}
@@ -1057,6 +1171,47 @@ export default function TodasSolicitacoes() {
                 <div><Label>Hora</Label><Input type="time" value={novaHoraSolicitacao} onChange={(e) => setNovaHoraSolicitacao(e.target.value)} /></div>
               </div>
               <DialogFooter><Button onClick={handleSalvarEdicaoSolicitacao} disabled={salvandoEdicao} className="bg-blue-600 hover:bg-blue-700 text-white">Salvar</Button></DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={modalExcecaoAberto} onOpenChange={setModalExcecaoAberto}>
+            <DialogContent className="sm:max-w-md border-blue-200 bg-slate-50">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <ShieldAlert className="h-6 w-6 text-blue-600" />
+                  Alerta de Monitoramento (Gestor)
+                </DialogTitle>
+              </DialogHeader>
+              <div className="py-4 space-y-4">
+                {qtdExcecoesDetectadas > 0 && (
+                  <div className="p-3 bg-red-50 border border-red-100 rounded-lg">
+                    <p className="text-red-700 font-medium flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4" />
+                      Existem <strong>{qtdExcecoesDetectadas}</strong> Exceções Críticas aguardando sua aprovação exclusiva.
+                    </p>
+                  </div>
+                )}
+                
+                {qtdUrgenciasDetectadas > 0 && (
+                  <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg">
+                    <p className="text-amber-700 font-medium flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Há <strong>{qtdUrgenciasDetectadas}</strong> Solicitações Urgentes para seu conhecimento (Fluxo Automático).
+                    </p>
+                    <p className="text-[10px] text-amber-600 mt-1 italic">*Estas não dependem de sua ação para prosseguir ao aprovador.</p>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button 
+                   onClick={() => {
+                     setModalExcecaoAberto(false)
+                   }}
+                   className="bg-slate-800 hover:bg-slate-900 text-white w-full"
+                >
+                  Entendido
+                </Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>

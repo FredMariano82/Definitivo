@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, CheckCircle, XCircle, Clock, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react"
+import { Search, CheckCircle, XCircle, Clock, AlertTriangle, ChevronLeft, ChevronRight, ChevronDown, Filter } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,6 +17,7 @@ import {
   StatusChecagemIcon,
 } from "../ui/status-badges"
 import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function Checagens() {
   const { usuario } = useAuth()
@@ -24,6 +25,9 @@ export default function Checagens() {
   const [solicitacoesReais, setSolicitacoesReais] = useState<any[]>([])
   const [carregando, setCarregando] = useState(true)
   const [paginaAtual, setPaginaAtual] = useState(1)
+  const [filtroStatus, setFiltroStatus] = useState<string>("todos")
+  const [filtroEmpresa, setFiltroEmpresa] = useState<string>("todos")
+  const [mostrarFiltros, setMostrarFiltros] = useState(false)
   const PRESTADORES_POR_PAGINA = 10
 
   const buscarSolicitacoesDepartamento = async () => {
@@ -47,7 +51,7 @@ export default function Checagens() {
   // Resetar página quando filtros mudarem
   useEffect(() => {
     setPaginaAtual(1)
-  }, [buscaGeral])
+  }, [buscaGeral, filtroStatus, filtroEmpresa])
 
   if (carregando) {
     return (
@@ -57,19 +61,29 @@ export default function Checagens() {
     )
   }
 
-  // Filtrar e organizar dados por status de checagem
-  const dadosPorStatus = solicitacoesReais
+  const empresasDisponiveis = Array.from(
+    new Set(solicitacoesReais.filter((s) => s.departamento === usuario?.departamento).map((s) => s.empresa)),
+  ).sort()
+
+  const dadosFiltradosTotal = solicitacoesReais
     .filter((solicitacao) => solicitacao.departamento === usuario?.departamento)
     .flatMap((solicitacao) =>
       solicitacao.prestadores
-        .filter((prestador: any) => prestador.liberacao !== "pendente")
-        .map((prestador: any) => ({
+        .filter((p: any) => p.liberacao !== "pendente")
+        .map((p: any) => ({
           solicitacao,
-          prestador,
-          statusChecagem: getChecagemStatus(prestador),
+          prestador: p,
+          statusChecagem: getChecagemStatus(p),
         })),
     )
+
+  const dadosPorStatus = dadosFiltradosTotal
     .filter((item) => {
+      const empresaMatch = filtroEmpresa === "todos" || item.solicitacao.empresa === filtroEmpresa
+      const statusMatch = filtroStatus === "todos" || item.statusChecagem === filtroStatus
+      
+      if (!empresaMatch || !statusMatch) return false
+
       if (!buscaGeral) return true
       const busca = buscaGeral.toLowerCase()
       return (
@@ -80,10 +94,10 @@ export default function Checagens() {
     })
 
   const statusCounts = {
-    pendente: dadosPorStatus.filter((item) => item.statusChecagem === "pendente").length,
-    aprovado: dadosPorStatus.filter((item) => item.statusChecagem === "aprovado").length,
-    reprovado: dadosPorStatus.filter((item) => item.statusChecagem === "reprovado").length,
-    vencida: dadosPorStatus.filter((item) => item.statusChecagem === "vencida").length,
+    pendente: dadosFiltradosTotal.filter((item) => (filtroEmpresa === "todos" || item.solicitacao.empresa === filtroEmpresa) && item.statusChecagem === "pendente").length,
+    aprovado: dadosFiltradosTotal.filter((item) => (filtroEmpresa === "todos" || item.solicitacao.empresa === filtroEmpresa) && item.statusChecagem === "aprovado").length,
+    reprovado: dadosFiltradosTotal.filter((item) => (filtroEmpresa === "todos" || item.solicitacao.empresa === filtroEmpresa) && item.statusChecagem === "reprovado").length,
+    vencida: dadosFiltradosTotal.filter((item) => (filtroEmpresa === "todos" || item.solicitacao.empresa === filtroEmpresa) && item.statusChecagem === "vencida").length,
   }
 
   const getStatusIcon = (status: string) => {
@@ -176,25 +190,78 @@ export default function Checagens() {
             </p>
           </div>
 
-          {/* Busca */}
+          {/* Busca & Filtros Avançados */}
           <div className="mb-8 p-6 bg-white rounded-2xl border border-slate-200 shadow-sm transition-soft hover:shadow-md">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="bg-slate-100 p-2 rounded-lg">
-                <Search className="h-5 w-5 text-slate-600" />
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-slate-100 p-2 rounded-lg">
+                  <Search className="h-5 w-5 text-slate-600" />
+                </div>
+                <Label className="text-lg font-bold text-slate-800">Filtrar Solicitações</Label>
               </div>
-              <Label className="text-lg font-bold text-slate-800">Buscar Prestador</Label>
+
+              <Button
+                onClick={() => setMostrarFiltros(!mostrarFiltros)}
+                variant="outline"
+                size="sm"
+                className="bg-white hover:bg-slate-50 text-slate-600 border-slate-200 rounded-xl"
+              >
+                Filtros Avançados
+                <ChevronDown className={`h-4 w-4 ml-2 transition-transform duration-200 ${mostrarFiltros ? "rotate-180" : ""}`} />
+              </Button>
             </div>
-            <div className="relative">
-              <Input
-                type="text"
-                placeholder="Nome, documento ou número da solicitação..."
-                value={buscaGeral}
-                onChange={(e) => setBuscaGeral(e.target.value)}
-                className="h-12 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl pr-12 text-slate-700 bg-slate-50/50"
-              />
-              <div className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-blue-600 p-1.5 rounded-lg text-white shadow-lg">
-                <Search className="h-4 w-4" />
+
+            <div className="space-y-4">
+              <div className="relative">
+                <Input
+                  type="text"
+                  placeholder="Nome, documento ou número da solicitação..."
+                  value={buscaGeral}
+                  onChange={(e) => setBuscaGeral(e.target.value)}
+                  className="h-12 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl pr-12 text-slate-700 bg-slate-50/50 shelf-inner"
+                />
+                <div className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-blue-600 p-1.5 rounded-lg text-white shadow-lg">
+                  <Search className="h-4 w-4" />
+                </div>
               </div>
+
+              {/* Filtros Avançados (Collapsible) */}
+              {mostrarFiltros && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 mt-4 border-t border-slate-100 animate-in fade-in slide-in-from-top-2 duration-300">
+                  {/* Filtro Empresa */}
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">Por Empresa</Label>
+                    <Select value={filtroEmpresa} onValueChange={setFiltroEmpresa}>
+                      <SelectTrigger className="h-11 border-slate-200 rounded-xl bg-slate-50/50">
+                        <SelectValue placeholder="Todas as Empresas" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-slate-200 shadow-xl">
+                        <SelectItem value="todos">Todas as Empresas</SelectItem>
+                        {empresasDisponiveis.map((empresa) => (
+                          <SelectItem key={empresa} value={empresa}>{empresa}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Filtro Status */}
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">Por Checagem</Label>
+                    <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                      <SelectTrigger className="h-11 border-slate-200 rounded-xl bg-slate-50/50">
+                        <SelectValue placeholder="Todos os Status" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-slate-200 shadow-xl">
+                        <SelectItem value="todos">Todos os Status</SelectItem>
+                        <SelectItem value="pendente">Pendente</SelectItem>
+                        <SelectItem value="aprovado">Aprovado</SelectItem>
+                        <SelectItem value="reprovado">Reprovado</SelectItem>
+                        <SelectItem value="vencida">Vencido</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

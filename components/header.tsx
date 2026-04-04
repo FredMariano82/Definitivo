@@ -27,8 +27,7 @@ export default function Header({ isCollapsed, onToggle }: HeaderProps) {
             {/* Logo e Info do Sistema - OCULTADO PARA APRESENTAÇÃO */}
             <div className="flex items-center space-x-5 group">
               <div className="hidden sm:block">
-                <h1 className="text-xl font-bold text-white tracking-tight leading-none uppercase">Sistema de Gestão</h1>
-                <p className="text-[10px] font-medium text-blue-300/60 uppercase tracking-widest mt-1">Controle de Acessos</p>
+                <img src="/images/mvm-solutions-logo.png" alt="MVM Solutions" className="h-14 w-auto" />
               </div>
             </div>
 
